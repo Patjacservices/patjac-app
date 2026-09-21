@@ -1313,7 +1313,7 @@ export default function PatjacCarPlay(){
       case "messaging":  return <MessagingApp {...props} lang={lang}/>;
       case "routes":     return <RoutesApp {...props} lang={lang}/>;
       case "reports":    return <ReportsApp {...props} lang={lang}/>;
-      case "settings":   return <SettingsApp {...props} lang={lang} setLang={setLang} companySettings={companySettings} setCompanySettings={setCompanySettings} currentUser={currentUser} clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} expenses={expenses} orders={orders} products={products} suppliers={suppliers} messages={messages}/>;
+      case "settings":   return <SettingsApp {...props} lang={lang} setLang={setLang} companySettings={companySettings} currentUser={currentUser} clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} expenses={expenses} orders={orders} products={products} suppliers={suppliers} messages={messages}/>;
       case "academy":    return <AcademyApp {...props} lang={lang} setLang={setLang}/>;
       case "payroll":    return <PayrollApp {...props} lang={lang}/>;
       case "inventory":  return <InventoryApp {...props} lang={lang}/>;
