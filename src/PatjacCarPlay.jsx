@@ -1162,6 +1162,9 @@ export default function PatjacCarPlay(){
             email:sett.email||prev.email, uid:sett.uid||prev.uid,
             mwstNr:sett.mwst_nr||prev.mwstNr, iban:sett.iban||prev.iban,
             bic:sett.bic||prev.bic,
+            adminEmail:sett.admin_email||prev.adminEmail,
+            adminPassword:sett.admin_password||prev.adminPassword,
+            logo:sett.logo||prev.logo,
           }));
         }
         setDbReady(true);
@@ -1285,8 +1288,9 @@ export default function PatjacCarPlay(){
     const dbSetContracts = (fn) => { setContracts(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_contracts',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('contracts',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('contracts',x);}); }return next;}); };
     const dbSetProducts  = (fn) => { setProducts(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_products',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('products',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('products',x);}); }return next;}); };
     const dbSetSuppliers = (fn) => { setSuppliers(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_suppliers',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('suppliers',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('suppliers',x);}); }return next;}); };
+    const dbSetCompanySettings = (fn) => { setCompanySettings(prev=>{ const next=typeof fn==='function'?fn(prev):fn; if(supa) dbSave('settings', {id:'company', ...next}); return next; }); };
 
-    const props = {t,lang,clients,setClients:dbSetClients,employees,setEmployees:dbSetEmployees,jobs,setJobs:dbSetJobs,invoices,setInvoices:dbSetInvoices,timeclock,setTimeclock:dbSetTimeclock,messages,setMessages:dbSetMessages,expenses,setExpenses:dbSetExpenses,orders,setOrders:dbSetOrders,contracts,setContracts:dbSetContracts,products,setProducts:dbSetProducts,suppliers,setSuppliers:dbSetSuppliers,notify,currentUser,companySettings,setCompanySettings,openApp,onBack:()=>setActiveApp(null)};
+    const props = {t,lang,clients,setClients:dbSetClients,employees,setEmployees:dbSetEmployees,jobs,setJobs:dbSetJobs,invoices,setInvoices:dbSetInvoices,timeclock,setTimeclock:dbSetTimeclock,messages,setMessages:dbSetMessages,expenses,setExpenses:dbSetExpenses,orders,setOrders:dbSetOrders,contracts,setContracts:dbSetContracts,products,setProducts:dbSetProducts,suppliers,setSuppliers:dbSetSuppliers,notify,currentUser,companySettings,setCompanySettings:dbSetCompanySettings,openApp,onBack:()=>setActiveApp(null)};
     switch(activeApp){
       case "dashboard":  return <DashApp {...props} lang={lang}/>;
       case "clients":    return <ClientsApp {...props} lang={lang}/>;
@@ -4600,6 +4604,64 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
   );
 }
 
+// ─── ADMIN PASSWORD CHANGE FORM ────────────────────────────────
+function SecurityPasswordForm({companySettings,setCompanySettings,notify,L}){
+  const [current,setCurrent] = useState("");
+  const [newEmail,setNewEmail] = useState(companySettings.adminEmail||"");
+  const [newPw,setNewPw] = useState("");
+  const [confirmPw,setConfirmPw] = useState("");
+  const [busy,setBusy] = useState(false);
+
+  const submit = () => {
+    if(current !== companySettings.adminPassword){
+      notify(L("Contraseña actual incorrecta.","Contraseña actual incorrecta.","Current password is incorrect.","Password attuale errata."),"error");
+      return;
+    }
+    if(newPw.length < 6){
+      notify(L("La nueva contraseña debe tener al menos 6 caracteres.","La nueva contraseña debe tener al menos 6 caracteres.","New password must be at least 6 characters.","La nuova password deve avere almeno 6 caratteri."),"error");
+      return;
+    }
+    if(newPw !== confirmPw){
+      notify(L("Las contraseñas nuevas no coinciden.","Las contraseñas nuevas no coinciden.","New passwords do not match.","Le nuove password non coincidono."),"error");
+      return;
+    }
+    setBusy(true);
+    setCompanySettings(prev=>({...prev, adminEmail:newEmail.trim()||prev.adminEmail, adminPassword:newPw}));
+    notify(L("Datos de acceso actualizados ✓","Datos de acceso actualizados ✓","Access credentials updated ✓","Credenziali di accesso aggiornate ✓"),"success");
+    setCurrent(""); setNewPw(""); setConfirmPw("");
+    setBusy(false);
+  };
+
+  const label = {fontSize:12,color:CP.textTertiary,fontWeight:600,marginBottom:6,display:"block"};
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14,marginBottom:2}}>
+        {L("Cambiar datos de acceso del administrador","Cambiar datos de acceso del administrador","Change administrator access credentials","Cambia le credenziali dell'amministratore")}
+      </div>
+      <div>
+        <label style={label}>{L("Correo de administrador","Correo de administrador","Admin email","Email amministratore")}</label>
+        <CPInput value={newEmail} onChange={e=>setNewEmail(e.target.value)} type="email"/>
+      </div>
+      <div>
+        <label style={label}>{L("Contraseña actual","Contraseña actual","Current password","Password attuale")}</label>
+        <CPInput value={current} onChange={e=>setCurrent(e.target.value)} type="password" placeholder="••••••••"/>
+      </div>
+      <div>
+        <label style={label}>{L("Nueva contraseña","Nueva contraseña","New password","Nuova password")}</label>
+        <CPInput value={newPw} onChange={e=>setNewPw(e.target.value)} type="password" placeholder="••••••••"/>
+      </div>
+      <div>
+        <label style={label}>{L("Confirmar nueva contraseña","Confirmar nueva contraseña","Confirm new password","Conferma nuova password")}</label>
+        <CPInput value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} type="password" placeholder="••••••••"/>
+      </div>
+      <CPBtn onClick={submit} disabled={busy}>
+        {L("Guardar nuevos datos de acceso","Guardar nuevos datos de acceso","Save new access credentials","Salva nuove credenziali")}
+      </CPBtn>
+    </div>
+  );
+}
+
 // ─── SETTINGS ────────────────────────────────────────────────
 function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySettings,currentUser,clients,employees,jobs,invoices,contracts,expenses,orders,products,suppliers,messages}){
   const L = makeL(lang);
@@ -4790,20 +4852,17 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
       {/* ── SECURITY TAB ── */}
       {tab==="security"&&(
         <CPCard>
-          <div style={{background:"rgba(47,158,68,.12)",border:"1px solid rgba(47,158,68,.3)",borderRadius:12,padding:"10px 16px",marginBottom:14}}>
-            <div style={{color:"#69DB7C",fontWeight:700,fontSize:13}}>
-              ✅ {L("Sicherheitsstatus: Aktiv","Estado seguridad: Activo","Security status: Active","Stato sicurezza: Attivo")}
+          {isAdmin ? (
+            <SecurityPasswordForm companySettings={companySettings} setCompanySettings={setCompanySettings} notify={notify} L={L}/>
+          ) : (
+            <div style={{color:CP.textSecondary,fontSize:14,padding:"10px 0"}}>
+              {L("Solo el administrador puede cambiar los datos de acceso.","Solo el administrador puede cambiar los datos de acceso.","Only the administrator can change access credentials.","Solo l'amministratore può modificare le credenziali.")}
             </div>
-          </div>
+          )}
           {[
-            "🔐 Login: E-Mail + "+L("Passwort","Contraseña","Password","Password")+" (Admin)",
             "🔑 Login: Code + PIN ("+L("Mitarbeiter","Empleado","Employee","Dipendente")+")",
-            "⏱️ Session-Timeout: 8h",
-            "🚫 "+L("Max. 5 Login-Versuche","Máx. 5 intentos login","Max. 5 login attempts","Max. 5 tentativi login"),
-            "🔒 "+L("Automatische Sperre","Bloqueo automático","Automatic lock","Blocco automatico"),
-            "📧 "+L("Benachrichtigung bei unbefugtem Zugriff","Notificación acceso no autorizado","Notification on unauthorized access","Notifica accesso non autorizzato"),
           ].map((item,i)=>(
-            <div key={i} style={{padding:"10px 0",borderBottom:`1px solid ${CP.border}`,color:CP.textSecondary,fontSize:14}}>{item}</div>
+            <div key={i} style={{padding:"10px 0",borderTop:`1px solid ${CP.border}`,marginTop:14,color:CP.textSecondary,fontSize:14}}>{item}</div>
           ))}
         </CPCard>
       )}
@@ -6233,10 +6292,10 @@ function HelpModal({t, lang, onClose}){
         },
         {
           h:{DE:"Benutzerrollen",ES:"Roles de usuario",EN:"User Roles",IT:"Ruoli utente"},
-          b:{DE:"👑 ADMINISTRATOR\nLogin: E-Mail + Passwort\n→ patjacservices@outlook.com / Patjac7684Patjac\nVollzugriff auf alle 15 Module\n\n👤 MITARBEITER\nLogin: Benutzercode (z.B. PJ-CARL01) + PIN (4-stellig)\nZugriff auf: Zeiterfassung, Aufträge, Nachrichten, Routen, Lohnabrechnung, Academy\n\n🔄 Abmelden: Logout-Button oben rechts → Login-Felder werden automatisch geleert",
-             ES:"👑 ADMINISTRADOR\nLogin: Correo + Contraseña\n→ patjacservices@outlook.com / Patjac7684Patjac\nAcceso total a los 15 módulos\n\n👤 EMPLEADO\nLogin: Código de usuario (ej. PJ-CARL01) + PIN (4 dígitos)\nAcceso a: Fichaje, Trabajos, Mensajes, Rutas, Nómina, Academy\n\n🔄 Cerrar sesión: Botón Salir arriba a la derecha → Los campos de login se borran automáticamente",
-             EN:"👑 ADMINISTRATOR\nLogin: Email + Password\n→ patjacservices@outlook.com / Patjac7684Patjac\nFull access to all 15 modules\n\n👤 EMPLOYEE\nLogin: User code (e.g. PJ-CARL01) + PIN (4 digits)\nAccess to: Time clock, Jobs, Messages, Routes, Payroll, Academy\n\n🔄 Logout: Logout button top right → Login fields are automatically cleared",
-             IT:"👑 AMMINISTRATORE\nLogin: Email + Password\n→ patjacservices@outlook.com / Patjac7684Patjac\nAccesso completo a tutti i 15 moduli\n\n👤 DIPENDENTE\nLogin: Codice utente (es. PJ-CARL01) + PIN (4 cifre)\nAccesso a: Timbrature, Lavori, Messaggi, Percorsi, Stipendi, Academy\n\n🔄 Disconnessione: Pulsante Esci in alto a destra → I campi di login vengono cancellati automaticamente"}
+          b:{DE:"👑 ADMINISTRATOR\nLogin: E-Mail + Passwort (änderbar in Einstellungen → Sicherheit)\nVollzugriff auf alle 15 Module\n\n👤 MITARBEITER\nLogin: Benutzercode (z.B. PJ-CARL01) + PIN (4-stellig)\nZugriff auf: Zeiterfassung, Aufträge, Nachrichten, Routen, Lohnabrechnung, Academy\n\n🔄 Abmelden: Logout-Button oben rechts → Login-Felder werden automatisch geleert",
+             ES:"👑 ADMINISTRADOR\nLogin: Correo + Contraseña (cambiable en Configuración → Seguridad)\nAcceso total a los 15 módulos\n\n👤 EMPLEADO\nLogin: Código de usuario (ej. PJ-CARL01) + PIN (4 dígitos)\nAcceso a: Fichaje, Trabajos, Mensajes, Rutas, Nómina, Academy\n\n🔄 Cerrar sesión: Botón Salir arriba a la derecha → Los campos de login se borran automáticamente",
+             EN:"👑 ADMINISTRATOR\nLogin: Email + Password (changeable in Settings → Security)\nFull access to all 15 modules\n\n👤 EMPLOYEE\nLogin: User code (e.g. PJ-CARL01) + PIN (4 digits)\nAccess to: Time clock, Jobs, Messages, Routes, Payroll, Academy\n\n🔄 Logout: Logout button top right → Login fields are automatically cleared",
+             IT:"👑 AMMINISTRATORE\nLogin: Email + Password (modificabile in Impostazioni → Sicurezza)\nAccesso completo a tutti i 15 moduli\n\n👤 DIPENDENTE\nLogin: Codice utente (es. PJ-CARL01) + PIN (4 cifre)\nAccesso a: Timbrature, Lavori, Messaggi, Percorsi, Stipendi, Academy\n\n🔄 Disconnessione: Pulsante Esci in alto a destra → I campi di login vengono cancellati automaticamente"}
         },
         {
           h:{DE:"Sprache wechseln",ES:"Cambiar idioma",EN:"Changing Language",IT:"Cambiare lingua"},
