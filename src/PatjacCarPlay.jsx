@@ -617,6 +617,17 @@ const PATJAC_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA4QAAAFjCAMAA
 
 // ─── DEMO DATA ───────────────────────────────────────────────
 const gid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c==='x'?r:(r&0x3|0x8)).toString(16); });
+
+// Get the device's real GPS location. Resolves to a "GPS: lat, lng" string,
+// or a clear fallback message if permission is denied / unavailable / times out.
+const getGeoLocation = () => new Promise((resolve) => {
+  if(!navigator.geolocation){ resolve("GPS: no disponible en este dispositivo"); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => resolve(`GPS: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`),
+    (err) => resolve(err.code===1 ? "GPS: permiso denegado" : "GPS: no disponible"),
+    { enableHighAccuracy:true, timeout:8000, maximumAge:60000 }
+  );
+});
 const gCode = () => "PJ-"+Math.random().toString(36).substr(2,6).toUpperCase();
 const gPin = () => Math.floor(1000+Math.random()*9000).toString();
 
@@ -3225,7 +3236,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
 
   return (
     <CPScreen title={t.invoices} icon="🧾" onBack={onBack} t={t}
-      actions={<CPBtn onClick={()=>{const n=`2024-${String(invoices.length+1).padStart(3,"0")}`;const d=new Date();d.setDate(d.getDate()+14);setForm({clientId:clients[0]?.id||"",invoiceNumber:n,date:todayStr,dueDate:d.toISOString().split("T")[0],items:[{description:"",qty:1,price:0,total:0}],status:"pending"});setSelInv(null);setModal("form");}} size="sm">＋ {t.generateInvoice}</CPBtn>}
+      actions={<CPBtn onClick={()=>{const yr=new Date().getFullYear();const nums=invoices.filter(i=>(i.invoiceNumber||"").startsWith(`${yr}-`)).map(i=>parseInt((i.invoiceNumber||"").split("-")[1],10)).filter(x=>!isNaN(x));const next=(nums.length?Math.max(...nums):0)+1;const n=`${yr}-${String(next).padStart(3,"0")}`;const d=new Date();d.setDate(d.getDate()+14);setForm({clientId:clients[0]?.id||"",invoiceNumber:n,date:todayStr,dueDate:d.toISOString().split("T")[0],items:[{description:"",qty:1,price:0,total:0}],status:"pending"});setSelInv(null);setModal("form");}} size="sm">＋ {t.generateInvoice}</CPBtn>}
     >
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {invoices.map(inv=>(
@@ -3660,7 +3671,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
   });
 
   // Clock IN for a specific job/client
-  const jobClockIn = (job) => {
+  const jobClockIn = async (job) => {
     const now = new Date().toTimeString().slice(0,5);
     const updated = {...job, actualStart:now, status:"inProgress"};
     setJobs(prev=>prev.map(j=>j.id===job.id?updated:j));
@@ -3668,10 +3679,11 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
     // Also update or create the day record
     const emp = employees.find(e=>e.id===selEmp);
     if(!tc){
+      const loc = await getGeoLocation();
       setTimeclock(p=>[...p,{
         id:gid(), employeeId:selEmp, employeeName:emp?.name||"",
         date:todayStr, clockIn:now, clockOut:null, hours:null,
-        location:"GPS: Zürich", jobCount:todayJobs.length,
+        location:loc, jobCount:todayJobs.length,
       }]);
     } else if(!tc.clockIn){
       setTimeclock(p=>p.map(x=>x.id===tc.id?{...x,clockIn:now}:x));
