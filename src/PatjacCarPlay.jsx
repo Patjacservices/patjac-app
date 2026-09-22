@@ -78,7 +78,7 @@ const T = {
     payrollSend:"Per E-Mail senden", payrollView:"Lohnabrechnung anzeigen",
     grossSalary:"Bruttolohn", netSalary:"Nettolohn", deductions:"Abzüge",
     employerContrib:"Arbeitgeberanteile", totalCost:"Gesamtkosten",
-    ahvEmployee:"AHV/IV/EO Arbeitnehmer (5.25%)",
+    ahvEmployee:"AHV/IV/EO Arbeitnehmer (5.3%)",
     ahvEmployer:"AHV/IV/EO Arbeitgeber (5.30%)",
     alvEmployee:"ALV Arbeitnehmer (1.10%)",
     alvEmployer:"ALV Arbeitgeber (1.10%)",
@@ -230,7 +230,7 @@ const T = {
     payrollSend:"Enviar por correo", payrollView:"Ver nómina",
     grossSalary:"Salario bruto", netSalary:"Salario neto", deductions:"Deducciones",
     employerContrib:"Aportaciones empresa", totalCost:"Coste total empresa",
-    ahvEmployee:"AVS/AI/IPG Empleado (5.25%)",
+    ahvEmployee:"AVS/AI/IPG Empleado (5.3%)",
     ahvEmployer:"AVS/AI/IPG Empresa (5.30%)",
     alvEmployee:"AD Empleado (1.10%)",
     alvEmployer:"AD Empresa (1.10%)",
@@ -381,7 +381,7 @@ const T = {
     payrollSend:"Send by email", payrollView:"View payslip",
     grossSalary:"Gross salary", netSalary:"Net salary", deductions:"Deductions",
     employerContrib:"Employer contributions", totalCost:"Total employer cost",
-    ahvEmployee:"AHV/IV/EO Employee (5.25%)",
+    ahvEmployee:"AHV/IV/EO Employee (5.3%)",
     ahvEmployer:"AHV/IV/EO Employer (5.30%)",
     alvEmployee:"ALV Employee (1.10%)",
     alvEmployer:"ALV Employer (1.10%)",
@@ -532,7 +532,7 @@ const T = {
     payrollSend:"Invia per email", payrollView:"Visualizza busta paga",
     grossSalary:"Salario lordo", netSalary:"Salario netto", deductions:"Deduzioni",
     employerContrib:"Contributi datore", totalCost:"Costo totale azienda",
-    ahvEmployee:"AVS/AI/IPG Dipendente (5.25%)",
+    ahvEmployee:"AVS/AI/IPG Dipendente (5.3%)",
     ahvEmployer:"AVS/AI/IPG Azienda (5.30%)",
     alvEmployee:"AD Dipendente (1.10%)",
     alvEmployer:"AD Azienda (1.10%)",
@@ -1861,7 +1861,7 @@ function calcSwissPayroll(emp, timeclock, month, year){
   const thirteenth = has_13th ? gross/12 : 0;
   const grossTotal = gross+thirteenth;
   // Employee deductions – Swiss 2024 official rates
-  const ahvEmp  = grossTotal*0.0525;
+  const ahvEmp  = grossTotal*0.053;
   const alvEmp  = grossTotal*0.011;
   const nbuvEmp = grossTotal*0.012;
   const bvgEmp  = grossTotal*0.07;
@@ -3433,7 +3433,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
   // ── SWISS TAX ESTIMATES ───────────────────────────────────
   const taxZH   = Math.max(0, profit * 0.12);
   const taxFed  = Math.max(0, profit * 0.085);
-  const ahvEmpl = salaries * 0.048;
+  const ahvEmpl = salaries * 0.053;
 
   // ── CHART BARS (real data by month from invoices & orders) ─
   const now = new Date();
@@ -4488,7 +4488,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
           {employees.filter(e=>e.active).map(emp=>{
             const hrs=timeclock.filter(tc=>tc.employeeId===emp.id&&tc.hours).reduce((h,tc)=>h+(tc.hours||0),0);
             const gross=emp.type==="hourly"?hrs*(emp.hourlyRate||0):(emp.fixedSalary||0);
-            const ahv=gross*0.0525,alv=gross*0.011,nbuv=gross*0.012,bvg=gross*0.07,ktg=gross*0.005;
+            const ahv=gross*0.053,alv=gross*0.011,nbuv=gross*0.012,bvg=gross*0.07,ktg=gross*0.005;
             const net=gross-(ahv+alv+nbuv+bvg+ktg);
             return (
               <CPCard key={emp.id}>
