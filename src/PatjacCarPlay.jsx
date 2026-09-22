@@ -976,7 +976,8 @@ function CPScreen({title,icon,onBack,actions,children,t}){
 
 // ─── MAIN APP ────────────────────────────────────────────────
 export default function PatjacCarPlay(){
-  const [lang,setLang] = useState("DE");
+  const [lang,setLangRaw] = useState(()=>localStorage.getItem('patjac_lang')||"ES");
+  const setLang = (l) => { setLangRaw(l); try{localStorage.setItem('patjac_lang',l);}catch(e){} };
   const t = T[lang];
 
   const [authState,setAuthState] = useState("login");
@@ -1253,17 +1254,18 @@ export default function PatjacCarPlay(){
   },[]);
 
   // ─── LOGIN ──────────────────────────────────────────────
+  const L = makeL(lang);
   const handleLogin = () => {
     setLoginErr("");
     if(authType==="admin"){
       if(loginEmail===companySettings.adminEmail && loginPw===companySettings.adminPassword){
         setCurrentUser({id:"admin",name:"Administrator",role:"admin"});
         setAuthState("app");
-      } else setLoginErr("Ungültige Anmeldedaten / Invalid credentials");
+      } else setLoginErr(L("Ungültige E-Mail oder Passwort","Correo o contraseña incorrectos","Invalid email or password","Email o password non corretti"));
     } else {
       const emp = employees.find(e=>(e.code||e.userCode||"")===loginCode.trim().toUpperCase()&&e.pin===loginPin.trim());
       if(emp){ setCurrentUser({id:emp.id,name:emp.name,role:"employee",code:emp.code||emp.userCode}); setAuthState("app"); }
-      else setLoginErr("Ungültiger Code oder PIN / Invalid code or PIN");
+      else setLoginErr(L("Ungültiger Code oder PIN","Código o PIN incorrectos","Invalid code or PIN","Codice o PIN non corretti"));
     }
   };
 
@@ -3285,7 +3287,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
           <CPField label={t.dueDate}><CPInput type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/></CPField>
           <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{t.description}</div>
           {(form.items||[]).map((item,idx)=>(
-            <div key={idx} style={{display:"grid",gridTemplateColumns:"3fr 1fr 1fr 1fr auto",gap:6,marginBottom:6,alignItems:"center"}}>
+            <div key={item._k||idx} style={{display:"grid",gridTemplateColumns:"3fr 1fr 1fr 1fr auto",gap:6,marginBottom:6,alignItems:"center"}}>
               <CPInput value={item.description} onChange={e=>setForm(f=>{const it=[...f.items];it[idx]={...it[idx],description:e.target.value};return{...f,items:it};})} placeholder={t.description}/>
               <CPInput type="number" value={item.qty} onChange={e=>{const q=parseFloat(e.target.value)||1;setForm(f=>{const it=[...f.items];it[idx]={...it[idx],qty:q,total:q*it[idx].price};return{...f,items:it};});}} placeholder="Qty"/>
               <CPInput type="number" value={item.price} onChange={e=>{const p=parseFloat(e.target.value)||0;setForm(f=>{const it=[...f.items];it[idx]={...it[idx],price:p,total:it[idx].qty*p};return{...f,items:it};});}} placeholder="CHF"/>
@@ -3293,7 +3295,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
               <CPBtn onClick={()=>setForm(f=>({...f,items:f.items.filter((_,i)=>i!==idx)}))} variant="danger" size="sm">✕</CPBtn>
             </div>
           ))}
-          <CPBtn onClick={()=>setForm(f=>({...f,items:[...(f.items||[]),{description:"",qty:1,price:0,total:0}]}))} variant="secondary" size="sm">＋ {L("Position","Posición","Line item","Voce")}</CPBtn>
+          <CPBtn onClick={()=>setForm(f=>({...f,items:[...(f.items||[]),{_k:gid(),description:"",qty:1,price:0,total:0}]}))} variant="secondary" size="sm">＋ {L("Position","Posición","Line item","Voce")}</CPBtn>
           {form.items?.length>0&&(()=>{const{s,v,t:tot}=calc(form.items);return(
             <div style={{background:"rgba(0,0,0,.25)",borderRadius:12,padding:"12px 16px",marginTop:10}}>
               {[[t.subtotal||"Subtotal",`CHF ${s}`],[L("MWST 8.1%","IVA 8.1%","VAT 8.1%","IVA 8.1%"),`CHF ${v}`]].map(([l,val])=>(
