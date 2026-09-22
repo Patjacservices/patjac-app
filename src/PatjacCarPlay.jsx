@@ -1151,17 +1151,20 @@ export default function PatjacCarPlay(){
           supaFetch("suppliers?order=created_at"),
         ]);
         console.log("Supabase loaded ✓ clients:", cl?.length, "contracts:", ct?.length);
-        setClients(cl?.length ? toCamel(cl) : JSON.parse(localStorage.getItem('patjac_clients')||'null') || DEMO_CLIENTS);
-        setEmployees(em?.length ? toCamel(em) : JSON.parse(localStorage.getItem('patjac_employees')||'null') || DEMO_EMPLOYEES);
-        setJobs(jo?.length ? toCamel(jo) : JSON.parse(localStorage.getItem('patjac_jobs')||'null') || DEMO_JOBS);
-        setInvoices(inv?.length ? toCamel(inv) : JSON.parse(localStorage.getItem('patjac_invoices')||'null') || DEMO_INVOICES);
-        setTimeclock(tc?.length ? toCamel(tc) : JSON.parse(localStorage.getItem('patjac_timeclock')||'null') || DEMO_TIMECLOCK);
+        // Only show demo data on a brand-new, unconfigured install (no real clients or employees yet).
+        // Once the business has real clients/employees, empty tables show truly empty — never fake demo rows.
+        const isLive = !!(cl?.length || em?.length);
+        setClients(cl?.length ? toCamel(cl) : JSON.parse(localStorage.getItem('patjac_clients')||'null') || (isLive?[]:DEMO_CLIENTS));
+        setEmployees(em?.length ? toCamel(em) : JSON.parse(localStorage.getItem('patjac_employees')||'null') || (isLive?[]:DEMO_EMPLOYEES));
+        setJobs(jo?.length ? toCamel(jo) : JSON.parse(localStorage.getItem('patjac_jobs')||'null') || (isLive?[]:DEMO_JOBS));
+        setInvoices(inv?.length ? toCamel(inv) : JSON.parse(localStorage.getItem('patjac_invoices')||'null') || (isLive?[]:DEMO_INVOICES));
+        setTimeclock(tc?.length ? toCamel(tc) : JSON.parse(localStorage.getItem('patjac_timeclock')||'null') || (isLive?[]:DEMO_TIMECLOCK));
         setMessages(msg?.length ? toCamel(msg) : JSON.parse(localStorage.getItem('patjac_messages')||'null') || []);
-        setExpenses(ex?.length ? toCamel(ex) : JSON.parse(localStorage.getItem('patjac_expenses')||'null') || DEMO_EXPENSES);
-        setOrders(ord?.length ? toCamel(ord) : JSON.parse(localStorage.getItem('patjac_orders')||'null') || DEMO_ORDERS);
+        setExpenses(ex?.length ? toCamel(ex) : JSON.parse(localStorage.getItem('patjac_expenses')||'null') || (isLive?[]:DEMO_EXPENSES));
+        setOrders(ord?.length ? toCamel(ord) : JSON.parse(localStorage.getItem('patjac_orders')||'null') || (isLive?[]:DEMO_ORDERS));
         setContracts(ct?.length ? toCamel(ct) : JSON.parse(localStorage.getItem('patjac_contracts')||'null') || []);
-        setProducts(prod?.length ? toCamel(prod) : JSON.parse(localStorage.getItem('patjac_products')||'null') || DEMO_PRODUCTS);
-        setSuppliers(sup?.length ? toCamel(sup) : JSON.parse(localStorage.getItem('patjac_suppliers')||'null') || DEMO_SUPPLIERS);
+        setProducts(prod?.length ? toCamel(prod) : JSON.parse(localStorage.getItem('patjac_products')||'null') || (isLive?[]:DEMO_PRODUCTS));
+        setSuppliers(sup?.length ? toCamel(sup) : JSON.parse(localStorage.getItem('patjac_suppliers')||'null') || (isLive?[]:DEMO_SUPPLIERS));
         // If Supabase has data, clear localStorage to avoid stale data on other devices
         if(cl?.length) localStorage.removeItem('patjac_clients');
         if(em?.length) localStorage.removeItem('patjac_employees');
@@ -1189,19 +1192,20 @@ export default function PatjacCarPlay(){
         setDbReady(true);
       } catch(e) {
         console.error("Supabase load error:",e);
-        setClients(DEMO_CLIENTS);
-        setEmployees(DEMO_EMPLOYEES);
-        setJobs(DEMO_JOBS);
-        setInvoices(DEMO_INVOICES);
-        setTimeclock(DEMO_TIMECLOCK);
-        setMessages(DEMO_MESSAGES);
-        setExpenses(DEMO_EXPENSES);
-        setOrders(DEMO_ORDERS);
-        setContracts([]);
-        setProducts(DEMO_PRODUCTS);
-        setSuppliers(DEMO_SUPPLIERS);
+        const cached = (key,demo) => JSON.parse(localStorage.getItem(key)||'null') || demo;
+        setClients(cached('patjac_clients', DEMO_CLIENTS));
+        setEmployees(cached('patjac_employees', DEMO_EMPLOYEES));
+        setJobs(cached('patjac_jobs', DEMO_JOBS));
+        setInvoices(cached('patjac_invoices', DEMO_INVOICES));
+        setTimeclock(cached('patjac_timeclock', DEMO_TIMECLOCK));
+        setMessages(cached('patjac_messages', DEMO_MESSAGES));
+        setExpenses(cached('patjac_expenses', DEMO_EXPENSES));
+        setOrders(cached('patjac_orders', DEMO_ORDERS));
+        setContracts(cached('patjac_contracts', []));
+        setProducts(cached('patjac_products', DEMO_PRODUCTS));
+        setSuppliers(cached('patjac_suppliers', DEMO_SUPPLIERS));
         setDbReady(true);
-        setDbError("Sin conexión a base de datos — usando datos demo");
+        setDbError("Sin conexión a base de datos — mostrando la última copia guardada en este dispositivo");
       }
     };
     load();
@@ -2353,7 +2357,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
             background:"rgba(255,255,255,0.08)",border:`1px solid ${CP.border}`,
             borderRadius:10,color:"#fff",padding:"6px 12px",fontSize:13,outline:"none",cursor:"pointer",
           }}>
-            {[2023,2024,2025].map(y=>(
+            {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y=>(
               <option key={y} value={y} style={{background:"#1a1a2e"}}>{y}</option>
             ))}
           </select>
@@ -2697,7 +2701,7 @@ function PayrollApp({t, lang, employees, timeclock, currentUser, notify, onBack,
           background:"rgba(255,255,255,0.08)",border:`1px solid ${CP.border}`,
           borderRadius:10,color:"#fff",padding:"8px 14px",fontSize:14,outline:"none",cursor:"pointer",
         }}>
-          {[2023,2024,2025].map(y=><option key={y} value={y} style={{background:"#1a1a2e"}}>{y}</option>)}
+          {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y=><option key={y} value={y} style={{background:"#1a1a2e"}}>{y}</option>)}
         </select>
 
         {isAdmin&&(
