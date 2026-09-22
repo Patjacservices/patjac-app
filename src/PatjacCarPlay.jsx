@@ -630,6 +630,13 @@ const getGeoLocation = () => new Promise((resolve) => {
 });
 const gCode = () => "PJ-"+Math.random().toString(36).substr(2,6).toUpperCase();
 const gPin = () => Math.floor(1000+Math.random()*9000).toString();
+// Keeps generating a code until it finds one not already used by another employee
+const gCodeUnique = (existingEmployees, excludeId) => {
+  let code;
+  do { code = gCode(); }
+  while ((existingEmployees||[]).some(e => e.code===code && e.id!==excludeId));
+  return code;
+};
 
 // ─── SEND BY EMAIL (opens Outlook/Gmail with prefilled content) ───
 const sendByEmail = ({to="", subject="", body=""}) => {
@@ -2296,7 +2303,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
     const n = `${form.firstName} ${form.lastName}`;
     if(selId) setEmployees(p=>p.map(e=>e.id===selId?{...e,...form,name:n}:e));
     else {
-      const code=gCode(), pin=gPin();
+      const code=gCodeUnique(employees), pin=gPin();
       setEmployees(p=>[...p,{...form,id:gid(),name:n,code,pin,role:"employee"}]);
       notify(`${t.userCode}: ${code} | ${t.pin}: ${pin}`,"info");
     }
@@ -2304,7 +2311,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
   };
 
   const regen = (id) => {
-    const code=gCode(), pin=gPin();
+    const code=gCodeUnique(employees, id), pin=gPin();
     setEmployees(p=>p.map(e=>e.id===id?{...e,code,pin}:e));
     notify(`${t.userCode}: ${code} | ${t.pin}: ${pin}`,"info");
   };
