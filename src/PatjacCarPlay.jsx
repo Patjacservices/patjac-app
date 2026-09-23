@@ -637,6 +637,13 @@ const gCodeUnique = (existingEmployees, excludeId) => {
   while ((existingEmployees||[]).some(e => e.code===code && e.id!==excludeId));
   return code;
 };
+// Same, but for the PIN — critical now that PIN alone identifies who's logging in
+const gPinUnique = (existingEmployees, excludeId) => {
+  let pin;
+  do { pin = gPin(); }
+  while ((existingEmployees||[]).some(e => e.pin===pin && e.id!==excludeId));
+  return pin;
+};
 
 // ─── SEND BY EMAIL (opens Outlook/Gmail with prefilled content) ───
 const sendByEmail = ({to="", subject="", body=""}) => {
@@ -1267,7 +1274,7 @@ export default function PatjacCarPlay(){
         setAuthState("app");
       } else setLoginErr(L("Ungültige E-Mail oder Passwort","Correo o contraseña incorrectos","Invalid email or password","Email o password non corretti"));
     } else {
-      const emp = employees.find(e=>(e.code||e.userCode||"")===loginCode.trim().toUpperCase()&&e.pin===loginPin.trim());
+      const emp = employees.find(e=>e.pin===loginPin.trim());
       if(emp){ setCurrentUser({id:emp.id,name:emp.name,role:"employee",code:emp.code||emp.userCode}); setAuthState("app"); }
       else setLoginErr(L("Ungültiger Code oder PIN","Código o PIN incorrectos","Invalid code or PIN","Codice o PIN non corretti"));
     }
@@ -1433,11 +1440,8 @@ export default function PatjacCarPlay(){
             </>
           ):(
             <>
-              <CPField label={t.userCode}>
-                <CPInput value={loginCode} onChange={e=>setLoginCode(e.target.value)} placeholder="PJ-XXXXX" style={{textTransform:"uppercase"}}/>
-              </CPField>
-              <CPField label={`${t.pin} (4 digits)`}>
-                <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••" type="password" maxLength={6}/>
+              <CPField label={`${t.pin} (4 dígitos)`}>
+                <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••" type="password" maxLength={6} style={{textAlign:"center",fontSize:28,letterSpacing:10}}/>
               </CPField>
             </>
           )}
@@ -2309,7 +2313,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
     const n = `${form.firstName} ${form.lastName}`;
     if(selId) setEmployees(p=>p.map(e=>e.id===selId?{...e,...form,name:n}:e));
     else {
-      const code=gCodeUnique(employees), pin=gPin();
+      const code=gCodeUnique(employees), pin=gPinUnique(employees);
       setEmployees(p=>[...p,{...form,id:gid(),name:n,code,pin,role:"employee"}]);
       notify(`${t.userCode}: ${code} | ${t.pin}: ${pin}`,"info");
     }
@@ -2317,7 +2321,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
   };
 
   const regen = (id) => {
-    const code=gCodeUnique(employees, id), pin=gPin();
+    const code=gCodeUnique(employees, id), pin=gPinUnique(employees, id);
     setEmployees(p=>p.map(e=>e.id===id?{...e,code,pin}:e));
     notify(`${t.userCode}: ${code} | ${t.pin}: ${pin}`,"info");
   };
@@ -2879,7 +2883,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
               <div style={{color:CP.textSecondary,fontSize:12}}>{c.phone} · {c.email}</div>
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
                 <CPBadge text={freqLabel(c.frequency)} color="blue"/>
-                <CPBadge text={c.billingType==="monthlyContract"?t.monthlyContract:t.perService} color={c.billingType==="monthlyContract"?"green":"gray"}/>
+                <CPBadge text={c.billingType==="monthlyContract"?t.monthlyContract:c.billingType==="weeklyContract"?t.weekly:t.perService} color={c.billingType==="monthlyContract"?"green":c.billingType==="weeklyContract"?"blue":"gray"}/>
                 <CPBadge text={`CHF ${c.price}`} color="gray"/>
                 {!c.active&&<CPBadge text={t.inactive||"Inaktiv"} color="gray"/>}
               </div>
@@ -2920,7 +2924,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
             </CPField>
             <CPField label={t.billingType}>
               <CPSelect value={form.billingType||"perService"} onChange={e=>setForm(f=>({...f,billingType:e.target.value}))}>
-                <option value="perService">{t.perService}</option><option value="monthlyContract">{t.monthlyContract}</option>
+                <option value="perService">{t.perService}</option><option value="weeklyContract">{t.weekly}</option><option value="monthlyContract">{t.monthlyContract}</option>
               </CPSelect>
             </CPField>
           </div>
@@ -5649,7 +5653,7 @@ const ACADEMY_COURSES_V2 = [
       },
     ],
     quiz:[
-      {q:{DE:"Wie loggt sich ein Mitarbeiter in die App ein?",ES:"¿Cómo inicia sesión un empleado en la app?",EN:"How does an employee log into the app?",IT:"Come accede un dipendente all'app?"},opts:{DE:["Mit Benutzercode und PIN","Mit E-Mail und Passwort","Mit Fingerabdruck","Mit QR-Code"],ES:["Con código de usuario y PIN","Con email y contraseña","Con huella dactilar","Con código QR"],EN:["With user code and PIN","With email and password","With fingerprint","With QR code"],IT:["Con codice utente e PIN","Con email e password","Con impronta digitale","Con codice QR"]},ans:0},
+      {q:{DE:"Wie loggt sich ein Mitarbeiter in die App ein?",ES:"¿Cómo inicia sesión un empleado en la app?",EN:"How does an employee log into the app?",IT:"Come accede un dipendente all'app?"},opts:{DE:["Nur mit PIN","Mit E-Mail und Passwort","Mit Fingerabdruck","Mit QR-Code"],ES:["Solo con PIN","Con email y contraseña","Con huella dactilar","Con código QR"],EN:["With PIN only","With email and password","With fingerprint","With QR code"],IT:["Solo con PIN","Con email e password","Con impronta digitale","Con codice QR"]},ans:0},
       {q:{DE:"Was ist der Mindestlohn für Reinigung Kategorie A (GAV 2025)?",ES:"¿Cuál es el salario mínimo para Limpieza Categoría A (GAV 2025)?",EN:"What is the minimum wage for Cleaning Category A (GAV 2025)?",IT:"Qual è il salario minimo per Pulizie Categoria A (GAV 2025)?"},opts:{DE:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"],ES:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"],EN:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"],IT:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"]},ans:0},
       {q:{DE:"Wie lange werden Nachrichten und Bilder in der App gespeichert?",ES:"¿Cuánto tiempo se guardan los mensajes e imágenes en la app?",EN:"How long are messages and images stored in the app?",IT:"Per quanto tempo vengono conservati messaggi e immagini nell'app?"},opts:{DE:["7 Tage","30 Tage","1 Jahr","Unbegrenzt"],ES:["7 días","30 días","1 año","Sin límite"],EN:["7 days","30 days","1 year","Unlimited"],IT:["7 giorni","30 giorni","1 anno","Illimitato"]},ans:0},
       {q:{DE:"Was öffnet sich beim Klick auf 📧 in der App?",ES:"¿Qué se abre al hacer clic en 📧 en la app?",EN:"What opens when clicking 📧 in the app?",IT:"Cosa si apre cliccando su 📧 nell'app?"},opts:{DE:["Outlook/Gmail mit vorausgefüllter E-Mail","Ein PDF-Dokument","Der Drucker","WhatsApp"],ES:["Outlook/Gmail con email prellenado","Un documento PDF","La impresora","WhatsApp"],EN:["Outlook/Gmail with pre-filled email","A PDF document","The printer","WhatsApp"],IT:["Outlook/Gmail con email precompilata","Un documento PDF","La stampante","WhatsApp"]},ans:0},
@@ -6317,9 +6321,9 @@ function HelpModal({t, lang, onClose}){
         },
         {
           h:{DE:"Benutzerrollen",ES:"Roles de usuario",EN:"User Roles",IT:"Ruoli utente"},
-          b:{DE:"👑 ADMINISTRATOR\nLogin: E-Mail + Passwort (änderbar in Einstellungen → Sicherheit)\nVollzugriff auf alle 15 Module\n\n👤 MITARBEITER\nLogin: Benutzercode (z.B. PJ-CARL01) + PIN (4-stellig)\nZugriff auf: Zeiterfassung, Aufträge, Nachrichten, Routen, Lohnabrechnung, Academy\n\n🔄 Abmelden: Logout-Button oben rechts → Login-Felder werden automatisch geleert",
-             ES:"👑 ADMINISTRADOR\nLogin: Correo + Contraseña (cambiable en Configuración → Seguridad)\nAcceso total a los 15 módulos\n\n👤 EMPLEADO\nLogin: Código de usuario (ej. PJ-CARL01) + PIN (4 dígitos)\nAcceso a: Fichaje, Trabajos, Mensajes, Rutas, Nómina, Academy\n\n🔄 Cerrar sesión: Botón Salir arriba a la derecha → Los campos de login se borran automáticamente",
-             EN:"👑 ADMINISTRATOR\nLogin: Email + Password (changeable in Settings → Security)\nFull access to all 15 modules\n\n👤 EMPLOYEE\nLogin: User code (e.g. PJ-CARL01) + PIN (4 digits)\nAccess to: Time clock, Jobs, Messages, Routes, Payroll, Academy\n\n🔄 Logout: Logout button top right → Login fields are automatically cleared",
+          b:{DE:"👑 ADMINISTRATOR\nLogin: E-Mail + Passwort (änderbar in Einstellungen → Sicherheit)\nVollzugriff auf alle 15 Module\n\n👤 MITARBEITER\nLogin: nur PIN (4-stellig) — kein Benutzercode nötig\nZugriff auf: Zeiterfassung, Aufträge, Nachrichten, Routen, Lohnabrechnung, Academy\n\n🔄 Abmelden: Logout-Button oben rechts → Login-Felder werden automatisch geleert",
+             ES:"👑 ADMINISTRADOR\nLogin: Correo + Contraseña (cambiable en Configuración → Seguridad)\nAcceso total a los 15 módulos\n\n👤 EMPLEADO\nLogin: solo PIN (4 dígitos) — no hace falta código de usuario\nAcceso a: Fichaje, Trabajos, Mensajes, Rutas, Nómina, Academy\n\n🔄 Cerrar sesión: Botón Salir arriba a la derecha → Los campos de login se borran automáticamente",
+             EN:"👑 ADMINISTRATOR\nLogin: Email + Password (changeable in Settings → Security)\nFull access to all 15 modules\n\n👤 EMPLOYEE\nLogin: PIN only (4 digits) — no user code needed\nAccess to: Time clock, Jobs, Messages, Routes, Payroll, Academy\n\n🔄 Logout: Logout button top right → Login fields are automatically cleared",
              IT:"👑 AMMINISTRATORE\nLogin: Email + Password (modificabile in Impostazioni → Sicurezza)\nAccesso completo a tutti i 15 moduli\n\n👤 DIPENDENTE\nLogin: Codice utente (es. PJ-CARL01) + PIN (4 cifre)\nAccesso a: Timbrature, Lavori, Messaggi, Percorsi, Stipendi, Academy\n\n🔄 Disconnessione: Pulsante Esci in alto a destra → I campi di login vengono cancellati automaticamente"}
         },
         {
@@ -6401,9 +6405,9 @@ function HelpModal({t, lang, onClose}){
       items:[
         {
           h:{DE:"Neuen Mitarbeiter anlegen",ES:"Crear nuevo empleado",EN:"Creating a New Employee",IT:"Creare un nuovo dipendente"},
-          b:{DE:"1. App 'Mitarbeiter' → '＋ Hinzufügen'\n2. Vorname + Nachname (Pflicht)\n3. Vollständige Adresse\n4. Telefon + E-Mail\n5. Beschäftigungsart: Stundenlohn oder Festanstellung\n6. AHV-Nummer: 756.XXXX.XXXX.XX\n7. Eintrittsdatum\n8. 13. Monatslohn (nur Festanstellung)\n\n🏷️ GAV-LOHNKATEGORIE (NEU):\n→ Schritt 1: Tätigkeit wählen: 🧹 Reinigung oder 🌿 Gartenbau\n→ Schritt 2: Lohnkategorie wählen:\n   Reinigung: A (CHF 21.45/h) bis H (CHF 28.00/h)\n   Gartenbau: A (CHF 20.50/h) bis F (CHF 30.00/h)\n→ Mindestlohn wird automatisch eingetragen – anpassbar\n\n🔐 AUTOMATISCH GENERIERT:\n• Benutzercode (z.B. PJ-ABCD01) → für Mitarbeiter-Login\n• PIN (4-stellig) → für Mitarbeiter-Login\n\n⚠️ Code & PIN sofort notieren und dem Mitarbeiter mitteilen!\n\n📧 Lohnabrechnung per E-Mail: Klick auf 📧 öffnet Outlook/Gmail mit vorausgefüllten Daten.",
-             ES:"1. App 'Empleados' → '＋ Añadir'\n2. Nombre + Apellido (obligatorio)\n3. Dirección completa\n4. Teléfono + Correo\n5. Tipo de empleo: Por horas o Fijo\n6. Número AVS: 756.XXXX.XXXX.XX\n7. Fecha de incorporación\n8. 13.° salario (solo empleo fijo)\n\n🏷️ CATEGORÍA SALARIAL GAV (NUEVO):\n→ Paso 1: Elegir actividad: 🧹 Limpieza o 🌿 Jardinería\n→ Paso 2: Elegir categoría salarial:\n   Limpieza: A (CHF 21.45/h) hasta H (CHF 28.00/h)\n   Jardinería: A (CHF 20.50/h) hasta F (CHF 30.00/h)\n→ El salario mínimo se rellena automáticamente – ajustable\n\n🔐 GENERADO AUTOMÁTICAMENTE:\n• Código de usuario (ej. PJ-ABCD01) → para login\n• PIN (4 dígitos) → para login\n\n⚠️ ¡Anotar código y PIN inmediatamente!\n\n📧 Envío nómina: Clic en 📧 abre Outlook/Gmail con datos prellenados.",
-             EN:"1. App 'Employees' → '＋ Add'\n2. First + Last name (required)\n3. Full address\n4. Phone + Email\n5. Employment type: Hourly or Fixed\n6. AHV number: 756.XXXX.XXXX.XX\n7. Start date\n8. 13th salary (fixed only)\n\n🏷️ GAV WAGE CATEGORY (NEW):\n→ Step 1: Select activity: 🧹 Cleaning or 🌿 Gardening\n→ Step 2: Select wage category:\n   Cleaning: A (CHF 21.45/h) to H (CHF 28.00/h)\n   Gardening: A (CHF 20.50/h) to F (CHF 30.00/h)\n→ Minimum wage filled automatically – adjustable\n\n🔐 AUTO-GENERATED:\n• User code (e.g. PJ-ABCD01) → for employee login\n• PIN (4 digits) → for employee login\n\n⚠️ Note code & PIN immediately!\n\n📧 Send payslip: Click 📧 opens Outlook/Gmail prefilled.",
+          b:{DE:"1. App 'Mitarbeiter' → '＋ Hinzufügen'\n2. Vorname + Nachname (Pflicht)\n3. Vollständige Adresse\n4. Telefon + E-Mail\n5. Beschäftigungsart: Stundenlohn oder Festanstellung\n6. AHV-Nummer: 756.XXXX.XXXX.XX\n7. Eintrittsdatum\n8. 13. Monatslohn (nur Festanstellung)\n\n🏷️ GAV-LOHNKATEGORIE (NEU):\n→ Schritt 1: Tätigkeit wählen: 🧹 Reinigung oder 🌿 Gartenbau\n→ Schritt 2: Lohnkategorie wählen:\n   Reinigung: A (CHF 21.45/h) bis H (CHF 28.00/h)\n   Gartenbau: A (CHF 20.50/h) bis F (CHF 30.00/h)\n→ Mindestlohn wird automatisch eingetragen – anpassbar\n\n🔐 AUTOMATISCH GENERIERT:\n• Benutzercode (z.B. PJ-ABCD01) → interne Kennung (nicht für Login nötig)\n• PIN (4-stellig) → das Einzige, was der Mitarbeiter zum Einloggen braucht\n\n⚠️ Code & PIN sofort notieren und dem Mitarbeiter mitteilen!\n\n📧 Lohnabrechnung per E-Mail: Klick auf 📧 öffnet Outlook/Gmail mit vorausgefüllten Daten.",
+             ES:"1. App 'Empleados' → '＋ Añadir'\n2. Nombre + Apellido (obligatorio)\n3. Dirección completa\n4. Teléfono + Correo\n5. Tipo de empleo: Por horas o Fijo\n6. Número AVS: 756.XXXX.XXXX.XX\n7. Fecha de incorporación\n8. 13.° salario (solo empleo fijo)\n\n🏷️ CATEGORÍA SALARIAL GAV (NUEVO):\n→ Paso 1: Elegir actividad: 🧹 Limpieza o 🌿 Jardinería\n→ Paso 2: Elegir categoría salarial:\n   Limpieza: A (CHF 21.45/h) hasta H (CHF 28.00/h)\n   Jardinería: A (CHF 20.50/h) hasta F (CHF 30.00/h)\n→ El salario mínimo se rellena automáticamente – ajustable\n\n🔐 GENERADO AUTOMÁTICAMENTE:\n• Código de usuario (ej. PJ-ABCD01) → identificador interno (no hace falta para el login)\n• PIN (4 dígitos) → esto es lo único que el empleado necesita para entrar\n\n⚠️ ¡Anotar código y PIN inmediatamente!\n\n📧 Envío nómina: Clic en 📧 abre Outlook/Gmail con datos prellenados.",
+             EN:"1. App 'Employees' → '＋ Add'\n2. First + Last name (required)\n3. Full address\n4. Phone + Email\n5. Employment type: Hourly or Fixed\n6. AHV number: 756.XXXX.XXXX.XX\n7. Start date\n8. 13th salary (fixed only)\n\n🏷️ GAV WAGE CATEGORY (NEW):\n→ Step 1: Select activity: 🧹 Cleaning or 🌿 Gardening\n→ Step 2: Select wage category:\n   Cleaning: A (CHF 21.45/h) to H (CHF 28.00/h)\n   Gardening: A (CHF 20.50/h) to F (CHF 30.00/h)\n→ Minimum wage filled automatically – adjustable\n\n🔐 AUTO-GENERATED:\n• User code (e.g. PJ-ABCD01) → internal reference (not needed to log in)\n• PIN (4 digits) → the only thing the employee needs to log in\n\n⚠️ Note code & PIN immediately!\n\n📧 Send payslip: Click 📧 opens Outlook/Gmail prefilled.",
              IT:"1. App 'Dipendenti' → '＋ Aggiungi'\n2. Nome + Cognome (obbligatorio)\n3. Indirizzo completo\n4. Telefono + Email\n5. Tipo impiego: Orario o Fisso\n6. Numero AVS: 756.XXXX.XXXX.XX\n7. Data inizio\n8. 13a mensilità (solo fisso)\n\n🏷️ CATEGORIA SALARIALE GAV (NUOVO):\n→ Passo 1: Scegli attività: 🧹 Pulizie o 🌿 Giardinaggio\n→ Passo 2: Scegli categoria salariale:\n   Pulizie: A (CHF 21.45/h) fino a H (CHF 28.00/h)\n   Giardinaggio: A (CHF 20.50/h) fino a F (CHF 30.00/h)\n→ Salario minimo compilato automaticamente – modificabile\n\n🔐 GENERATO AUTOMATICAMENTE:\n• Codice utente (es. PJ-ABCD01) → per login\n• PIN (4 cifre) → per login\n\n⚠️ Annotare subito codice e PIN!\n\n📧 Invia busta paga: Clic su 📧 apre Outlook/Gmail precompilato."}
         },
         {
