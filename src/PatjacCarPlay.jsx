@@ -1217,7 +1217,10 @@ export default function PatjacCarPlay(){
     };
     load();
 
-    // Poll messages every 5 seconds for real-time chat
+    // ── AUTO-EXTEND RECURRING JOBS ──────────────────────────
+    // Keeps weekly/monthly recurring jobs generated ahead of time, without needing a server.
+    // Runs once dbReady, and tops up any series getting close to running out.
+    // (separate effect below, watches [dbReady])
     // ── SMART MESSAGE POLLING ──────────────────────────────
     // Poll every 15s when app is visible, every 60s when hidden
     // This keeps requests under 100/hour (well within Free plan limits)
@@ -1246,6 +1249,48 @@ export default function PatjacCarPlay(){
 
     return ()=>{ clearInterval(msgPollRef); window.removeEventListener("focus", onFocus); };
   },[]);
+
+  // Tops up weekly/monthly recurring job series once they start running low,
+  // so they keep generating automatically every time the app is opened.
+  useEffect(()=>{
+    if(!dbReady) return;
+    const groups = {};
+    jobs.forEach(j=>{ if(j.recurringId){ (groups[j.recurringId] = groups[j.recurringId]||[]).push(j); } });
+    const toAdd = [];
+    const todayD = new Date(todayStr+"T00:00:00");
+    Object.values(groups).forEach(group=>{
+      const sample = group[0];
+      const maxDate = group.reduce((m,j)=>j.date>m?j.date:m, group[0].date);
+      const maxD = new Date(maxDate+"T00:00:00");
+      const daysUntilEnd = Math.round((maxD - todayD)/86400000);
+      if(sample.recurrence==="weekly" && (sample.recurWeekdays||[]).length && daysUntilEnd < 21){
+        let cursor = new Date(maxD); cursor.setDate(cursor.getDate()+1);
+        const end = new Date(maxD); end.setDate(end.getDate()+12*7);
+        while(cursor<=end){
+          if(sample.recurWeekdays.includes(cursor.getDay())){
+            toAdd.push({...sample,id:gid(),date:cursor.toISOString().split("T")[0],status:"pending",actualStart:null,actualEnd:null,actualHours:null,photos:[],signature:null});
+          }
+          cursor.setDate(cursor.getDate()+1);
+        }
+      } else if(sample.recurrence==="monthly" && daysUntilEnd < 45){
+        const dayOfMonth = new Date(sample.date+"T00:00:00").getDate();
+        for(let i=1;i<=6;i++){
+          const d = new Date(maxD.getFullYear(), maxD.getMonth()+i, 1);
+          const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+          d.setDate(Math.min(dayOfMonth,lastDay));
+          toAdd.push({...sample,id:gid(),date:d.toISOString().split("T")[0],status:"pending",actualStart:null,actualEnd:null,actualHours:null,photos:[],signature:null});
+        }
+      }
+    });
+    if(toAdd.length){
+      setJobs(prev=>{
+        const next=[...prev,...toAdd];
+        localStorage.setItem('patjac_jobs',JSON.stringify(next));
+        return next;
+      });
+      if(supa) toAdd.forEach(x=>dbSave('jobs',x));
+    }
+  },[dbReady]);
 
   const [companySettings, setCompanySettings] = useState({
     name:"Patjac Reinigung Garten & Services",
@@ -2983,9 +3028,45 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
   const save=()=>{
     const c=clients.find(x=>x.id===form.clientId);
     const e=employees.find(x=>x.id===form.employeeId);
-    if(form.id) setJobs(p=>p.map(j=>j.id===form.id?{...form,clientName:c?.name||"",employeeName:e?.name||""}:j));
-    else setJobs(p=>[...p,{...form,id:gid(),clientName:c?.name||"",employeeName:e?.name||"",photos:[],signature:null}]);
-    notify(t.success);setModal(null);
+    const base = {...form,clientName:c?.name||"",employeeName:e?.name||""};
+
+    if(form.id){
+      setJobs(p=>p.map(j=>j.id===form.id?base:j));
+      notify(t.success); setModal(null); return;
+    }
+
+    if(form.recurrence==="weekly" && (form.recurWeekdays||[]).length){
+      const recurringId = gid();
+      const startD = new Date(form.date+"T00:00:00");
+      const horizonEnd = new Date(startD); horizonEnd.setDate(horizonEnd.getDate()+12*7); // ~3 months ahead
+      const occurrences = [];
+      let cursor = new Date(startD);
+      while(cursor<=horizonEnd){
+        if(form.recurWeekdays.includes(cursor.getDay())){
+          occurrences.push({...base,id:gid(),recurringId,date:cursor.toISOString().split("T")[0],photos:[],signature:null});
+        }
+        cursor.setDate(cursor.getDate()+1);
+      }
+      setJobs(p=>[...p,...occurrences]);
+      notify(`${t.success} (${occurrences.length} ${L("Termine erstellt","trabajos creados","jobs created","lavori creati")})`);
+    } else if(form.recurrence==="monthly"){
+      const recurringId = gid();
+      const startD = new Date(form.date+"T00:00:00");
+      const dayOfMonth = startD.getDate();
+      const occurrences = [];
+      for(let i=0;i<6;i++){ // ~6 months ahead
+        const d = new Date(startD.getFullYear(), startD.getMonth()+i, 1);
+        const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+        d.setDate(Math.min(dayOfMonth,lastDay));
+        occurrences.push({...base,id:gid(),recurringId,date:d.toISOString().split("T")[0],photos:[],signature:null});
+      }
+      setJobs(p=>[...p,...occurrences]);
+      notify(`${t.success} (${occurrences.length} ${L("Termine erstellt","trabajos creados","jobs created","lavori creati")})`);
+    } else {
+      setJobs(p=>[...p,{...base,id:gid(),photos:[],signature:null}]);
+      notify(t.success);
+    }
+    setModal(null);
   };
 
   // ── EMPLOYEE VIEW — read-only, minimal info ──────────────────
@@ -3146,7 +3227,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             <button key={s} onClick={()=>setFilter(s)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filter===s?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{s==="all"?"All":statusLabel(s)}</button>
           ))}
         </div>
-        {<CPBtn onClick={()=>{setForm({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",serviceType:"cleaning",description:"",date:new Date().toISOString().split("T")[0],timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending"});setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
+        {<CPBtn onClick={()=>{setForm({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",serviceType:"cleaning",description:"",date:new Date().toISOString().split("T")[0],timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]});setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
       </>}
     >
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -3177,7 +3258,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
       {modal==="form"&&(
         <CPModal title={form.id?t.edit:t.newJob||"Neu"} onClose={()=>setModal(null)} width={540}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
-            <CPField label={t.clients}><CPSelect value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</CPSelect></CPField>
+            <CPField label={t.clients}>
+              <CPSelect value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</CPSelect>
+              {(()=>{const c=clients.find(x=>x.id===form.clientId);const addr=c?`${c.street||""} ${c.number||""}, ${c.postalCode||""} ${c.city||""}`.trim().replace(/^,\s*/,""):"";return addr?(<div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📍 {addr}</div>):null;})()}
+            </CPField>
             <CPField label={t.employees}><CPSelect value={form.employeeId} onChange={e=>setForm(f=>({...f,employeeId:e.target.value}))}>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</CPSelect></CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 12px"}}>
@@ -3192,6 +3276,49 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
           <CPField label={t.description}><CPInput value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></CPField>
           <CPField label={t.status}><CPSelect value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option value="pending">{t.pending}</option><option value="inProgress">{t.inProgress}</option><option value="completed">{t.completed}</option></CPSelect></CPField>
           <CPField label={t.notes}><CPInput value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></CPField>
+
+          {!form.id && (
+            <>
+              <CPField label={L("Wiederholung","Repetición","Repeat","Ripetizione")}>
+                <CPSelect value={form.recurrence||"once"} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))}>
+                  <option value="once">{t.perService}</option>
+                  <option value="weekly">{t.weekly}</option>
+                  <option value="monthly">{t.monthlyContract}</option>
+                </CPSelect>
+              </CPField>
+              {form.recurrence==="weekly" && (
+                <CPField label={L("¿Qué días?","¿Qué días?","Which days?","Quali giorni?")}>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {[1,2,3,4,5,6,0].map(d=>{
+                      const dayLabels = L("Mo,Di,Mi,Do,Fr,Sa,So","Lun,Mar,Mié,Jue,Vie,Sáb,Dom","Mon,Tue,Wed,Thu,Fri,Sat,Sun","Lun,Mar,Mer,Gio,Ven,Sab,Dom").split(",");
+                      const idx=[1,2,3,4,5,6,0].indexOf(d);
+                      const active = (form.recurWeekdays||[]).includes(d);
+                      return (
+                        <button key={d} type="button" onClick={()=>setForm(f=>{
+                          const cur = f.recurWeekdays||[];
+                          const next = cur.includes(d) ? cur.filter(x=>x!==d) : [...cur,d];
+                          return {...f,recurWeekdays:next};
+                        })} style={{
+                          padding:"6px 12px",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:700,
+                          border:active?"1px solid rgba(28,126,214,0.6)":`1px solid ${CP.border}`,
+                          background:active?"rgba(28,126,214,0.25)":"rgba(255,255,255,0.05)",
+                          color:active?"#74C0FC":CP.textSecondary,
+                        }}>{dayLabels[idx]}</button>
+                      );
+                    })}
+                  </div>
+                  <div style={{color:CP.textTertiary,fontSize:11,marginTop:6}}>
+                    {L("Se generarán automáticamente los próximos meses, y la app irá creando más con el tiempo.","Se generarán automáticamente los próximos meses, y la app irá creando más con el tiempo.","Upcoming occurrences are generated automatically and extended over time.","Le prossime occorrenze vengono generate automaticamente ed estese nel tempo.")}
+                  </div>
+                </CPField>
+              )}
+              {form.recurrence==="monthly" && (
+                <div style={{color:CP.textTertiary,fontSize:11,margin:"-6px 0 10px"}}>
+                  {L(`Se repetirá cada mes el día ${form.date?new Date(form.date).getDate():"—"}.`,`Se repetirá cada mes el día ${form.date?new Date(form.date).getDate():"—"}.`,`Repeats monthly on day ${form.date?new Date(form.date).getDate():"—"}.`,`Si ripete ogni mese il giorno ${form.date?new Date(form.date).getDate():"—"}.`)}
+                </div>
+              )}
+            </>
+          )}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}>
             <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.cancel}</CPBtn>
             <CPBtn onClick={save}>💾 {t.save}</CPBtn>
