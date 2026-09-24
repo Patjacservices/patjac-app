@@ -956,6 +956,74 @@ function CPTable({headers,rows}){
 }
 
 // Screen wrapper with CarPlay-style top bar
+// ── BULK SELECTION (select several items and delete them at once, like email) ──
+function useBulkSelect(){
+  const [selectMode,setSelectMode] = useState(false);
+  const [selected,setSelected] = useState(()=>new Set());
+  const toggle = (id) => setSelected(prev=>{ const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
+  const clear = () => setSelected(new Set());
+  const exit = () => { setSelectMode(false); setSelected(new Set()); };
+  return { selectMode, setSelectMode, selected, setSelected, toggle, clear, exit };
+}
+function SelBox({checked,onChange}){
+  return (
+    <div onClick={e=>{e.stopPropagation();onChange();}} role="checkbox" aria-checked={checked} style={{
+      width:22,height:22,minWidth:22,borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+      border:checked?"2px solid #4DABF7":`2px solid ${CP.border}`,background:checked?"#1C7ED6":"transparent",color:"#fff",fontSize:14,fontWeight:800,
+    }}>{checked?"✓":""}</div>
+  );
+}
+// Toolbar: "Seleccionar" button, then "Todos / N seleccionados / Eliminar / Cancelar", with a confirm dialog.
+function BulkBar({bulk,visibleIds,onDelete,lang,itemWord}){
+  const L = makeL(lang);
+  const [confirm,setConfirm] = useState(false);
+  const count = visibleIds.filter(id=>bulk.selected.has(id)).length;
+  const allSel = visibleIds.length>0 && count===visibleIds.length;
+  if(!bulk.selectMode){
+    if(!visibleIds.length) return null;
+    return (
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+        <CPBtn onClick={()=>bulk.setSelectMode(true)} variant="secondary" size="sm">☑️ {L("Auswählen","Seleccionar","Select","Seleziona")}</CPBtn>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div style={{position:"sticky",top:0,zIndex:5,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:10,padding:"8px 10px",borderRadius:12,background:"rgba(28,126,214,0.18)",border:"1px solid rgba(28,126,214,0.45)"}}>
+        <SelBox checked={allSel} onChange={()=>bulk.setSelected(allSel?new Set():new Set(visibleIds))}/>
+        <span style={{color:CP.textPrimary,fontSize:13,fontWeight:700,flex:1}}>
+          {allSel?L("Alle","Todos","All","Tutti"):""} {count} {L("ausgewählt","seleccionados","selected","selezionati")}
+        </span>
+        <CPBtn onClick={()=>count&&setConfirm(true)} variant="danger" size="sm">🗑️ {L("Löschen","Eliminar","Delete","Elimina")} ({count})</CPBtn>
+        <CPBtn onClick={bulk.exit} variant="secondary" size="sm">✕</CPBtn>
+      </div>
+      {confirm&&(
+        <CPModal title={L("Bestätigen","Confirmar","Confirm","Conferma")} onClose={()=>setConfirm(false)} width={360}>
+          <div style={{color:CP.textSecondary,textAlign:"center",marginBottom:20,fontSize:15}}>
+            {L(`${count} ${itemWord.DE} löschen? Dies kann nicht rückgängig gemacht werden.`,`¿Eliminar ${count} ${itemWord.ES}? No se puede deshacer.`,`Delete ${count} ${itemWord.EN}? This cannot be undone.`,`Eliminare ${count} ${itemWord.IT}? Non si può annullare.`)}
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+            <CPBtn onClick={()=>setConfirm(false)} variant="secondary">{L("Abbrechen","Cancelar","Cancel","Annulla")}</CPBtn>
+            <CPBtn onClick={()=>{ const ids=new Set(visibleIds.filter(id=>bulk.selected.has(id))); onDelete(ids); setConfirm(false); bulk.exit(); }} variant="danger">🗑️ {L("Löschen","Eliminar","Delete","Elimina")}</CPBtn>
+          </div>
+        </CPModal>
+      )}
+    </>
+  );
+}
+
+// ── HOURLY CLIENT PRICING ── client.price = CHF per hour
+const hoursBetween = (start,end) => {
+  if(!start||!end) return 0;
+  const [h1,m1]=start.split(":").map(Number), [h2,m2]=end.split(":").map(Number);
+  let mins=(h2*60+m2)-(h1*60+m1); if(mins<0) mins+=24*60;
+  return Math.round(mins/60*100)/100;
+};
+const jobAmountFor = (client,start,end) => {
+  const rate=parseFloat(client?.price)||0;
+  return Math.round(rate*hoursBetween(start,end)*100)/100;
+};
+
 function CPScreen({title,icon,onBack,actions,children,t}){
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",fontFamily:CP.font}}>
@@ -2905,6 +2973,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
   const [form,setForm]=useState({});
   const [search,setSearch]=useState("");
   const ff=clients.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())||c.city?.toLowerCase().includes(search.toLowerCase()));
+  const bulk=useBulkSelect();
 
   const openAdd=()=>{setForm({firstName:"",lastName:"",street:"",number:"",postalCode:"",city:"",phone:"",email:"",frequency:"weekly",billingType:"perService",price:"",serviceType:"cleaning",notes:"",active:true});setEditId(null);setModal("form");};
   const save=()=>{
@@ -2921,24 +2990,28 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
       actions={<CPBtn onClick={openAdd}>＋ {t.addClient}</CPBtn>}
     >
       <div style={{marginBottom:14}}><CPInput value={search} onChange={e=>setSearch(e.target.value)} placeholder={`🔍 ${t.search||"Suchen..."}`}/></div>
+      <BulkBar bulk={bulk} visibleIds={ff.map(c=>c.id)} lang={lang}
+        itemWord={{DE:"Kunden",ES:"clientes",EN:"clients",IT:"clienti"}}
+        onDelete={ids=>{setClients(p=>p.filter(c=>!ids.has(c.id)));notify(t.success);}}/>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {ff.map(c=>(
-          <CPCard key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-            <div>
+          <CPCard key={c.id} onClick={bulk.selectMode?()=>bulk.toggle(c.id):undefined} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,...(bulk.selected.has(c.id)?{outline:"2px solid #4DABF7"}:{})}}>
+            {bulk.selectMode&&<SelBox checked={bulk.selected.has(c.id)} onChange={()=>bulk.toggle(c.id)}/>}
+            <div style={{flex:1}}>
               <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{c.name}</div>
               <div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{c.street} {c.number}, {c.postalCode} {c.city}</div>
               <div style={{color:CP.textSecondary,fontSize:12}}>{c.phone} · {c.email}</div>
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
                 <CPBadge text={freqLabel(c.frequency)} color="blue"/>
                 <CPBadge text={c.billingType==="monthlyContract"?t.monthlyContract:c.billingType==="weeklyContract"?t.weekly:t.perService} color={c.billingType==="monthlyContract"?"green":c.billingType==="weeklyContract"?"blue":"gray"}/>
-                <CPBadge text={`CHF ${c.price}`} color="gray"/>
+                <CPBadge text={`CHF ${c.price||0}/h`} color="gray"/>
                 {!c.active&&<CPBadge text={t.inactive||"Inaktiv"} color="gray"/>}
               </div>
             </div>
-            <div style={{display:"flex",gap:6}}>
+            {!bulk.selectMode&&<div style={{display:"flex",gap:6}}>
               <CPBtn onClick={()=>{setForm({...c});setEditId(c.id);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
               <CPBtn onClick={()=>{setEditId(c.id);setModal("del");}} variant="danger" size="sm">🗑️</CPBtn>
-            </div>
+            </div>}
           </CPCard>
         ))}
         {ff.length===0&&<div style={{color:CP.textTertiary,textAlign:"center",padding:"2rem",fontSize:14}}>{t.noRecords}</div>}
@@ -2981,7 +3054,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
                 <option value="cleaning">{t.cleaning}</option><option value="gardening">{t.gardening}</option><option value="other">{t.other}</option>
               </CPSelect>
             </CPField>
-            <CPField label="CHF"><CPInput type="number" value={form.price||""} onChange={e=>setForm(f=>({...f,price:parseFloat(e.target.value)||""}))}/></CPField>
+            <CPField label={L("CHF pro Stunde","CHF por hora","CHF per hour","CHF all'ora")}><CPInput type="number" value={form.price||""} onChange={e=>setForm(f=>({...f,price:parseFloat(e.target.value)||""}))} placeholder="z.B. 45"/></CPField>
           </div>
           <CPField label={t.notes}><CPInput value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></CPField>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}>
@@ -3023,7 +3096,12 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
     ? jobs
     : jobs.filter(j=>j.employeeId===currentUser?.id);
 
-  const ff = visibleJobs.filter(j=>filter==="all"?true:j.status===filter);
+  const ff = visibleJobs
+    .filter(j=>filter==="all"?true:j.status===filter)
+    .sort((a,b)=>`${a.date||""}${a.timeStart||""}`.localeCompare(`${b.date||""}${b.timeStart||""}`));
+  const bulk = useBulkSelect();
+  // Client price is CHF per hour → job amount = rate × planned hours
+  const withAutoAmount = (f) => ({...f, amount: jobAmountFor(clients.find(c=>c.id===f.clientId), f.timeStart, f.timeEnd)});
   const statusLabel=(s)=>s==="completed"?t.completed:s==="inProgress"?t.inProgress:t.pending;
   const statusColor=(s)=>s==="completed"?"green":s==="inProgress"?"blue":"yellow";
 
@@ -3233,13 +3311,17 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             <button key={s} onClick={()=>setFilter(s)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filter===s?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{s==="all"?"All":statusLabel(s)}</button>
           ))}
         </div>
-        {<CPBtn onClick={()=>{setForm({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",serviceType:"cleaning",description:"",date:ymd(new Date()),timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]});setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
+        {<CPBtn onClick={()=>{setForm(withAutoAmount({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",serviceType:"cleaning",description:"",date:ymd(new Date()),timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]}));setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
       </>}
     >
+      {isAdmin&&<BulkBar bulk={bulk} visibleIds={ff.map(j=>j.id)} lang={lang}
+        itemWord={{DE:"Aufträge",ES:"trabajos",EN:"jobs",IT:"lavori"}}
+        onDelete={ids=>{setJobs(p=>p.filter(j=>!ids.has(j.id)));notify(L("Aufträge gelöscht","Trabajos eliminados","Jobs deleted","Lavori eliminati"),"success");}}/>}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {ff.map(job=>(
-          <CPCard key={job.id}>
+          <CPCard key={job.id} onClick={bulk.selectMode?()=>bulk.toggle(job.id):undefined} style={bulk.selected.has(job.id)?{outline:"2px solid #4DABF7"}:undefined}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+              {bulk.selectMode&&<SelBox checked={bulk.selected.has(job.id)} onChange={()=>bulk.toggle(job.id)}/>}
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                   <span style={{fontSize:18}}>{job.serviceType==="cleaning"?"🧹":"🌿"}</span>
@@ -3248,13 +3330,18 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {job.date} · {job.timeStart}–{job.timeEnd}</div>
                 {job.description&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{job.description}</div>}
-                <div style={{color:"#FFD43B",fontWeight:700,fontSize:13,marginTop:4}}>CHF {(job.amount||0).toFixed(2)}</div>
+                <div style={{color:"#FFD43B",fontWeight:700,fontSize:13,marginTop:4}}>CHF {(Number(job.amount)||0).toFixed(2)} <span style={{color:CP.textTertiary,fontWeight:500,fontSize:11}}>({hoursBetween(job.timeStart,job.timeEnd)} h)</span>{job.recurringId&&<span style={{color:"#74C0FC",fontWeight:600,fontSize:11}}> · 🔁</span>}</div>
+                {bulk.selectMode&&job.recurringId&&(
+                  <button type="button" onClick={e=>{e.stopPropagation();const ids=ff.filter(j=>j.recurringId===job.recurringId).map(j=>j.id);bulk.setSelected(prev=>new Set([...prev,...ids]));}} style={{marginTop:6,padding:"3px 10px",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,border:"1px dashed rgba(116,192,252,0.6)",background:"transparent",color:"#74C0FC"}}>
+                    🔁 {L("Ganze Serie auswählen","Seleccionar toda la serie","Select whole series","Seleziona tutta la serie")}
+                  </button>
+                )}
               </div>
-              <div style={{display:"flex",gap:6,flexShrink:0}}>
+              {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexShrink:0}}>
                 {<CPBtn onClick={()=>{setForm({...job});setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>}
                 {job.status!=="completed"&&<CPBtn onClick={()=>{setJobs(p=>p.map(j=>j.id===job.id?{...j,status:job.status==="pending"?"inProgress":"completed"}:j));notify(t.success);}} variant={job.status==="pending"?"warning":"success"} size="sm">{job.status==="pending"?"▶":"✓"}</CPBtn>}
                 <CPBtn onClick={()=>setDeleteJobId(job.id)} variant="danger" size="sm">🗑️</CPBtn>
-              </div>
+              </div>}
             </div>
           </CPCard>
         ))}
@@ -3265,19 +3352,25 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         <CPModal title={form.id?t.edit:t.newJob||"Neu"} onClose={()=>setModal(null)} width={540}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.clients}>
-              <CPSelect value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</CPSelect>
+              <CPSelect value={form.clientId} onChange={e=>setForm(f=>withAutoAmount({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</CPSelect>
               {(()=>{const c=clients.find(x=>x.id===form.clientId);const addr=c?`${c.street||""} ${c.number||""}, ${c.postalCode||""} ${c.city||""}`.trim().replace(/^,\s*/,""):"";return addr?(<div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📍 {addr}</div>):null;})()}
             </CPField>
             <CPField label={t.employees}><CPSelect value={form.employeeId} onChange={e=>setForm(f=>({...f,employeeId:e.target.value}))}>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</CPSelect></CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 12px"}}>
             <CPField label={t.date}><CPInput type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
-            <CPField label="Start"><CPInput type="time" value={form.timeStart} onChange={e=>setForm(f=>({...f,timeStart:e.target.value}))}/></CPField>
-            <CPField label={L("Ende","Fin","End","Fine")}><CPInput type="time" value={form.timeEnd} onChange={e=>setForm(f=>({...f,timeEnd:e.target.value}))}/></CPField>
+            <CPField label="Start"><CPInput type="time" value={form.timeStart} onChange={e=>setForm(f=>withAutoAmount({...f,timeStart:e.target.value}))}/></CPField>
+            <CPField label={L("Ende","Fin","End","Fine")}><CPInput type="time" value={form.timeEnd} onChange={e=>setForm(f=>withAutoAmount({...f,timeEnd:e.target.value}))}/></CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.service||"Service"}><CPSelect value={form.serviceType} onChange={e=>setForm(f=>({...f,serviceType:e.target.value}))}><option value="cleaning">{t.cleaning}</option><option value="gardening">{t.gardening}</option><option value="other">{t.other}</option></CPSelect></CPField>
-            <CPField label="CHF"><CPInput type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:parseFloat(e.target.value)||""}))}/></CPField>
+            <CPField label={L("Betrag CHF","Importe CHF","Amount CHF","Importo CHF")}>
+              <CPInput type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:parseFloat(e.target.value)||""}))}/>
+              {(()=>{const c=clients.find(x=>x.id===form.clientId);const rate=parseFloat(c?.price)||0;const h=hoursBetween(form.timeStart,form.timeEnd);
+                return rate
+                  ? <div style={{color:"#74C0FC",fontSize:11,marginTop:4}}>CHF {rate.toFixed(2)}/h × {h} h = CHF {(rate*h).toFixed(2)}</div>
+                  : <div style={{color:"#FFA94D",fontSize:11,marginTop:4}}>{L("Kunde hat keinen Stundensatz","El cliente no tiene precio por hora","Client has no hourly rate","Il cliente non ha tariffa oraria")}</div>;})()}
+            </CPField>
           </div>
           <CPField label={t.description}><CPInput value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></CPField>
           <CPField label={t.status}><CPSelect value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option value="pending">{t.pending}</option><option value="inProgress">{t.inProgress}</option><option value="completed">{t.completed}</option></CPSelect></CPField>
@@ -3383,6 +3476,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
   const [selInv,setSelInv]=useState(null);
   const [form,setForm]=useState({});
   const [deleteInvId,setDeleteInvId]=useState(null);
+  const bulk=useBulkSelect();
 
   const deleteInvoice = (id) => {
     setInvoices(p=>p.filter(i=>i.id!==id));
@@ -3406,10 +3500,14 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
     <CPScreen title={t.invoices} icon="🧾" onBack={onBack} t={t}
       actions={<CPBtn onClick={()=>{const yr=new Date().getFullYear();const nums=invoices.filter(i=>(i.invoiceNumber||"").startsWith(`${yr}-`)).map(i=>parseInt((i.invoiceNumber||"").split("-")[1],10)).filter(x=>!isNaN(x));const next=(nums.length?Math.max(...nums):0)+1;const n=`${yr}-${String(next).padStart(3,"0")}`;const d=new Date();d.setDate(d.getDate()+14);setForm({clientId:clients[0]?.id||"",invoiceNumber:n,date:todayStr,dueDate:ymd(d),items:[{description:"",qty:1,price:0,total:0}],status:"pending"});setSelInv(null);setModal("form");}} size="sm">＋ {t.generateInvoice}</CPBtn>}
     >
+      <BulkBar bulk={bulk} visibleIds={invoices.map(i=>i.id)} lang={lang}
+        itemWord={{DE:"Rechnungen",ES:"facturas",EN:"invoices",IT:"fatture"}}
+        onDelete={ids=>{setInvoices(p=>p.filter(i=>!ids.has(i.id)));notify(L("Rechnungen gelöscht","Facturas eliminadas","Invoices deleted","Fatture eliminate"),"success");}}/>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {invoices.map(inv=>(
-          <CPCard key={inv.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-            <div>
+          <CPCard key={inv.id} onClick={bulk.selectMode?()=>bulk.toggle(inv.id):undefined} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,...(bulk.selected.has(inv.id)?{outline:"2px solid #4DABF7"}:{})}}>
+            {bulk.selectMode&&<SelBox checked={bulk.selected.has(inv.id)} onChange={()=>bulk.toggle(inv.id)}/>}
+            <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                 <span style={{color:"#74C0FC",fontWeight:700,fontSize:15}}>{inv.invoiceNumber}</span>
                 <CPBadge text={sl(inv.status)} color={sc(inv.status)}/>
@@ -3418,7 +3516,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
               <div style={{color:CP.textSecondary,fontSize:12}}>{inv.date} → {inv.dueDate}</div>
               <div style={{color:"#FFD43B",fontWeight:700,fontSize:14,marginTop:4}}>CHF {(inv.total||0).toFixed(2)}</div>
             </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <CPBtn onClick={()=>{setSelInv(inv);setModal("preview");}} variant="secondary" size="sm">👁️</CPBtn>
               {inv.status!=="paid"&&<CPBtn onClick={()=>{setInvoices(p=>p.map(i=>i.id===inv.id?{...i,status:"paid"}:i));notify(t.paid);}} variant="success" size="sm">✓ {t.paid}</CPBtn>}
               <CPBtn onClick={()=>{setForm({...inv,items:inv.items||[]});setSelInv(inv.id);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
@@ -3431,7 +3529,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
                 });
               }} variant="primary" size="sm">📧</CPBtn>
               <CPBtn onClick={()=>setDeleteInvId(inv.id)} variant="danger" size="sm">🗑️</CPBtn>
-            </div>
+            </div>}
           </CPCard>
         ))}
       </div>
