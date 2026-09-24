@@ -2604,7 +2604,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,cur
                       ✏️ {t.edit}
                     </CPBtn>
                     <CPBtn onClick={()=>{
-                      const pay = calcPayroll(emp, selMonth, selYear);
+                      const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs);
                       sendByEmail({
                         to: emp.email||"",
                         subject: `Lohnabrechnung / Nómina — ${emp.name} — ${selMonth}/${selYear}`,
@@ -2916,7 +2916,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, currentUser, notify, o
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────
-function DashApp({t,clients,jobs,invoices,employees,timeclock,notify,openApp,onBack,lang}){
+function DashApp({t,clients,jobs,invoices,employees,timeclock,notify,openApp,onBack,lang,companySettings}){
   const L = makeL(lang);
   const today=ymd(new Date());
   const income=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+(i.total||0),0);
@@ -3673,7 +3673,8 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
 }
 
 // ─── FINANCE ─────────────────────────────────────────────────
-function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,notify,onBack,lang}){
+function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,notify,onBack,lang,companySettings}){
+  const cs = companySettings||{};
   const [modal,setModal] = useState(null);
   const [ef,setEf] = useState({description:"",amount:"",category:"materials",date:todayStr});
   const [periodFilter,setPeriodFilter] = useState("all"); // all | month | year
@@ -7727,7 +7728,7 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
       salaryType: tp==="employee"?(employees[0]?.type==="hourly"?"hourly":"monthly"):"hourly",
       hours: tp==="employee"?"42":"",
       noticePeriod: tp==="employee"?L("1 Monat","1 mes","1 month","1 mese"):L("30 Tage","30 días","30 days","30 giorni"),
-      trialPeriod: tp==="employee"?trialEnymd(d):"",
+      trialPeriod: tp==="employee"?ymd(trialEnd):"",
       serviceType: tp==="client"?"cleaning":"",
       frequency: tp==="client"?"weekly":"",
       price: tp==="client"?(clients[0]?.price||""):"",
