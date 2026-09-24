@@ -1832,7 +1832,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
   const todayClock = timeclock.find(tc=>tc.employeeId===currentUser?.id&&tc.date===todayStr);
   const isClockedIn = !!(todayClock?.clockIn&&!todayClock?.clockOut);
   const unread = messages.filter(m=>m.to===currentUser?.id&&!m.read).length;
-  const pay = emp ? calcSwissPayroll(emp,timeclock,now.getMonth()+1,now.getFullYear()) : null;
+  const pay = emp ? calcSwissPayroll(emp,timeclock,now.getMonth()+1,now.getFullYear(),jobs) : null;
   const pendingCount = todayJobs.filter(j=>j.status==="pending").length;
   const completedCount = todayJobs.filter(j=>j.status==="completed").length;
   const [ticker,setTicker] = useState(0);
@@ -1984,10 +1984,21 @@ function EmployeeAppTile({app,label,sublabel,badge,isClockedIn,onOpen}){
 }
 
 
-function calcSwissPayroll(emp, timeclock, month, year){
+function calcSwissPayroll(emp, timeclock, month, year, jobs){
   const monthStr = `${year}-${String(month).padStart(2,"0")}`;
-  const monthClocks = timeclock.filter(tc=>tc.employeeId===emp.id && tc.date&&tc.date.startsWith(monthStr) && tc.hours);
-  const hoursWorked = monthClocks.reduce((s,tc)=>s+(tc.hours||0),0);
+  // Hourly employees are paid for the agreed (planned) hours of the jobs assigned to them that month:
+  // sum of (job start → job end) × employee hourly rate. Clock-in/out times do not change the pay.
+  // Falls back to clocked hours only if the jobs list isn't available.
+  let hoursWorked;
+  if(Array.isArray(jobs)){
+    hoursWorked = jobs
+      .filter(j=>j.employeeId===emp.id && j.date && j.date.startsWith(monthStr))
+      .reduce((s,j)=>s+hoursBetween(j.timeStart,j.timeEnd),0);
+    hoursWorked = Math.round(hoursWorked*100)/100;
+  } else {
+    const monthClocks = timeclock.filter(tc=>tc.employeeId===emp.id && tc.date&&tc.date.startsWith(monthStr) && tc.hours);
+    hoursWorked = monthClocks.reduce((s,tc)=>s+(tc.hours||0),0);
+  }
   const gross = emp.type==="hourly" ? hoursWorked*(emp.hourlyRate||0) : (emp.fixedSalary||0);
   const has_13th = emp.type==="fixed" && emp.has_13th;
   const thirteenth = has_13th ? gross/12 : 0;
@@ -2404,7 +2415,7 @@ td:last-child{text-align:right;font-weight:600}
 }
 
 // ─── EMPLOYEES APP (payroll integrated) ──────────────────────
-function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentUser,lang,companySettings}){
+function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,currentUser,lang,companySettings}){
   const L = makeL(lang);
   const [modal,setModal] = useState(null);
   const [form,setForm] = useState({});
@@ -2419,7 +2430,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
   const monthNames = MONTHS[lang]||MONTHS.EN;
 
   const openPayslip = (emp) => {
-    const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear);
+    const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs);
     setPayslipData({emp, pay, month:selMonth, year:selYear});
   };
 
@@ -2491,7 +2502,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
 
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         {visibleEmps.map(emp=>{
-          const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear);
+          const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs);
           return (
             <CPCard key={emp.id}>
               {/* Header */}
@@ -2789,7 +2800,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,notify,onBack,currentU
 }
 
 // ─── PAYROLL APP (standalone icon) ───────────────────────────
-function PayrollApp({t, lang, employees, timeclock, currentUser, notify, onBack, companySettings}){
+function PayrollApp({t, lang, employees, timeclock, jobs, currentUser, notify, onBack, companySettings}){
   const now = new Date();
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
   const [selYear,setSelYear] = useState(now.getFullYear());
@@ -2799,7 +2810,7 @@ function PayrollApp({t, lang, employees, timeclock, currentUser, notify, onBack,
   const monthNames = MONTHS[lang]||MONTHS.EN;
 
   const totals = employees.reduce((acc,emp)=>{
-    const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear);
+    const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear,jobs);
     acc.net+=parseFloat(pay.net);
     acc.gross+=parseFloat(pay.grossTotal);
     acc.cost+=parseFloat(pay.totalCost);
@@ -2849,7 +2860,7 @@ function PayrollApp({t, lang, employees, timeclock, currentUser, notify, onBack,
       {/* Employee list */}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {visibleEmps.map(emp=>{
-          const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear);
+          const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear,jobs);
           return (
             <CPCard key={emp.id}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
