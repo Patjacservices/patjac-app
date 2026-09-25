@@ -1822,6 +1822,7 @@ const EMPLOYEE_APPS = [
 ];
 
 function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,messages,employees,notify}){
+  useQstTariffs(employees);
   const L = makeL(lang);
   const dayStr = clock.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"long",day:"numeric",month:"long"});
   const now = new Date();
@@ -1984,6 +1985,59 @@ function EmployeeAppTile({app,label,sublabel,badge,isClockedIn,onOpen}){
 }
 
 
+// ── QUELLENSTEUER (withholding tax) – official ESTV 2026 tariff for canton Zurich ──
+// The full tariff (all codes A/B/C/H × children × church) is stored in Supabase table qst_tariffs
+// (imported from https://www.estv2.admin.ch/qst/2026/loehne/tar26zh.zip via edge function "qst-import").
+// The employee's code is derived from their situation; the % is looked up by monthly QST-relevant income.
+const QST_YEAR = 2026;
+const QST_API = { url:"https://rtviublrukagwxaypmit.supabase.co", key:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0dml1YmxydWthZ3d4YXlwbWl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MjkwMjEsImV4cCI6MjEwNTUwNTAyMX0.Ykj1dz8elWC12GP-m88IBiDc_Hscrw1AjPY9Tw7p-G8" };
+const QST_CACHE = {}; // code -> [{f,r}] sorted by income_from
+const QST_SITUATIONS = [
+  {id:"single",        L:["Ledig/geschieden/verwitwet, ohne Kinder","Soltero/a, divorciado/a o viudo/a, sin hijos","Single/divorced/widowed, no children","Celibe/divorziato/vedovo, senza figli"]},
+  {id:"singleKids",    L:["Alleinerziehend (lebt mit den Kindern)","Vive solo/a con sus hijos (familia monoparental)","Single parent (lives with children)","Genitore solo (vive con i figli)"]},
+  {id:"marriedSingle", L:["Verheiratet – Ehepartner/in arbeitet NICHT","Casado/a, el cónyuge NO trabaja","Married – spouse does NOT work","Sposato/a – coniuge NON lavora"]},
+  {id:"marriedDouble", L:["Verheiratet – Ehepartner/in arbeitet auch","Casado/a, el cónyuge también trabaja","Married – spouse also works","Sposato/a – anche il coniuge lavora"]},
+];
+const qstSubject = emp => ["B","L","G","other"].includes(emp.permit||"");
+function qstCodeFor(emp){
+  if(!qstSubject(emp) || !emp.maritalStatus) return null;
+  const kids = Math.min(9,(Number(emp.kidsUnder12)||0)+(Number(emp.kidsTeen)||0)+(Number(emp.kidsEdu)||0));
+  const ch = emp.church ? "Y" : "N";
+  switch(emp.maritalStatus){
+    case "marriedSingle": return `B${kids}${ch}`;
+    case "marriedDouble": return `C${kids}${ch}`;
+    case "singleKids":    return kids>0 ? `H${kids}${ch}` : `A0${ch}`;
+    default:              return `A0${ch}`;
+  }
+}
+async function loadQstTariffs(codes){
+  const need = [...new Set(codes.filter(c=>c && !QST_CACHE[c]))];
+  if(!need.length) return false;
+  let ok = false;
+  for(const c of need){ // one request per code (keeps each response well under the 1000-row API limit)
+    try{
+      const r = await fetch(`${QST_API.url}/rest/v1/qst_tariffs?select=income_from,rate&year=eq.${QST_YEAR}&code=eq.${c}&order=income_from.asc`,
+        {headers:{apikey:QST_API.key, Authorization:`Bearer ${QST_API.key}`}});
+      if(!r.ok) continue;
+      const rows = await r.json();
+      if(rows.length){ QST_CACHE[c] = rows.map(x=>({f:Number(x.income_from), r:Number(x.rate)})); ok = true; }
+    }catch(e){}
+  }
+  return ok;
+}
+function qstRateFor(code, monthlyIncome){
+  const rows = QST_CACHE[code]; if(!rows || !rows.length) return null;
+  let rate = 0;
+  for(const x of rows){ if(x.f <= monthlyIncome) rate = x.r; else break; }
+  return rate;
+}
+// React hook: loads the tariffs needed for a list of employees; re-renders when ready.
+function useQstTariffs(employees){
+  const [,setTick] = useState(0);
+  const codes = (employees||[]).map(qstCodeFor).filter(Boolean).sort().join(",");
+  useEffect(()=>{ if(codes) loadQstTariffs(codes.split(",")).then(ok=>{ if(ok) setTick(x=>x+1); }); },[codes]);
+}
+
 // ── SWISS PAYROLL 2026 ──────────────────────────────────────────────────────
 // Sources: AHV/IV/EO 5.3% + ALV 1.1% each side; BVG 2026 (entry CHF 22'680, coordination CHF 26'460,
 // min coordinated 3'780, max 64'260, age credits 7/10/15/18% split 50/50); GAV Reinigung 2026
@@ -2056,7 +2110,10 @@ function calcSwissPayroll(emp, timeclock, month, year, jobs, extras){
     const credit = age===null?7 : age<35?7 : age<45?10 : age<55?15 : 18;
     bvgEmpPct = credit/2;
   }
-  const qstPct = Number(emp.qstRate)||0;
+  // Withholding tax: official ZH tariff by code & monthly income (gross + family allowances); manual % only as fallback
+  const qstCode = qstCodeFor(emp);
+  const qstLookup = qstCode ? qstRateFor(qstCode, grossTotal + family) : null;
+  const qstPct = qstSubject(emp) ? (qstLookup!==null ? qstLookup : (Number(emp.qstRate)||0)) : 0;
   const deductions = [
     {key:"ahv", base:grossTotal, pct:P.ahv*100, amount:r2(grossTotal*P.ahv)},
     {key:"alv", base:grossTotal, pct:P.alv*100, amount:r2(grossTotal*P.alv)},
@@ -2086,7 +2143,7 @@ function calcSwissPayroll(emp, timeclock, month, year, jobs, extras){
   return {
     // structured
     earnings, deductions, employer, age, fiveWeeks, weeklyHours:r2(weeklyHours), nbuApplies,
-    family, familyLow, kids:{u:kidsU,t:kidsT,e:kidsE}, spesen, qstPct,
+    family, familyLow, kids:{u:kidsU,t:kidsT,e:kidsE}, spesen, qstPct, qstCode, qstFromTariff: qstLookup!==null,
     // legacy string fields (used elsewhere in the app)
     hoursWorked:Number(hoursWorked).toFixed(1), gross:f(base), thirteenth:f(byKey(earnings,"thirteenth")),
     grossTotal:f(grossTotal), ahvEmp:f(byKey(deductions,"ahv")), alvEmp:f(byKey(deductions,"alv")),
@@ -2602,7 +2659,7 @@ td:last-child{text-align:right;font-weight:600}
               nbu:L("NBU (Nichtberufsunfall)","Seguro accidentes no laborales (ANP)","Non-occupational accident (NBU)","Infortuni non professionali (INP)"),
               ktg:L("KTG (Krankentaggeld)","Seguro de pérdida de ganancia por enfermedad","Daily sickness allowance insurance","Indennità giornaliera malattia"),
               bvg:L("BVG / Pensionskasse","Caja de pensiones (LPP / 2.º pilar)","Pension fund (BVG)","Cassa pensione (LPP)"),
-              qst:L("Quellensteuer","Impuesto en la fuente","Withholding tax","Imposta alla fonte"),
+              qst:L("Quellensteuer","Impuesto en la fuente","Withholding tax","Imposta alla fonte")+(pay.qstCode?` (${L("Tarif","tarifa","tariff","tariffa")} ${pay.qstCode})`:""),
               bu:L("BU (Berufsunfall, nur Arbeitgeber)","Accidentes laborales (solo empresa)","Occupational accident (employer only)","Infortuni professionali (solo datore)"),
             };
             return (<>
@@ -2725,6 +2782,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
   const [payslipData,setPayslipData] = useState(null);
   const [worksheetEmp,setWorksheetEmp] = useState(null);
   const [,setSpesenTick] = useState(0);
+  useQstTariffs(employees);
   const now = new Date();
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
   const [selYear,setSelYear] = useState(now.getFullYear());
@@ -3050,11 +3108,29 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
               <CPInput type="number" value={form.kidsEdu??""} onChange={e=>setForm(f=>({...f,kidsEdu:parseInt(e.target.value)||0}))}/>
             </CPField>
           </div>
-          {(form.permit==="B"||form.permit==="L"||form.permit==="G"||form.permit==="other")&&(
-            <CPField label={L("Quellensteuer-Satz % (gemäss Tarif ZH)","Impuesto en la fuente % (según tarifa ZH)","Withholding tax % (ZH tariff)","Imposta alla fonte % (tariffa ZH)")}>
-              <CPInput type="number" value={form.qstRate??""} onChange={e=>setForm(f=>({...f,qstRate:parseFloat(e.target.value)||0}))} placeholder="z.B. 4.5"/>
-              <div style={{color:CP.textTertiary,fontSize:11,marginTop:4}}>{L("Den Satz im offiziellen Tarif des Kantons Zürich nachschlagen (Tarifcode A/B/C/H je nach Zivilstand und Kindern).","Busque el porcentaje en la tarifa oficial del cantón de Zúrich. El código de tarifa (A, B, C o H) depende del estado civil y los hijos.","Look up the rate in the official Canton Zurich tariff (code A/B/C/H by marital status and children).","Cercare il tasso nella tariffa ufficiale ZH (codice A/B/C/H).")}</div>
-            </CPField>
+          {qstSubject(form)&&(
+            <div style={{background:"rgba(250,176,5,.08)",border:"1px solid rgba(250,176,5,.3)",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
+              <div style={{color:"#FFD43B",fontSize:12,fontWeight:700,marginBottom:6}}>🧾 {L("Quellensteuer (offizieller Tarif Kanton Zürich 2026)","Impuesto en la fuente (tarifa oficial del cantón de Zúrich 2026)","Withholding tax (official Canton Zurich 2026 tariff)","Imposta alla fonte (tariffa ufficiale ZH 2026)")}</div>
+              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:"0 12px"}}>
+                <CPField label={L("Familiensituation","Situación familiar","Family situation","Situazione familiare")}>
+                  <CPSelect value={form.maritalStatus||""} onChange={e=>setForm(f=>({...f,maritalStatus:e.target.value}))}>
+                    <option value="">— {L("bitte wählen","elija una opción","please choose","scegliere")} —</option>
+                    {QST_SITUATIONS.map(o=><option key={o.id} value={o.id}>{o.L[["DE","ES","EN","IT"].indexOf(lang)]||o.L[2]}</option>)}
+                  </CPSelect>
+                </CPField>
+                <CPField label={L("Kirchensteuer","Impuesto eclesiástico","Church tax","Imposta di culto")}>
+                  <CPSelect value={form.church?"Y":"N"} onChange={e=>setForm(f=>({...f,church:e.target.value==="Y"}))}>
+                    <option value="N">{L("Nein (keine Landeskirche)","No (sin iglesia oficial)","No","No")}</option>
+                    <option value="Y">{L("Ja (reformiert/katholisch)","Sí (reformada o católica)","Yes (reformed/catholic)","Sì (riformata/cattolica)")}</option>
+                  </CPSelect>
+                </CPField>
+              </div>
+              <div style={{color:CP.textSecondary,fontSize:11}}>
+                {qstCodeFor(form)
+                  ? <>✅ {L("Tarifcode","Código de tarifa","Tariff code","Codice tariffa")}: <b style={{color:"#FFD43B"}}>{qstCodeFor(form)}</b> — {L("Der Prozentsatz wird jeden Monat automatisch nach Lohn berechnet.","El porcentaje se calcula solo cada mes según el salario.","The rate is calculated automatically each month from the salary.","La percentuale è calcolata automaticamente ogni mese.")}</>
+                  : L("Situation wählen – die Anzahl Kinder wird oben erfasst.","Elija la situación. El número de hijos se toma de los campos de arriba.","Choose the situation – children are taken from the fields above.","Scegliere la situazione – i figli dai campi sopra.")}
+              </div>
+            </div>
           )}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={L("Transport zwischen Kunden","Transporte entre clientes","Transport between clients","Trasporto tra clienti")}>
@@ -3162,6 +3238,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
   const [payslipData,setPayslipData] = useState(null);
   const [worksheetEmp,setWorksheetEmp] = useState(null);
   const [,setSpesenTick] = useState(0);
+  useQstTariffs(employees);
   const isAdmin = currentUser?.role==="admin";
   const visibleEmps = isAdmin ? employees : employees.filter(e=>e.id===currentUser?.id);
   const monthNames = MONTHS[lang]||MONTHS.EN;
