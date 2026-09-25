@@ -1832,7 +1832,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
   const todayClock = timeclock.find(tc=>tc.employeeId===currentUser?.id&&tc.date===todayStr);
   const isClockedIn = !!(todayClock?.clockIn&&!todayClock?.clockOut);
   const unread = messages.filter(m=>m.to===currentUser?.id&&!m.read).length;
-  const pay = emp ? calcSwissPayroll(emp,timeclock,now.getMonth()+1,now.getFullYear(),jobs) : null;
+  const pay = emp ? calcSwissPayroll(emp,timeclock,now.getMonth()+1,now.getFullYear(),jobs,{spesen:getSavedSpesen(emp.id,now.getFullYear(),now.getMonth()+1)}) : null;
   const pendingCount = todayJobs.filter(j=>j.status==="pending").length;
   const completedCount = todayJobs.filter(j=>j.status==="completed").length;
   const [ticker,setTicker] = useState(0);
@@ -1984,49 +1984,117 @@ function EmployeeAppTile({app,label,sublabel,badge,isClockedIn,onOpen}){
 }
 
 
-function calcSwissPayroll(emp, timeclock, month, year, jobs){
+// ── SWISS PAYROLL 2026 ──────────────────────────────────────────────────────
+// Sources: AHV/IV/EO 5.3% + ALV 1.1% each side; BVG 2026 (entry CHF 22'680, coordination CHF 26'460,
+// min coordinated 3'780, max 64'260, age credits 7/10/15/18% split 50/50); GAV Reinigung 2026
+// (vacation 8.33%/10.64%, holidays 1.5%/3.6%, 13th salary 8.33% for hourly); Familienzulagen ZH 2026
+// (CHF 215 <12 y., 268 12–16 y., 268 education). NBU/KTG/BU rates depend on the company's insurance policy.
+const PAYROLL_2026 = {
+  ahv:0.053, alv:0.011, nbu:0.012, ktg:0.005, bu:0.005,
+  bvgEntry:22680, bvgCoord:26460, bvgMinCoord:3780, bvgMaxCoord:64260,
+  kidUnder12:215, kidTeen:268, kidEdu:268, famMinIncome:7560,
+};
+const ageAt = (birthDate, onDate) => {
+  if(!birthDate) return null;
+  const b=new Date(birthDate+"T00:00:00"); if(isNaN(b)) return null;
+  let a=onDate.getFullYear()-b.getFullYear();
+  const m=onDate.getMonth()-b.getMonth(); if(m<0||(m===0&&onDate.getDate()<b.getDate())) a--;
+  return a;
+};
+function calcSwissPayroll(emp, timeclock, month, year, jobs, extras){
+  const P = PAYROLL_2026;
   const monthStr = `${year}-${String(month).padStart(2,"0")}`;
-  // Hourly employees are paid for the agreed (planned) hours of the jobs assigned to them that month:
-  // sum of (job start → job end) × employee hourly rate. Clock-in/out times do not change the pay.
-  // Falls back to clocked hours only if the jobs list isn't available.
+  const refDate = new Date(year, month, 0); // last day of month
+  // Hourly employees: agreed (planned) hours of their jobs this month. Clock-in/out does not change pay.
   let hoursWorked;
   if(Array.isArray(jobs)){
-    hoursWorked = jobs
-      .filter(j=>j.employeeId===emp.id && j.date && j.date.startsWith(monthStr))
+    hoursWorked = jobs.filter(j=>j.employeeId===emp.id && j.date && j.date.startsWith(monthStr))
       .reduce((s,j)=>s+hoursBetween(j.timeStart,j.timeEnd),0);
     hoursWorked = Math.round(hoursWorked*100)/100;
   } else {
-    const monthClocks = timeclock.filter(tc=>tc.employeeId===emp.id && tc.date&&tc.date.startsWith(monthStr) && tc.hours);
-    hoursWorked = monthClocks.reduce((s,tc)=>s+(tc.hours||0),0);
+    hoursWorked = timeclock.filter(tc=>tc.employeeId===emp.id && tc.date&&tc.date.startsWith(monthStr) && tc.hours)
+      .reduce((s,tc)=>s+(tc.hours||0),0);
   }
-  const gross = emp.type==="hourly" ? hoursWorked*(emp.hourlyRate||0) : (emp.fixedSalary||0);
-  const has_13th = emp.type==="fixed" && emp.has_13th;
-  const thirteenth = has_13th ? gross/12 : 0;
-  const grossTotal = gross+thirteenth;
-  // Employee deductions – Swiss 2024 official rates
-  const ahvEmp  = grossTotal*0.053;
-  const alvEmp  = grossTotal*0.011;
-  const nbuvEmp = grossTotal*0.012;
-  const bvgEmp  = grossTotal*0.07;
-  const ktgEmp  = grossTotal*0.005;
-  const totalDeductEmp = ahvEmp+alvEmp+nbuvEmp+bvgEmp+ktgEmp;
-  const net = grossTotal-totalDeductEmp;
-  // Employer contributions
-  const ahvEmpl = grossTotal*0.053;
-  const alvEmpl = grossTotal*0.011;
-  const buvEmpl = grossTotal*0.005;
-  const bvgEmpl = grossTotal*0.07;
-  const ktgEmpl = grossTotal*0.005;
-  const totalDeductEmpl = ahvEmpl+alvEmpl+buvEmpl+bvgEmpl+ktgEmpl;
-  const totalCost = grossTotal+totalDeductEmpl;
+  const age = ageAt(emp.birthDate, refDate);
+  const yearsService = emp.startDate ? (refDate - new Date(emp.startDate+"T00:00:00"))/(365.25*86400000) : 0;
+  const fiveWeeks = age!==null && (age<=20 || (age>=50 && yearsService>=5));
+  const r2 = n=>Math.round(n*100)/100;
+
+  // ── Earnings (AHV-subject) ──
+  const earnings = [];
+  let base;
+  if(emp.type==="hourly"){
+    const rate = Number(emp.hourlyRate)||0;
+    base = r2(hoursWorked*rate);
+    earnings.push({key:"base", qty:hoursWorked, rate, amount:base});
+    const vacPct = fiveWeeks?10.64:8.33;
+    earnings.push({key:"vacation", pct:vacPct, amount:r2(base*vacPct/100)});
+    const cat = emp.gavCategory||"";
+    const holPct = /^reinigung_/.test(cat) ? 1.5 : /^(spezial|spital|fahrzeug)_/.test(cat) ? 3.6 : 0;
+    if(holPct) earnings.push({key:"holidays", pct:holPct, amount:r2(base*holPct/100)});
+    earnings.push({key:"thirteenth", pct:8.33, amount:r2(base*8.33/100)});
+  } else {
+    base = Number(emp.fixedSalary)||0;
+    earnings.push({key:"monthly", amount:base});
+    if(emp.has_13th) earnings.push({key:"thirteenth", amount:r2(base/12)});
+  }
+  const grossTotal = r2(earnings.reduce((s,e)=>s+e.amount,0));
+
+  // ── Family allowances (not AHV-subject, added to pay) ──
+  const kidsU = Number(emp.kidsUnder12)||0, kidsT = Number(emp.kidsTeen)||0, kidsE = Number(emp.kidsEdu)||0;
+  const family = r2(kidsU*P.kidUnder12 + kidsT*P.kidTeen + kidsE*P.kidEdu);
+  const familyLow = family>0 && grossTotal*12 < P.famMinIncome;
+
+  // ── Employee deductions ──
+  const weeklyHours = emp.type==="hourly" ? hoursWorked/4.33 : 42;
+  const nbuApplies = weeklyHours >= 8;
+  const annual = grossTotal*12;
+  let bvgCoordMonthly = 0, bvgEmpPct = 0;
+  if(annual > P.bvgEntry && (age===null || age>=25)){
+    const coord = Math.min(Math.max(annual-P.bvgCoord, P.bvgMinCoord), P.bvgMaxCoord);
+    bvgCoordMonthly = r2(coord/12);
+    const credit = age===null?7 : age<35?7 : age<45?10 : age<55?15 : 18;
+    bvgEmpPct = credit/2;
+  }
+  const qstPct = Number(emp.qstRate)||0;
+  const deductions = [
+    {key:"ahv", base:grossTotal, pct:P.ahv*100, amount:r2(grossTotal*P.ahv)},
+    {key:"alv", base:grossTotal, pct:P.alv*100, amount:r2(grossTotal*P.alv)},
+  ];
+  if(nbuApplies) deductions.push({key:"nbu", base:grossTotal, pct:P.nbu*100, amount:r2(grossTotal*P.nbu)});
+  deductions.push({key:"ktg", base:grossTotal, pct:P.ktg*100, amount:r2(grossTotal*P.ktg)});
+  if(bvgEmpPct) deductions.push({key:"bvg", base:bvgCoordMonthly, pct:bvgEmpPct, amount:r2(bvgCoordMonthly*bvgEmpPct/100)});
+  if(qstPct) deductions.push({key:"qst", base:r2(grossTotal+family), pct:qstPct, amount:r2((grossTotal+family)*qstPct/100)});
+  const totalDeductEmp = r2(deductions.reduce((s,d)=>s+d.amount,0));
+
+  // ── Expenses (not taxable): transport + meals from the monthly work sheet ──
+  const spesen = r2(Number(extras?.spesen)||0);
+  const net = r2(grossTotal - totalDeductEmp + family + spesen);
+
+  // ── Employer contributions ──
+  const employer = [
+    {key:"ahv", pct:P.ahv*100, amount:r2(grossTotal*P.ahv)},
+    {key:"alv", pct:P.alv*100, amount:r2(grossTotal*P.alv)},
+    {key:"bu",  pct:P.bu*100,  amount:r2(grossTotal*P.bu)},
+    {key:"ktg", pct:P.ktg*100, amount:r2(grossTotal*P.ktg)},
+  ];
+  if(bvgEmpPct) employer.push({key:"bvg", pct:bvgEmpPct, amount:r2(bvgCoordMonthly*bvgEmpPct/100)});
+  const totalDeductEmpl = r2(employer.reduce((s,d)=>s+d.amount,0));
+  const totalCost = r2(grossTotal + totalDeductEmpl + family + spesen);
+  const byKey = (arr,k)=> (arr.find(x=>x.key===k)?.amount)||0;
   const f = n=>Number(n).toFixed(2);
   return {
-    hoursWorked:hoursWorked.toFixed(1), gross:f(gross), thirteenth:f(thirteenth),
-    grossTotal:f(grossTotal), ahvEmp:f(ahvEmp), alvEmp:f(alvEmp), nbuvEmp:f(nbuvEmp),
-    bvgEmp:f(bvgEmp), ktgEmp:f(ktgEmp), totalDeductEmp:f(totalDeductEmp), net:f(net),
-    ahvEmpl:f(ahvEmpl), alvEmpl:f(alvEmpl), buvEmpl:f(buvEmpl), bvgEmpl:f(bvgEmpl),
-    ktgEmpl:f(ktgEmpl), totalDeductEmpl:f(totalDeductEmpl), totalCost:f(totalCost),
-    taxableSalary:f(net),
+    // structured
+    earnings, deductions, employer, age, fiveWeeks, weeklyHours:r2(weeklyHours), nbuApplies,
+    family, familyLow, kids:{u:kidsU,t:kidsT,e:kidsE}, spesen, qstPct,
+    // legacy string fields (used elsewhere in the app)
+    hoursWorked:Number(hoursWorked).toFixed(1), gross:f(base), thirteenth:f(byKey(earnings,"thirteenth")),
+    grossTotal:f(grossTotal), ahvEmp:f(byKey(deductions,"ahv")), alvEmp:f(byKey(deductions,"alv")),
+    nbuvEmp:f(byKey(deductions,"nbu")), bvgEmp:f(byKey(deductions,"bvg")), ktgEmp:f(byKey(deductions,"ktg")),
+    qstEmp:f(byKey(deductions,"qst")), totalDeductEmp:f(totalDeductEmp), net:f(net),
+    ahvEmpl:f(byKey(employer,"ahv")), alvEmpl:f(byKey(employer,"alv")), buvEmpl:f(byKey(employer,"bu")),
+    bvgEmpl:f(byKey(employer,"bvg")), ktgEmpl:f(byKey(employer,"ktg")), totalDeductEmpl:f(totalDeductEmpl),
+    totalCost:f(totalCost), taxableSalary:f(grossTotal - totalDeductEmp + family),
   };
 }
 
@@ -2036,6 +2104,237 @@ const MONTHS = {
   EN:["January","February","March","April","May","June","July","August","September","October","November","December"],
   IT:["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"],
 };
+
+// ── MONTHLY WORK SHEET (Arbeitsrapport) with routes & transport expenses ─────
+// Distances: OpenStreetMap Nominatim (geocoding) + OSRM (driving distance). Results cached in the browser.
+// If the map services are unreachable, a straight-line estimate × 1.3 is used and marked "≈".
+const KM_RATE_CAR = 0.75;      // ESTV 2026 private car rate CHF/km
+const MEAL_ALLOWANCE = 16;     // GAV Reinigung Art. 14: CHF 16/day when ≥ 6 h away
+const lsGet = (k,d)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } };
+const lsSet = (k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} };
+const fmtAddr = o => o ? `${o.street||""} ${o.number||""}, ${o.postalCode||""} ${o.city||""}`.replace(/\s+/g," ").replace(/^[\s,]+|[\s,]+$/g,"").trim() : "";
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let _lastGeo = 0;
+async function geocodeCH(addr){
+  if(!addr) return null;
+  const cache = lsGet("patjac_geo",{});
+  if(cache[addr]) return cache[addr];
+  const wait = 1100 - (Date.now()-_lastGeo); if(wait>0) await sleep(wait); // Nominatim: max 1 request/second
+  _lastGeo = Date.now();
+  try{
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ch&q=${encodeURIComponent(addr)}`,{headers:{"Accept-Language":"de"}});
+    const j = await r.json();
+    if(j && j[0]){ const p={lat:+j[0].lat, lon:+j[0].lon}; cache[addr]=p; lsSet("patjac_geo",cache); return p; }
+  }catch(e){}
+  return null;
+}
+const haversineKm = (a,b)=>{ const R=6371, toR=x=>x*Math.PI/180; const dLa=toR(b.lat-a.lat), dLo=toR(b.lon-a.lon);
+  const h=Math.sin(dLa/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+async function routeKm(addrA, addrB){
+  if(!addrA||!addrB) return null;
+  if(addrA===addrB) return {km:0, approx:false};
+  const key=`${addrA}→${addrB}`; const cache=lsGet("patjac_routes",{});
+  if(cache[key]) return cache[key];
+  const a=await geocodeCH(addrA), b=await geocodeCH(addrB);
+  if(!a||!b) return null;
+  let res=null;
+  try{
+    const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`);
+    const j=await r.json();
+    if(j && j.routes && j.routes[0]) res={km:Math.round(j.routes[0].distance/100)/10, approx:false};
+  }catch(e){}
+  if(!res) res={km:Math.round(haversineKm(a,b)*1.3*10)/10, approx:true};
+  cache[key]=res; lsSet("patjac_routes",cache);
+  return res;
+}
+const spesenKey = (empId,y,m)=>`${empId}_${y}-${String(m).padStart(2,"0")}`;
+const getSavedSpesen = (empId,y,m)=> (lsGet("patjac_spesen",{})[spesenKey(empId,y,m)]||0);
+const saveSpesen = (empId,y,m,val)=>{ const all=lsGet("patjac_spesen",{}); all[spesenKey(empId,y,m)]=val; lsSet("patjac_spesen",all); };
+
+function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, companySettings, onSpesen}){
+  const L = makeL(lang);
+  const cs = companySettings||{name:"Patjac Reinigung Garten & Services",street:"",number:"",postalCode:"",city:"Zürich",uid:""};
+  const monthName = (MONTHS[lang]||MONTHS.EN)[month-1];
+  const monthStr = `${year}-${String(month).padStart(2,"0")}`;
+  const [rows,setRows] = useState(null);
+  const [progress,setProgress] = useState("");
+  const [withMeals,setWithMeals] = useState(()=>lsGet("patjac_meals_on",true));
+  const mode = emp.transportMode||"public";
+  const ticket = Number(emp.ticketPrice)||0;
+  const homeAddr = fmtAddr(emp);
+
+  useEffect(()=>{
+    let alive=true;
+    (async()=>{
+      const mine = (jobs||[]).filter(j=>j.employeeId===emp.id && j.date && j.date.startsWith(monthStr))
+        .sort((a,b)=>`${a.date}${a.timeStart||""}`.localeCompare(`${b.date}${b.timeStart||""}`));
+      const out=[]; let prevDate=null, prevAddr=null, i=0;
+      for(const j of mine){
+        i++; if(alive) setProgress(`${i}/${mine.length}`);
+        const c = clients.find(x=>x.id===j.clientId);
+        const addr = fmtAddr(c);
+        const first = j.date!==prevDate;
+        const from = first ? homeAddr : prevAddr;
+        const r = await routeKm(from, addr);
+        out.push({
+          from, date:j.date, client:j.clientName||c?.name||"", addr,
+          planStart:j.timeStart||"", planEnd:j.timeEnd||"", hours:hoursBetween(j.timeStart,j.timeEnd),
+          actStart:j.actualStart||"", actEnd:j.actualEnd||"",
+          first, km:r?r.km:null, approx:r?r.approx:false, missing:!r,
+        });
+        prevDate=j.date; prevAddr=addr;
+      }
+      if(alive){ setRows(out); setProgress(""); }
+    })();
+    return ()=>{ alive=false; };
+  },[emp.id, monthStr]);
+
+  // Per-row reimbursement: only trips between clients (home → first job is private commute)
+  const rowCost = r => r.first ? 0 : (mode==="car" ? (r.km||0)*KM_RATE_CAR : (r.km>0 ? ticket : 0));
+  const days = rows ? [...new Set(rows.map(r=>r.date))] : [];
+  const dayMeal = d => {
+    if(!withMeals) return 0;
+    const rs = rows.filter(r=>r.date===d);
+    const start = rs.map(r=>r.planStart).sort()[0], end = rs.map(r=>r.planEnd).sort().slice(-1)[0];
+    return hoursBetween(start,end) >= 6 ? MEAL_ALLOWANCE : 0;
+  };
+  const totals = rows ? {
+    hours: Math.round(rows.reduce((s,r)=>s+r.hours,0)*100)/100,
+    kmHome: Math.round(rows.filter(r=>r.first).reduce((s,r)=>s+(r.km||0),0)*10)/10,
+    kmBetween: Math.round(rows.filter(r=>!r.first).reduce((s,r)=>s+(r.km||0),0)*10)/10,
+    transport: Math.round(rows.reduce((s,r)=>s+rowCost(r),0)*100)/100,
+    meals: days.reduce((s,d)=>s+dayMeal(d),0),
+  } : null;
+  const spesenTotal = totals ? Math.round((totals.transport+totals.meals)*100)/100 : 0;
+
+  useEffect(()=>{ if(totals){ saveSpesen(emp.id,year,month,spesenTotal); onSpesen&&onSpesen(spesenTotal); } },[rows, withMeals]);
+
+  const fm = n=>Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fd = d=>{ const x=new Date(d+"T00:00:00"); return x.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"short",day:"2-digit",month:"2-digit"}); };
+  const th = {padding:"5px 6px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #000",fontSize:10.5};
+  const td = {padding:"4px 6px",borderBottom:"1px solid #eee",fontSize:10.5,verticalAlign:"top"};
+
+  const download = ()=>{
+    const el=document.getElementById("patjac-worksheet"); if(!el) return;
+    const title=L("Arbeitsrapport","Hoja de trabajo","Work sheet","Rapporto di lavoro");
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} ${emp.name} ${monthName} ${year}</title>
+<style>*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}body{padding:24px;max-width:1000px;margin:0 auto;color:#000}
+.hint{background:#1C7ED6;color:#fff;padding:10px;border-radius:6px;text-align:center;margin-bottom:14px;font-size:12px}
+@media print{.hint{display:none}@page{size:A4 landscape;margin:1.2cm}}</style></head><body>
+<div class="hint">${L("💡 Drucken → Als PDF speichern","💡 Imprimir → Guardar como PDF","💡 Print → Save as PDF","💡 Stampa → Salva come PDF")}</div>${el.innerHTML}</body></html>`;
+    try{ const b=new Blob([html],{type:"text/html;charset=utf-8"}); const u=URL.createObjectURL(b); const a=document.createElement("a");
+      a.href=u; a.download=`${title}_${emp.name.replace(/\s+/g,"_")}_${monthName}_${year}.html`; document.body.appendChild(a); a.click();
+      setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(u);},3000);
+    }catch(e){ const w=window.open("about:blank","_blank"); if(w){w.document.write(html);w.document.close();} }
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:99999,padding:16,overflowY:"auto",display:"flex",justifyContent:"center",alignItems:"flex-start"}} onClick={onClose}>
+      <div style={{background:"rgba(8,12,24,0.99)",border:"1px solid rgba(28,126,214,0.5)",borderRadius:20,width:"min(1040px,97vw)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{background:"linear-gradient(90deg,#1C7ED6,#0CA678)",borderRadius:"20px 20px 0 0",padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <div style={{color:"#fff",fontWeight:700}}>📋 {L("Arbeitsrapport","Hoja mensual de trabajo","Monthly work sheet","Rapporto mensile")} · {emp.name} · {monthName} {year}</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <label style={{color:"#fff",fontSize:12,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+              <input type="checkbox" checked={withMeals} onChange={e=>{setWithMeals(e.target.checked);lsSet("patjac_meals_on",e.target.checked);}}/>
+              {L("Verpflegung CHF 16 (GAV)","Comida CHF 16 (GAV)","Meals CHF 16 (GAV)","Pasto CHF 16 (CCL)")}
+            </label>
+            <button onClick={download} disabled={!rows} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontWeight:700}}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</button>
+            <button onClick={onClose} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer"}}>✕</button>
+          </div>
+        </div>
+        <div style={{padding:16}}>
+          {!rows ? (
+            <div style={{color:"#74C0FC",textAlign:"center",padding:40}}>🗺️ {L("Distanzen werden berechnet…","Calculando distancias…","Calculating distances…","Calcolo distanze…")} {progress}</div>
+          ) : (
+          <div id="patjac-worksheet" style={{background:"#fff",color:"#000",borderRadius:8,padding:"24px 26px",fontFamily:"Arial,Helvetica,sans-serif"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"2.5px solid #1C7ED6",paddingBottom:10,marginBottom:12}}>
+              <div>
+                <img src={PATJAC_LOGO} alt="Patjac" style={{height:38,display:"block",marginBottom:4}}/>
+                <div style={{fontSize:10,color:"#555"}}>{cs.name} · {cs.street} {cs.number}, {cs.postalCode} {cs.city}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:16,fontWeight:700,color:"#1C7ED6"}}>{L("ARBEITSRAPPORT","HOJA MENSUAL DE TRABAJO","MONTHLY WORK SHEET","RAPPORTO MENSILE")}</div>
+                <div style={{fontSize:12,fontWeight:600}}>{monthName} {year}</div>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,fontSize:11,marginBottom:12}}>
+              <div><b>{L("Mitarbeiter/in","Empleado/a","Employee","Dipendente")}:</b> {emp.name}</div>
+              <div><b>{L("Anstellung","Tipo","Type","Tipo")}:</b> {emp.type==="fixed"?L("Festlohn","Salario fijo","Fixed salary","Fisso"):L("Stundenlohn","Por horas","Hourly","A ore")}</div>
+              <div><b>{L("Transport","Transporte","Transport","Trasporto")}:</b> {mode==="car"?`🚗 ${L("Auto","Coche","Car","Auto")} CHF ${KM_RATE_CAR}/km`:`🚋 ${L("ÖV","Transporte público","Public transport","Trasporto pubblico")} CHF ${fm(ticket)}/${L("Fahrt","trayecto","trip","tratta")}`}</div>
+              <div style={{gridColumn:"1 / span 3"}}><b>{L("Wohnadresse","Domicilio","Home address","Domicilio")}:</b> {homeAddr||<span style={{color:"#c00"}}>{L("fehlt – bitte im Profil erfassen","falta: añádalo en la ficha del empleado","missing – add to profile","mancante")}</span>}</div>
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr>
+                <th style={th}>{L("Datum","Fecha","Date","Data")}</th>
+                <th style={th}>{L("Arbeitsort","Lugar de trabajo","Workplace","Luogo")}</th>
+                <th style={th}>{L("Geplant","Planificado","Planned","Pianificato")}</th>
+                <th style={th}>{L("Ein / Aus (effektiv)","Entrada / salida (real)","In / out (actual)","Entrata / uscita")}</th>
+                <th style={{...th,textAlign:"right"}}>{L("Std.","Horas","Hours","Ore")}</th>
+                <th style={th}>{L("Strecke","Recorrido","Route","Tragitto")}</th>
+                <th style={{...th,textAlign:"right"}}>km</th>
+                <th style={{...th,textAlign:"right"}}>{L("Transport CHF","Transporte CHF","Transport CHF","Trasporto CHF")}</th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r,i)=>(
+                  <tr key={i} style={{background:r.first?"#f6f9fc":"#fff"}}>
+                    <td style={td}>{r.first?fd(r.date):""}</td>
+                    <td style={td}><b>{r.client}</b><br/><span style={{color:"#555"}}>{r.addr}</span></td>
+                    <td style={td}>{r.planStart}–{r.planEnd}</td>
+                    <td style={td}>{r.actStart||"—"} / {r.actEnd||"—"}</td>
+                    <td style={{...td,textAlign:"right"}}>{r.hours.toFixed(2)}</td>
+                    <td style={{...td,color:"#555"}}>{r.first?`🏠 → ${L("1. Einsatz","1.er trabajo","1st job","1° lavoro")}`:`↪ ${L("von vorherigem Kunden","desde el cliente anterior","from previous client","dal cliente precedente")}`}</td>
+                    <td style={{...td,textAlign:"right",cursor:"pointer"}} title={L("Klicken, um km zu korrigieren","Pulse para corregir los km","Click to correct km","Clic per correggere i km")}
+                      onClick={()=>{
+                        const v = window.prompt(L("Kilometer für diese Strecke:","Kilómetros de este recorrido:","Kilometres for this route:","Chilometri per questo tragitto:"), r.km??"");
+                        if(v===null) return; const km=parseFloat(String(v).replace(",",".")); if(isNaN(km)) return;
+                        const cache=lsGet("patjac_routes",{}); cache[`${r.from}→${r.addr}`]={km,approx:false,manual:true}; lsSet("patjac_routes",cache);
+                        setRows(prev=>prev.map((x,k)=>k===i?{...x,km,approx:false,missing:false}:x));
+                      }}>{r.missing?<span style={{color:"#c00",fontWeight:700}}>?</span>:`${r.approx?"≈":""}${r.km.toFixed(1)}`}</td>
+                    <td style={{...td,textAlign:"right"}}>{r.first?<span style={{color:"#888",fontSize:9.5}}>{L("privat","privado","private","privato")}</span>:fm(rowCost(r))}</td>
+                  </tr>
+                ))}
+                {rows.length===0&&<tr><td colSpan={8} style={{...td,textAlign:"center",color:"#888",padding:20}}>{L("Keine Einsätze in diesem Monat","No hay trabajos este mes","No jobs this month","Nessun lavoro questo mese")}</td></tr>}
+              </tbody>
+            </table>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginTop:14,fontSize:11}}>
+              <div style={{border:"1px solid #dce5f0",borderRadius:6,padding:"8px 10px"}}>
+                <div style={{color:"#555"}}>{L("Arbeitstage / Einsätze","Días trabajados / trabajos","Days / jobs","Giorni / lavori")}</div>
+                <div style={{fontWeight:700,fontSize:14}}>{days.length} / {rows.length}</div>
+              </div>
+              <div style={{border:"1px solid #dce5f0",borderRadius:6,padding:"8px 10px"}}>
+                <div style={{color:"#555"}}>{L("Vereinbarte Stunden","Horas pactadas","Agreed hours","Ore concordate")}</div>
+                <div style={{fontWeight:700,fontSize:14}}>{totals.hours.toFixed(2)} h</div>
+              </div>
+              <div style={{border:"1px solid #dce5f0",borderRadius:6,padding:"8px 10px"}}>
+                <div style={{color:"#555"}}>km: 🏠→{L("Arbeit","trabajo","work","lavoro")} / {L("zwischen Kunden","entre clientes","between clients","tra clienti")}</div>
+                <div style={{fontWeight:700,fontSize:14}}>{totals.kmHome.toFixed(1)} / {totals.kmBetween.toFixed(1)}</div>
+              </div>
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse",marginTop:12,fontSize:11.5}}>
+              <tbody>
+                <tr><td style={td}>{mode==="car"?L(`Fahrtkosten Auto: ${totals.kmBetween.toFixed(1)} km × CHF ${KM_RATE_CAR}`,`Transporte en coche: ${totals.kmBetween.toFixed(1)} km × CHF ${KM_RATE_CAR}`,`Car: ${totals.kmBetween.toFixed(1)} km × CHF ${KM_RATE_CAR}`,`Auto: ${totals.kmBetween.toFixed(1)} km × CHF ${KM_RATE_CAR}`):L("Billette öffentlicher Verkehr zwischen Kunden","Billetes de transporte público entre clientes","Public transport tickets between clients","Biglietti trasporto pubblico tra clienti")}</td><td style={{...td,textAlign:"right"}}>{fm(totals.transport)}</td></tr>
+                {withMeals&&<tr><td style={td}>{L("Verpflegungsentschädigung (Tage ≥ 6 Std.) × CHF 16","Comida (días de 6 h o más) × CHF 16","Meal allowance (days ≥ 6 h) × CHF 16","Indennità pasto (giorni ≥ 6 h) × CHF 16")}</td><td style={{...td,textAlign:"right"}}>{fm(totals.meals)}</td></tr>}
+                <tr style={{background:"#e8f5ee"}}><td style={{...td,fontWeight:700}}>{L("Total Spesen (steuerfrei, mit dem Lohn ausbezahlt)","Total de gastos (no imponibles, se pagan con la nómina)","Total expenses (tax-free, paid with salary)","Totale spese (esenti, pagate con lo stipendio)")}</td><td style={{...td,textAlign:"right",fontWeight:700}}>CHF {fm(spesenTotal)}</td></tr>
+              </tbody>
+            </table>
+            <div style={{marginTop:10,fontSize:9.5,color:"#555",lineHeight:1.5}}>
+              {rows.some(r=>r.missing)&&<div style={{color:"#c00",fontWeight:700,marginBottom:4}}>{L("⚠️ Einige Distanzen konnten nicht berechnet werden (?). Auf das ? klicken und km eingeben.","⚠️ No se pudieron calcular algunas distancias (?). Pulse sobre el ? y escriba los km.","⚠️ Some distances could not be calculated (?). Click the ? and enter the km.","⚠️ Alcune distanze non calcolate (?). Cliccare sul ? e inserire i km.")}</div>}
+              {L("Grundlagen: Reisezeit und Fahrkosten zwischen Kunden gelten als Arbeitszeit bzw. werden ersetzt (GAV Reinigung Art. 14; Art. 327a OR). Der Weg von zu Hause zum ersten Einsatz ist Arbeitsweg (privat). Auto: CHF 0.75/km (ESTV 2026). Distanzen: OpenStreetMap; ≈ = geschätzt.",
+                 "Base legal: el tiempo de viaje entre clientes es tiempo de trabajo y los gastos de transporte se reembolsan (GAV de limpieza, Art. 14; Art. 327a CO). El trayecto de casa al primer trabajo es privado. Coche: CHF 0.75/km (tarifa ESTV 2026). Distancias calculadas con OpenStreetMap; ≈ significa estimado.",
+                 "Basis: travel time and costs between clients are working time / reimbursed (GAV Art. 14; Art. 327a CO). Home → first job is private commute. Car CHF 0.75/km (ESTV 2026). Distances: OpenStreetMap; ≈ = estimated.",
+                 "Base: tempo e spese di viaggio tra clienti sono tempo di lavoro / rimborsati (CCL Art. 14; Art. 327a CO). Casa → primo lavoro è privato. Auto CHF 0.75/km (AFC 2026). Distanze: OpenStreetMap; ≈ = stimato.")}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,marginTop:26,fontSize:10,color:"#555",textAlign:"center"}}>
+              <div style={{borderTop:"1px solid #333",paddingTop:5}}>{L("Mitarbeiter/in","Empleado/a","Employee","Dipendente")}: {emp.name}</div>
+              <div style={{borderTop:"1px solid #333",paddingTop:5}}>{cs.name}</div>
+            </div>
+          </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── PAYSLIP MODAL – On-Screen Preview + PDF Download ────────
 function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings}){
@@ -2285,112 +2584,114 @@ td:last-child{text-align:right;font-weight:600}
             </div>
           </div>
 
-          {/* ── Haupttabelle ── */}
-          <table style={{width:"100%",borderCollapse:"collapse",marginBottom:0,fontSize:12}}>
-            <thead>
-              <tr style={{borderBottom:"2px solid #000"}}>
-                <th style={{padding:"4px 6px",textAlign:"left",fontWeight:700}}>{L("Lohnart","Concepto","Pay type","Tipo retrib.")}</th>
-                <th style={{padding:"4px 6px",textAlign:"right",fontWeight:700}}>{L("Anzahl","Cantidad","Qty","Quant.")}</th>
-                <th style={{padding:"4px 6px",textAlign:"right",fontWeight:700}}>{L("Ansatz","Tasa","Rate","Tasso")}</th>
-                <th style={{padding:"4px 6px",textAlign:"right",fontWeight:700}}>Subtotal</th>
-                <th style={{padding:"4px 6px",textAlign:"right",fontWeight:700}}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* 1000 Grundlohn */}
-              {emp.type==="fixed"&&(
+          {/* ── Haupttabelle (2026) ── */}
+          {(()=>{
+            const fm = n=>Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
+            const td = {padding:"4px 6px",borderBottom:"1px solid #eee"};
+            const tdr = {...td,textAlign:"right"};
+            const EL = {
+              base:L("Stundenlohn (vereinbarte Std.)","Salario por horas (horas pactadas)","Hourly wage (agreed hours)","Salario orario (ore concordate)"),
+              monthly:L("Monatslohn","Salario mensual","Monthly salary","Salario mensile"),
+              vacation:L("Ferienentschädigung","Compensación de vacaciones","Holiday pay","Indennità ferie"),
+              holidays:L("Feiertagsentschädigung","Compensación de festivos","Public holiday pay","Indennità festivi"),
+              thirteenth:L("13. Monatslohn (anteilig)","13.º salario (parte proporcional)","13th salary (pro rata)","13ª mensilità (pro rata)"),
+            };
+            const DL = {
+              ahv:L("AHV/IV/EO (Alters-, Invaliden-, Erwerbsersatz)","AVS/AI/APG (jubilación, invalidez, pérdida de ganancia)","AHV/IV/EO (old age, disability, income loss)","AVS/AI/IPG (vecchiaia, invalidità, IPG)"),
+              alv:L("ALV (Arbeitslosenversicherung)","Seguro de desempleo (AD)","Unemployment insurance (ALV)","Assicurazione disoccupazione (AD)"),
+              nbu:L("NBU (Nichtberufsunfall)","Seguro accidentes no laborales (ANP)","Non-occupational accident (NBU)","Infortuni non professionali (INP)"),
+              ktg:L("KTG (Krankentaggeld)","Seguro de pérdida de ganancia por enfermedad","Daily sickness allowance insurance","Indennità giornaliera malattia"),
+              bvg:L("BVG / Pensionskasse","Caja de pensiones (LPP / 2.º pilar)","Pension fund (BVG)","Cassa pensione (LPP)"),
+              qst:L("Quellensteuer","Impuesto en la fuente","Withholding tax","Imposta alla fonte"),
+              bu:L("BU (Berufsunfall, nur Arbeitgeber)","Accidentes laborales (solo empresa)","Occupational accident (employer only)","Infortuni professionali (solo datore)"),
+            };
+            return (<>
+            <table style={{width:"100%",borderCollapse:"collapse",marginBottom:0,fontSize:12}}>
+              <thead>
+                <tr style={{borderBottom:"2px solid #000"}}>
+                  <th style={{padding:"4px 6px",textAlign:"left",fontWeight:700}}>{L("Lohnart","Concepto","Pay type","Voce")}</th>
+                  <th style={{padding:"4px 6px",textAlign:"right",fontWeight:700}}>{L("Basis","Base","Base","Base")}</th>
+                  <th style={{padding:"4px 6px",textAlign:"right",fontWeight:700}}>{L("Ansatz","Tasa","Rate","Tasso")}</th>
+                  <th style={{padding:"4px 6px",textAlign:"right",fontWeight:700}}>CHF</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pay.earnings.map(e=>(
+                  <tr key={e.key}>
+                    <td style={td}>{EL[e.key]}</td>
+                    <td style={tdr}>{e.key==="base"?`${e.qty} h`:(e.pct?fm(pay.earnings[0].amount):"")}</td>
+                    <td style={tdr}>{e.key==="base"?fm(e.rate):(e.pct?`${e.pct}%`:"")}</td>
+                    <td style={{...tdr,fontWeight:600}}>{fm(e.amount)}</td>
+                  </tr>
+                ))}
+                <tr style={{borderTop:"2px solid #000",borderBottom:"2px solid #000"}}>
+                  <td style={{padding:"6px",fontWeight:700,fontSize:13}}>{L("Bruttolohn (AHV-pflichtig)","Salario bruto (sujeto a AVS)","Gross salary (AHV-subject)","Salario lordo (soggetto AVS)")}</td>
+                  <td></td><td></td>
+                  <td style={{padding:"6px",textAlign:"right",fontWeight:700,fontSize:13}}>{fm(pay.grossTotal)}</td>
+                </tr>
+                <tr><td colSpan={4} style={{padding:"4px 0"}}></td></tr>
+                {pay.deductions.map((d,i)=>(
+                  <tr key={d.key} style={{background:i%2===0?"#fafafa":"#fff"}}>
+                    <td style={td}>{DL[d.key]}</td>
+                    <td style={{...tdr,color:"#555"}}>{fm(d.base)}</td>
+                    <td style={{...tdr,color:"#555"}}>{Number(d.pct).toFixed(2)}%</td>
+                    <td style={{...tdr,color:"#c00"}}>-{fm(d.amount)}</td>
+                  </tr>
+                ))}
                 <tr>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee"}}>{L("Monatslohn","Salario mensual","Monthly salary","Salario mensile")}</td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right",fontWeight:600}}>{Number(pay.gross).toLocaleString("de-CH",{minimumFractionDigits:2})}</td>
+                  <td style={{padding:"5px 6px",borderBottom:"1px solid #ddd",fontWeight:600}}>{L("Total Abzüge","Total deducciones","Total deductions","Totale deduzioni")}</td>
+                  <td colSpan={2} style={{borderBottom:"1px solid #ddd"}}></td>
+                  <td style={{padding:"5px 6px",borderBottom:"1px solid #ddd",textAlign:"right",color:"#c00",fontWeight:600}}>-{fm(pay.totalDeductEmp)}</td>
                 </tr>
-              )}
-              {emp.type==="hourly"&&(
-                <tr>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee"}}>{L("Stundenlohn","Salario por horas","Hourly wage","Salario orario")}</td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}>{pay.hoursWorked}</td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}>{Number(emp.hourlyRate).toFixed(4)}</td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right",fontWeight:600}}>{Number(pay.gross).toLocaleString("de-CH",{minimumFractionDigits:2})}</td>
+                {pay.family>0&&(
+                  <tr>
+                    <td style={td}>{L("Familienzulagen (Kinder-/Ausbildungszulagen)","Asignaciones familiares (hijos / formación)","Family allowances (child / education)","Assegni familiari (figli / formazione)")}</td>
+                    <td style={{...tdr,color:"#555"}}>{[pay.kids.u?`${pay.kids.u}×215`:"",pay.kids.t?`${pay.kids.t}×268`:"",pay.kids.e?`${pay.kids.e}×268`:""].filter(Boolean).join(" + ")}</td>
+                    <td></td>
+                    <td style={{...tdr,color:"#0a7d4f",fontWeight:600}}>+{fm(pay.family)}</td>
+                  </tr>
+                )}
+                {pay.spesen>0&&(
+                  <tr>
+                    <td style={td}>{L("Spesen (Transport, Verpflegung) – steuerfrei","Gastos (transporte, comidas) – no imponibles","Expenses (transport, meals) – tax-free","Spese (trasporto, pasti) – esenti")}</td>
+                    <td></td><td></td>
+                    <td style={{...tdr,color:"#0a7d4f",fontWeight:600}}>+{fm(pay.spesen)}</td>
+                  </tr>
+                )}
+                <tr><td colSpan={4} style={{padding:"4px 0"}}></td></tr>
+                <tr style={{borderTop:"2px solid #000",borderBottom:"2px solid #000",background:"#f0f0f0"}}>
+                  <td style={{padding:"8px 6px",fontWeight:700,fontSize:14}}>{L("Auszahlung (Nettolohn)","A cobrar (salario neto)","Net pay","Netto da pagare")}</td>
+                  <td colSpan={2}></td>
+                  <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:14}}>{fm(pay.net)}</td>
                 </tr>
-              )}
-              {/* 13. Monatslohn */}
-              {parseFloat(pay.thirteenth)>0&&(
-                <tr>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee"}}>{L("13. Monatslohn (÷12)","13.° salario (÷12)","13th salary (÷12)","13a mensilità (÷12)")}</td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right",fontWeight:600}}>{Number(pay.thirteenth).toLocaleString("de-CH",{minimumFractionDigits:2})}</td>
-                </tr>
-              )}
-              {/* Bruttolohn */}
-              <tr style={{borderTop:"2px solid #000",borderBottom:"2px solid #000"}}>
-                <td style={{padding:"6px 6px",fontWeight:700,fontSize:13}}>{L("Bruttolohn","Salario bruto","Gross salary","Salario lordo")}</td>
-                <td style={{padding:"6px 6px",textAlign:"right"}}></td>
-                <td style={{padding:"6px 6px",textAlign:"right"}}></td>
-                <td style={{padding:"6px 6px",textAlign:"right"}}></td>
-                <td style={{padding:"6px 6px",textAlign:"right",fontWeight:700,fontSize:13}}>{Number(pay.grossTotal).toLocaleString("de-CH",{minimumFractionDigits:2})}</td>
-              </tr>
-              {/* Leerzeile */}
-              <tr><td colSpan={5} style={{padding:"4px 0"}}></td></tr>
-              {/* Abzüge */}
-              {[
-                ["AHV/IV/EO-Beitrag",        pay.ahvEmp,  "5.3000", Number(pay.grossTotal)],
-                ["ALV-Beitrag",               pay.alvEmp,  "1.1000", Number(pay.grossTotal)],
-                ["SUVA/NBU-Beitrag",          pay.nbuvEmp, "1.3800", Number(pay.grossTotal)],
-                ["BVG/Pensionskasse-Beitrag", pay.bvgEmp,  "7.0000", Number(pay.grossTotal)],
-                ["KTG-Beitrag",               pay.ktgEmp,  "0.5000", Number(pay.grossTotal)],
-              ].map(([label,amount,rate,base],i)=>(
-                <tr key={label} style={{background:i%2===0?"#fafafa":"#fff"}}>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee"}}>{label}</td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right",color:"#555"}}>
-                    -{Number(base).toLocaleString("de-CH",{minimumFractionDigits:2})}
-                  </td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right",color:"#555"}}>{rate}</td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right",color:"#c00"}}>
-                    {(Number(base)*parseFloat(rate)/100).toFixed(2)}
-                  </td>
-                  <td style={{padding:"4px 6px",borderBottom:"1px solid #eee",textAlign:"right"}}></td>
-                </tr>
-              ))}
-              {/* Total Abzüge */}
-              <tr>
-                <td style={{padding:"5px 6px",borderBottom:"1px solid #ddd",color:"#333"}}>{L("Total Abzüge","Total deducciones","Total deductions","Totale deduzioni")}</td>
-                <td colSpan={3} style={{padding:"5px 6px",borderBottom:"1px solid #ddd"}}></td>
-                <td style={{padding:"5px 6px",borderBottom:"1px solid #ddd",textAlign:"right",color:"#c00"}}>
-                  -{Number(pay.totalDeductEmp).toLocaleString("de-CH",{minimumFractionDigits:2})}
-                </td>
-              </tr>
-              {/* Leerzeile */}
-              <tr><td colSpan={5} style={{padding:"4px 0"}}></td></tr>
-              {/* Nettolohn */}
-              <tr style={{borderTop:"2px solid #000",borderBottom:"2px solid #000",background:"#f0f0f0"}}>
-                <td style={{padding:"8px 6px",fontWeight:700,fontSize:14}}>{L("Nettolohn","Salario neto","Net salary","Salario netto")}</td>
-                <td colSpan={3} style={{padding:"8px 6px"}}></td>
-                <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:14}}>
-                  {Number(pay.net).toLocaleString("de-CH",{minimumFractionDigits:2})}
-                </td>
-              </tr>
-              {/* Leerzeile */}
-              <tr><td colSpan={5} style={{padding:"4px 0"}}></td></tr>
-              {/* Stunden */}
-              {emp.type==="hourly"&&<>
-                <tr>
-                  <td style={{padding:"3px 6px",borderBottom:"1px solid #eee",color:"#555"}}>{L("Total IST-Stunden","Total horas reales","Total actual hours","Ore effettive tot.")}</td>
-                  <td colSpan={3} style={{padding:"3px 6px",borderBottom:"1px solid #eee",textAlign:"right",color:"#555"}}>{pay.hoursWorked}</td>
-                  <td style={{padding:"3px 6px",borderBottom:"1px solid #eee"}}></td>
-                </tr>
-                <tr>
-                  <td style={{padding:"3px 6px",borderBottom:"1px solid #eee",color:"#555"}}>{L("Total SOLL-Stunden","Total horas previstas","Total target hours","Ore previste tot.")}</td>
-                  <td colSpan={3} style={{padding:"3px 6px",borderBottom:"1px solid #eee",textAlign:"right",color:"#555"}}>{pay.hoursWorked}</td>
-                  <td style={{padding:"3px 6px",borderBottom:"1px solid #eee"}}></td>
-                </tr>
-              </>}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+
+            {/* Employer contributions */}
+            <div style={{marginTop:16,fontWeight:700,fontSize:12,color:"#1C7ED6"}}>{L("Beiträge des Arbeitgebers (zusätzlich, nicht vom Lohn abgezogen)","Aportes de la empresa (adicionales, no se descuentan del salario)","Employer contributions (additional, not deducted from pay)","Contributi del datore (aggiuntivi, non trattenuti)")}</div>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,marginTop:4}}>
+              <tbody>
+                {pay.employer.map(d=>(
+                  <tr key={d.key}><td style={td}>{DL[d.key]}</td><td style={{...tdr,color:"#555"}}>{Number(d.pct).toFixed(2)}%</td><td style={tdr}>{fm(d.amount)}</td></tr>
+                ))}
+                <tr><td style={{...td,fontWeight:700}}>{L("Total Arbeitgeberkosten (Lohn + Beiträge + Zulagen + Spesen)","Coste total para la empresa (salario + aportes + asignaciones + gastos)","Total employer cost","Costo totale datore")}</td><td></td><td style={{...tdr,fontWeight:700}}>{fm(pay.totalCost)}</td></tr>
+              </tbody>
+            </table>
+
+            {/* Rights & benefits summary */}
+            <div style={{marginTop:14,background:"#f0f7ff",border:"1px solid #bfdbfe",borderRadius:6,padding:"10px 12px",fontSize:10.5,color:"#1e3a5f",lineHeight:1.55}}>
+              <div style={{fontWeight:700,marginBottom:4}}>{L("Ihre gesetzlichen Leistungen","Sus beneficios de ley","Your statutory benefits","Le sue prestazioni di legge")}</div>
+              <div>• {L(`Ferien: ${pay.fiveWeeks?5:4} Wochen/Jahr`,`Vacaciones: ${pay.fiveWeeks?5:4} semanas al año`,`Holidays: ${pay.fiveWeeks?5:4} weeks/year`,`Ferie: ${pay.fiveWeeks?5:4} settimane/anno`)}{emp.type==="hourly"?L(" – bei Stundenlohn mit jeder Abrechnung ausbezahlt."," – con salario por hora se pagan en cada nómina."," – paid with each payslip for hourly pay."," – pagate con ogni busta per paga oraria."):"."}</div>
+              <div>• {L("Krankheit: 80 % Lohn bis 730 Tage (ab 3. Tag). Unfall: SUVA/UVG","Enfermedad: 80 % del salario hasta 730 días (desde el 3.er día). Accidentes: SUVA/LAA","Illness: 80% salary up to 730 days (from day 3). Accident: SUVA/UVG","Malattia: 80% fino a 730 giorni (dal 3° giorno). Infortunio: SUVA/LAINF")}{pay.nbuApplies?"":L(" (Nichtberufsunfall nicht versichert: unter 8 Std./Woche – über Krankenkasse)"," (accidentes no laborales no cubiertos: menos de 8 h/semana – cubrir con su seguro médico)"," (non-occupational accidents not covered: under 8 h/week)"," (INP non coperti: meno di 8 h/settimana)")}.</div>
+              <div>• {L("AHV: Altersrente, Invaliden- und Hinterlassenenschutz für Sie und Ihre Familie.","AVS/AI: pensión de jubilación y protección por invalidez y para su familia en caso de fallecimiento.","AHV: old-age pension, disability and survivors' cover for you and your family.","AVS/AI: rendita di vecchiaia, invalidità e superstiti per lei e la famiglia.")}</div>
+              <div>• {pay.bvgEmp>0?L("Pensionskasse (BVG): aktiv – Arbeitgeber zahlt die Hälfte.","Caja de pensiones (LPP): activa, la empresa paga la mitad.","Pension fund (BVG): active – employer pays half.","Cassa pensione (LPP): attiva – il datore paga metà."):L("Pensionskasse (BVG): erst ab Jahreslohn CHF 22'680 obligatorisch.","Caja de pensiones (LPP): obligatoria solo desde un salario anual de CHF 22'680.","Pension fund (BVG): mandatory only from annual salary CHF 22,680.","Cassa pensione (LPP): obbligatoria solo da CHF 22'680 annui.")}</div>
+              <div>• {L("Familienzulagen ZH 2026: CHF 215 pro Kind bis 12 J., CHF 268 von 12–16 J., CHF 268 Ausbildungszulage (bis 25 J.).","Asignaciones familiares ZH 2026: CHF 215 por hijo hasta 12 años, CHF 268 de 12 a 16 años y CHF 268 por formación (hasta 25 años).","Family allowances ZH 2026: CHF 215 per child up to 12, CHF 268 age 12–16, CHF 268 education allowance (up to 25).","Assegni familiari ZH 2026: CHF 215 per figlio fino a 12 anni, CHF 268 da 12 a 16, CHF 268 formazione (fino a 25).")}{pay.familyLow?L(" ⚠️ Anspruch erst ab Jahreseinkommen CHF 7'560 – bitte prüfen."," ⚠️ Solo hay derecho desde unos ingresos anuales de CHF 7'560; hay que revisarlo."," ⚠️ Entitlement only from annual income CHF 7,560 – please check."," ⚠️ Diritto solo da CHF 7'560 annui – verificare."):""}</div>
+              <div>• {L("Mutterschaft 16 Wochen, Vaterschaft 2 Wochen (EO).","Maternidad 16 semanas, paternidad 2 semanas (APG).","Maternity 16 weeks, paternity 2 weeks (EO).","Maternità 16 settimane, paternità 2 settimane (IPG).")}</div>
+              {pay.qstPct>0?<div>• {L("Quellensteuer gemäss Tarif des Kantons Zürich.","Impuesto en la fuente según la tarifa del cantón de Zúrich.","Withholding tax per Canton Zurich tariff.","Imposta alla fonte secondo tariffa ZH.")}</div>
+               :<div>• {L("Keine Quellensteuer: Einkommenssteuer wird über die Steuererklärung bezahlt.","Sin impuesto en la fuente: el impuesto sobre la renta se paga con la declaración de impuestos.","No withholding tax: income tax paid via tax return.","Nessuna imposta alla fonte: imposta tramite dichiarazione.")}</div>}
+            </div>
+            </>);
+          })()}
 
           {/* ── Auszahlung ── */}
           <div style={{marginTop:20,padding:"10px 0",borderTop:"1px solid #ccc"}}>
@@ -2415,13 +2716,15 @@ td:last-child{text-align:right;font-weight:600}
 }
 
 // ─── EMPLOYEES APP (payroll integrated) ──────────────────────
-function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,currentUser,lang,companySettings}){
+function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,onBack,currentUser,lang,companySettings}){
   const L = makeL(lang);
   const [modal,setModal] = useState(null);
   const [form,setForm] = useState({});
   const [selId,setSelId] = useState(null);
   const [deleteId,setDeleteId] = useState(null);
   const [payslipData,setPayslipData] = useState(null);
+  const [worksheetEmp,setWorksheetEmp] = useState(null);
+  const [,setSpesenTick] = useState(0);
   const now = new Date();
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
   const [selYear,setSelYear] = useState(now.getFullYear());
@@ -2430,7 +2733,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,cur
   const monthNames = MONTHS[lang]||MONTHS.EN;
 
   const openPayslip = (emp) => {
-    const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs);
+    const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs, {spesen:getSavedSpesen(emp.id,selYear,selMonth)});
     setPayslipData({emp, pay, month:selMonth, year:selYear});
   };
 
@@ -2502,7 +2805,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,cur
 
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         {visibleEmps.map(emp=>{
-          const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs);
+          const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs, {spesen:getSavedSpesen(emp.id,selYear,selMonth)});
           return (
             <CPCard key={emp.id}>
               {/* Header */}
@@ -2598,13 +2901,16 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,cur
                 <CPBtn onClick={()=>openPayslip(emp)} variant="success" size="sm">
                   📄 {t.payrollView||"Lohnabrechnung"}
                 </CPBtn>
+                <CPBtn onClick={()=>setWorksheetEmp(emp)} variant="secondary" size="sm">
+                  📋 {L("Arbeitsrapport","Hoja mensual","Work sheet","Rapporto")}
+                </CPBtn>
                 {isAdmin&&(
                   <>
                     <CPBtn onClick={()=>{setForm({...emp});setSelId(emp.id);setModal("form");}} variant="secondary" size="sm">
                       ✏️ {t.edit}
                     </CPBtn>
                     <CPBtn onClick={()=>{
-                      const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs);
+                      const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs, {spesen:getSavedSpesen(emp.id,selYear,selMonth)});
                       sendByEmail({
                         to: emp.email||"",
                         subject: `Lohnabrechnung / Nómina — ${emp.name} — ${selMonth}/${selYear}`,
@@ -2719,6 +3025,50 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,cur
               </label>
             </div>
           )}
+          {/* ── Payroll, family & transport data ── */}
+          <div style={{marginTop:6,marginBottom:8,color:"#74C0FC",fontSize:12,fontWeight:700}}>👨‍👩‍👧 {L("Lohn-, Familien- und Transportdaten","Datos de nómina, familia y transporte","Payroll, family & transport data","Dati busta paga, famiglia e trasporto")}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+            <CPField label={L("Geburtsdatum","Fecha de nacimiento","Date of birth","Data di nascita")}>
+              <CPInput type="date" value={form.birthDate||""} onChange={e=>setForm(f=>({...f,birthDate:e.target.value}))}/>
+            </CPField>
+            <CPField label={L("Aufenthaltsbewilligung","Permiso de residencia","Residence permit","Permesso")}>
+              <CPSelect value={form.permit||""} onChange={e=>setForm(f=>({...f,permit:e.target.value}))}>
+                <option value="">—</option>
+                <option value="CH">{L("Schweizer/in","Suizo/a","Swiss","Svizzero/a")}</option>
+                <option value="C">C</option><option value="B">B</option><option value="L">L</option><option value="G">G</option><option value="other">{L("Andere","Otro","Other","Altro")}</option>
+              </CPSelect>
+            </CPField>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>
+            <CPField label={L("Kinder bis 12 J.","Hijos hasta 12 años","Children up to 12","Figli fino a 12")}>
+              <CPInput type="number" value={form.kidsUnder12??""} onChange={e=>setForm(f=>({...f,kidsUnder12:parseInt(e.target.value)||0}))}/>
+            </CPField>
+            <CPField label={L("Kinder 12–16 J.","Hijos de 12 a 16","Children 12–16","Figli 12–16")}>
+              <CPInput type="number" value={form.kidsTeen??""} onChange={e=>setForm(f=>({...f,kidsTeen:parseInt(e.target.value)||0}))}/>
+            </CPField>
+            <CPField label={L("In Ausbildung (bis 25)","Estudiando (hasta 25)","In education (to 25)","In formazione (fino a 25)")}>
+              <CPInput type="number" value={form.kidsEdu??""} onChange={e=>setForm(f=>({...f,kidsEdu:parseInt(e.target.value)||0}))}/>
+            </CPField>
+          </div>
+          {(form.permit==="B"||form.permit==="L"||form.permit==="G"||form.permit==="other")&&(
+            <CPField label={L("Quellensteuer-Satz % (gemäss Tarif ZH)","Impuesto en la fuente % (según tarifa ZH)","Withholding tax % (ZH tariff)","Imposta alla fonte % (tariffa ZH)")}>
+              <CPInput type="number" value={form.qstRate??""} onChange={e=>setForm(f=>({...f,qstRate:parseFloat(e.target.value)||0}))} placeholder="z.B. 4.5"/>
+              <div style={{color:CP.textTertiary,fontSize:11,marginTop:4}}>{L("Den Satz im offiziellen Tarif des Kantons Zürich nachschlagen (Tarifcode A/B/C/H je nach Zivilstand und Kindern).","Busque el porcentaje en la tarifa oficial del cantón de Zúrich. El código de tarifa (A, B, C o H) depende del estado civil y los hijos.","Look up the rate in the official Canton Zurich tariff (code A/B/C/H by marital status and children).","Cercare il tasso nella tariffa ufficiale ZH (codice A/B/C/H).")}</div>
+            </CPField>
+          )}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+            <CPField label={L("Transport zwischen Kunden","Transporte entre clientes","Transport between clients","Trasporto tra clienti")}>
+              <CPSelect value={form.transportMode||"public"} onChange={e=>setForm(f=>({...f,transportMode:e.target.value}))}>
+                <option value="public">🚋 {L("Öffentlicher Verkehr (Billett)","Transporte público (billete)","Public transport (ticket)","Trasporto pubblico (biglietto)")}</option>
+                <option value="car">🚗 {L("Eigenes Auto (CHF 0.75/km)","Coche propio (CHF 0.75/km)","Own car (CHF 0.75/km)","Auto propria (CHF 0.75/km)")}</option>
+              </CPSelect>
+            </CPField>
+            {(form.transportMode||"public")==="public"&&(
+              <CPField label={L("Billettpreis pro Fahrt CHF","Precio del billete por trayecto CHF","Ticket price per trip CHF","Prezzo biglietto per tratta CHF")}>
+                <CPInput type="number" value={form.ticketPrice??""} onChange={e=>setForm(f=>({...f,ticketPrice:parseFloat(e.target.value)||0}))} placeholder="4.60"/>
+              </CPField>
+            )}
+          </div>
           {!selId&&(
             <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#74C0FC"}}>
               ℹ️ {lang==="DE"?"Code & PIN werden automatisch generiert.":
@@ -2795,22 +3145,30 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,notify,onBack,cur
           companySettings={companySettings}
         />
       )}
+      {worksheetEmp&&(
+        <WorkSheetModal emp={worksheetEmp} month={selMonth} year={selYear} jobs={jobs} clients={clients||[]}
+          lang={lang} companySettings={companySettings} onClose={()=>setWorksheetEmp(null)}
+          onSpesen={()=>setSpesenTick(x=>x+1)}/>
+      )}
     </CPScreen>
   );
 }
 
 // ─── PAYROLL APP (standalone icon) ───────────────────────────
-function PayrollApp({t, lang, employees, timeclock, jobs, currentUser, notify, onBack, companySettings}){
+function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, notify, onBack, companySettings}){
   const now = new Date();
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
   const [selYear,setSelYear] = useState(now.getFullYear());
   const [payslipData,setPayslipData] = useState(null);
+  const [worksheetEmp,setWorksheetEmp] = useState(null);
+  const [,setSpesenTick] = useState(0);
   const isAdmin = currentUser?.role==="admin";
   const visibleEmps = isAdmin ? employees : employees.filter(e=>e.id===currentUser?.id);
   const monthNames = MONTHS[lang]||MONTHS.EN;
+  const L = makeL(lang);
 
   const totals = employees.reduce((acc,emp)=>{
-    const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear,jobs);
+    const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear,jobs,{spesen:getSavedSpesen(emp.id,selYear,selMonth)});
     acc.net+=parseFloat(pay.net);
     acc.gross+=parseFloat(pay.grossTotal);
     acc.cost+=parseFloat(pay.totalCost);
@@ -2860,7 +3218,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, currentUser, notify, o
       {/* Employee list */}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {visibleEmps.map(emp=>{
-          const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear,jobs);
+          const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear,jobs,{spesen:getSavedSpesen(emp.id,selYear,selMonth)});
           return (
             <CPCard key={emp.id}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -2875,9 +3233,14 @@ function PayrollApp({t, lang, employees, timeclock, jobs, currentUser, notify, o
                     </div>
                   </div>
                 </div>
-                <CPBtn onClick={()=>setPayslipData({emp,pay,month:selMonth,year:selYear})} variant="success" size="sm">
-                  📄 {t.payrollView||"Anzeigen"}
-                </CPBtn>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <CPBtn onClick={()=>setPayslipData({emp,pay,month:selMonth,year:selYear})} variant="success" size="sm">
+                    📄 {t.payrollView||"Anzeigen"}
+                  </CPBtn>
+                  <CPBtn onClick={()=>setWorksheetEmp(emp)} variant="secondary" size="sm">
+                    📋 {L("Arbeitsrapport","Hoja mensual","Work sheet","Rapporto")}
+                  </CPBtn>
+                </div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                 <div style={{background:"rgba(28,126,214,0.1)",border:"1px solid rgba(28,126,214,0.2)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
@@ -2910,6 +3273,11 @@ function PayrollApp({t, lang, employees, timeclock, jobs, currentUser, notify, o
           lang={lang} t={t} onClose={()=>setPayslipData(null)}
           companySettings={companySettings}
         />
+      )}
+      {worksheetEmp&&(
+        <WorkSheetModal emp={worksheetEmp} month={selMonth} year={selYear} jobs={jobs} clients={clients||[]}
+          lang={lang} companySettings={companySettings} onClose={()=>setWorksheetEmp(null)}
+          onSpesen={()=>setSpesenTick(x=>x+1)}/>
       )}
     </CPScreen>
   );
