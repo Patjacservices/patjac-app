@@ -630,6 +630,13 @@ const getGeoLocation = () => new Promise((resolve) => {
     { enableHighAccuracy:true, timeout:8000, maximumAge:60000 }
   );
 });
+// Edit forms need firstName/lastName; older records only have "name" → split it (first 2 words = first names)
+const withNameParts = (o) => {
+  if(!o || (o.firstName && o.lastName!==undefined)) return o;
+  const w = String(o.name||"").trim().split(/\s+/).filter(Boolean);
+  const k = w.length<=2 ? 1 : 2;
+  return {...o, firstName:o.firstName||w.slice(0,k).join(" "), lastName:o.lastName??w.slice(k).join(" ")};
+};
 const gCode = () => "PJ-"+Math.random().toString(36).substr(2,6).toUpperCase();
 const gPin = () => Math.floor(1000+Math.random()*9000).toString();
 // Keeps generating a code until it finds one not already used by another employee
@@ -1145,7 +1152,7 @@ export default function PatjacCarPlay(){
       // Remove null values after conversion
       Object.keys(row).forEach(k => row[k]===null && delete row[k]);
       // Remove first_name/last_name — DB uses name column only
-      delete row.first_name; delete row.last_name;
+      // first_name / last_name are stored too (needed so edit forms show the names)
       console.log("📤 dbSave:", table, JSON.stringify(row).slice(0,100));
       // Debounce: cancel previous pending save for same record
       const saveKey = `${table}_${data.id}`;
@@ -2819,7 +2826,10 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
   const [selYear,setSelYear] = useState(now.getFullYear());
   const isAdmin = currentUser?.role==="admin";
-  const visibleEmps = isAdmin ? employees : employees.filter(e=>e.id===currentUser?.id);
+  const [empSearch,setEmpSearch] = useState("");
+  const visibleEmps = (isAdmin ? employees : employees.filter(e=>e.id===currentUser?.id))
+    .filter(e=>{ const q=empSearch.trim().toLowerCase(); if(!q) return true;
+      return [e.name,e.city,e.phone,e.email,e.ahv,e.street].some(v=>String(v||"").toLowerCase().includes(q)); });
   const monthNames = MONTHS[lang]||MONTHS.EN;
 
   const openPayslip = (emp) => {
@@ -2893,6 +2903,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
         </div>
       </CPCard>
 
+      {isAdmin&&<div style={{marginBottom:14}}><CPInput value={empSearch} onChange={e=>setEmpSearch(e.target.value)} placeholder={`🔍 ${L("Mitarbeiter suchen (Name, Ort, Telefon, AHV…)","Buscar empleado (nombre, ciudad, teléfono, AVS…)","Search employee (name, city, phone, AHV…)","Cerca dipendente (nome, città, telefono, AVS…)")}`}/></div>}
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         {visibleEmps.map(emp=>{
           const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs, {spesen:getSavedSpesen(emp.id,selYear,selMonth)});
@@ -2996,7 +3007,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                 </CPBtn>
                 {isAdmin&&(
                   <>
-                    <CPBtn onClick={()=>{setForm({...emp});setSelId(emp.id);setModal("form");}} variant="secondary" size="sm">
+                    <CPBtn onClick={()=>{setForm(withNameParts({...emp}));setSelId(emp.id);setModal("form");}} variant="secondary" size="sm">
                       ✏️ {t.edit}
                     </CPBtn>
                     <CPBtn onClick={()=>{
@@ -3497,7 +3508,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
               </div>
             </div>
             {!bulk.selectMode&&<div style={{display:"flex",gap:6}}>
-              <CPBtn onClick={()=>{setForm({...c});setEditId(c.id);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
+              <CPBtn onClick={()=>{setForm(withNameParts({...c}));setEditId(c.id);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
               <CPBtn onClick={()=>{setEditId(c.id);setModal("del");}} variant="danger" size="sm">🗑️</CPBtn>
             </div>}
           </CPCard>
@@ -4459,9 +4470,93 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
     </CPScreen>
   );
 }
-// ─── TIMECLOCK ───────────────────────────────────────────────
-function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onBack,lang,jobs,setJobs}){
+// ── CLOCK-IN / CLOCK-OUT LOCATION (anti-fraud) ──────────────────────────────
+// Records the real GPS position when an employee clocks in/out, turns it into a street address
+// (OpenStreetMap) and measures the distance to the client's address.
+const getGeoPoint = () => new Promise((resolve)=>{
+  if(!navigator.geolocation){ resolve({error:"unsupported"}); return; }
+  navigator.geolocation.getCurrentPosition(
+    p=>resolve({lat:p.coords.latitude, lon:p.coords.longitude, acc:Math.round(p.coords.accuracy||0)}),
+    e=>resolve({error:e.code===1?"denied":"unavailable"}),
+    {enableHighAccuracy:true, timeout:10000, maximumAge:0}
+  );
+});
+async function reverseGeocode(lat,lon){
+  try{
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,{headers:{"Accept-Language":"de"}});
+    const j = await r.json(); const a = j.address||{};
+    const street = [a.road||a.pedestrian||a.footway||a.path, a.house_number].filter(Boolean).join(" ");
+    const town = [a.postcode, a.city||a.town||a.village||a.suburb].filter(Boolean).join(" ");
+    return [street,town].filter(Boolean).join(", ") || j.display_name || null;
+  }catch(e){ return null; }
+}
+async function captureClockLocation(clientAddr){
+  const g = await getGeoPoint();
+  if(g.error) return {text: g.error==="denied" ? "GPS: permiso denegado / Zugriff verweigert" : "GPS: no disponible / nicht verfügbar"};
+  const addr = await reverseGeocode(g.lat,g.lon);
+  let dist = null;
+  if(clientAddr){ const c = await geocodeCH(clientAddr); if(c) dist = Math.round(haversineKm({lat:g.lat,lon:g.lon},c)*1000); }
+  return {text:`${addr || `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}`} (±${g.acc} m)`, lat:g.lat, lon:g.lon, dist};
+}
+function DistBadge({m,lang}){
   const L = makeL(lang);
+  if(m===null||m===undefined||m==="") return <span style={{fontSize:11,color:"#888"}}>—</span>;
+  const d=Number(m);
+  const [bg,fg,txt] = d<=300 ? ["rgba(47,158,68,.18)","#69DB7C",L("beim Kunden","en el cliente","at client","dal cliente")]
+    : d<=1000 ? ["rgba(240,140,0,.18)","#FFA94D",L("in der Nähe","cerca","nearby","vicino")]
+    : ["rgba(201,42,42,.2)","#FF8787",L("⚠️ weit entfernt","⚠️ lejos del cliente","⚠️ far away","⚠️ lontano")];
+  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10,background:bg,color:fg}}>{txt} · {d<1000?`${d} m`:`${(d/1000).toFixed(1)} km`}</span>;
+}
+function ClockLocationsView({jobs,employees,isAdmin,selEmp,lang}){
+  const L = makeL(lang);
+  const [who,setWho] = useState(isAdmin?"all":selEmp);
+  const [days,setDays] = useState(30);
+  const since = ymd(new Date(Date.now()-days*86400000));
+  const rows = (jobs||[]).filter(j=>j.actualStart && j.date>=since && (who==="all"||j.employeeId===who))
+    .sort((a,b)=>`${b.date}${b.actualStart}`.localeCompare(`${a.date}${a.actualStart}`));
+  const suspicious = rows.filter(j=>Number(j.startDistM)>1000||Number(j.endDistM)>1000).length;
+  const mapLink = (lat,lon)=> lat&&lon ? `https://www.google.com/maps?q=${lat},${lon}` : null;
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
+        {isAdmin&&<CPSelect value={who} onChange={e=>setWho(e.target.value)} style={{maxWidth:260}}>
+          <option value="all">{L("Alle Mitarbeiter","Todos los empleados","All employees","Tutti i dipendenti")}</option>
+          {employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+        </CPSelect>}
+        <CPSelect value={days} onChange={e=>setDays(Number(e.target.value))} style={{maxWidth:200}}>
+          {[7,30,90].map(d=><option key={d} value={d}>{L(`Letzte ${d} Tage`,`Últimos ${d} días`,`Last ${d} days`,`Ultimi ${d} giorni`)}</option>)}
+        </CPSelect>
+        {suspicious>0&&<span style={{alignSelf:"center",color:"#FF8787",fontWeight:700,fontSize:13}}>⚠️ {suspicious} {L("auffällige Stempelungen","fichajes sospechosos","suspicious clock-ins","timbrature sospette")}</span>}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {rows.map(j=>(
+          <CPCard key={j.id} style={{padding:"12px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:6,marginBottom:6}}>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{j.clientName} {isAdmin&&<span style={{color:CP.textSecondary,fontWeight:500}}>· {j.employeeName}</span>}</div>
+              <div style={{color:CP.textSecondary,fontSize:12}}>{j.date}</div>
+            </div>
+            {[["▶",L("Eingang","Entrada","In","Entrata"),j.actualStart,j.startLocation,j.startDistM,j.startLat,j.startLon],
+              ["■",L("Ausgang","Salida","Out","Uscita"),j.actualEnd,j.endLocation,j.endDistM,j.endLat,j.endLon]].map(([ic,lbl,time,loc,dist,lat,lon])=>(
+              <div key={lbl} style={{display:"flex",gap:8,alignItems:"flex-start",flexWrap:"wrap",padding:"4px 0",borderTop:`1px solid ${CP.border}`}}>
+                <span style={{color:ic==="▶"?"#69DB7C":"#FF8787",fontWeight:700,minWidth:90,fontSize:13}}>{ic} {lbl} {time||"—"}</span>
+                <span style={{color:CP.textSecondary,fontSize:12,flex:1,minWidth:180}}>📍 {loc || (time?L("Keine Position","Sin ubicación","No location","Nessuna posizione"):"—")}</span>
+                <DistBadge m={dist} lang={lang}/>
+                {mapLink(lat,lon)&&<a href={mapLink(lat,lon)} target="_blank" rel="noreferrer" style={{fontSize:12,color:"#74C0FC"}}>🗺️ {L("Karte","Mapa","Map","Mappa")}</a>}
+              </div>
+            ))}
+          </CPCard>
+        ))}
+        {rows.length===0&&<div style={{color:CP.textTertiary,textAlign:"center",padding:"2rem",fontSize:14}}>{L("Keine Stempelungen in diesem Zeitraum","No hay fichajes en este periodo","No clock-ins in this period","Nessuna timbratura")}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── TIMECLOCK ───────────────────────────────────────────────
+function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onBack,lang,jobs,setJobs,clients=[]}){
+  const L = makeL(lang);
+  const [tab,setTab] = useState("clock");
+  const clientAddrOf = (job)=> fmtAddr(clients.find(c=>c.id===job.clientId));
   const [selEmp,setSelEmp] = useState(currentUser?.role==="employee"?currentUser?.id:employees[0]?.id);
 
   // General day record (for history & monthly total)
@@ -4490,6 +4585,10 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
     const now = new Date().toTimeString().slice(0,5);
     const updated = {...job, actualStart:now, status:"inProgress"};
     setJobs(prev=>prev.map(j=>j.id===job.id?updated:j));
+    captureClockLocation(clientAddrOf(job)).then(loc=>{
+      setJobs(prev=>prev.map(j=>j.id===job.id?{...j,startLocation:loc.text,startLat:loc.lat??null,startLon:loc.lon??null,startDistM:loc.dist??null}:j));
+      if(loc.dist>1000) notify(`⚠️ ${L("Sie sind weit von der Kundenadresse entfernt","Está lejos de la dirección del cliente","You are far from the client address","Sei lontano dall'indirizzo del cliente")} (${(loc.dist/1000).toFixed(1)} km)`,"warning",6000);
+    });
 
     // Also update or create the day record
     const emp = employees.find(e=>e.id===selEmp);
@@ -4515,6 +4614,9 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
 
     const updated = {...job, actualEnd:now, actualHours:hrs, status:"completed"};
     setJobs(prev=>prev.map(j=>j.id===job.id?updated:j));
+    captureClockLocation(clientAddrOf(job)).then(loc=>{
+      setJobs(prev=>prev.map(j=>j.id===job.id?{...j,endLocation:loc.text,endLat:loc.lat??null,endLon:loc.lon??null,endDistM:loc.dist??null}:j));
+    });
 
     // Recalculate total day hours from all completed jobs
     const allUpdatedJobs = (jobs||[])
@@ -4540,6 +4642,13 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
 
   return (
     <CPScreen title={t.timeclock} icon="⏱️" onBack={onBack} t={t}>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        {[["clock","⏱️ "+L("Stempeln","Fichar","Clock","Timbrare")],["locations","📍 "+L("Standorte","Ubicaciones","Locations","Posizioni")]].map(([k,lbl])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{padding:"7px 16px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,
+            background:tab===k?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{lbl}</button>
+        ))}
+      </div>
+      {tab==="locations" ? <ClockLocationsView jobs={jobs} employees={employees} isAdmin={currentUser?.role==="admin"} selEmp={selEmp} lang={lang}/> : (<>
 
       {/* Employee selector (admin only) */}
       {currentUser?.role==="admin"&&(
@@ -4760,6 +4869,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
           ])}
         />
       </CPCard>
+      </>)}
     </CPScreen>
   );
 }
@@ -4778,11 +4888,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
   const isAdmin=currentUser?.role==="admin";
   const THREE_DAYS=3*24*60*60*1000;
 
-  // Auto-delete messages older than 3 days on mount
-  useEffect(()=>{
-    const now=Date.now();
-    setMessages(prev=>prev.filter(m=>now-new Date(m.timestamp).getTime()<THREE_DAYS));
-  },[]);
+  // Messages are deleted automatically by the server every Sunday at 12:00 (Zurich time).
 
   // Clean today's messages (admin only)
   const cleanToday = () => {
@@ -4840,7 +4946,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
               </div>
               <div style={{flex:1}}>
                 <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{convs.find(c=>c.id===selConv)?.name||selConv}</div>
-                <div style={{color:CP.textTertiary,fontSize:10}}>{L("Auto-Löschung nach 3 Tagen","Eliminación automática en 3 días","Auto-deleted after 3 days","Eliminazione dopo 3 giorni")}</div>
+                <div style={{color:CP.textTertiary,fontSize:10}}>{L("Auto-Löschung jeden Sonntag 12:00","Se borran solos cada domingo a las 12:00","Auto-deleted every Sunday 12:00","Eliminati ogni domenica alle 12:00")}</div>
               </div>
               {isAdmin&&<button onClick={cleanToday} style={{background:"rgba(255,0,0,.15)",border:"1px solid rgba(255,0,0,.3)",borderRadius:8,padding:"5px 8px",color:"#FF8787",cursor:"pointer",fontSize:12}}>🗑️</button>}
             </div>
@@ -7861,7 +7967,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                   {stockBar(p)}
 
                   <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                    <CPBtn onClick={()=>{setForm({...p});setSelId(p.id);setModal("product");}} variant="secondary" size="sm">✏️</CPBtn>
+                    <CPBtn onClick={()=>{setForm({...p, price:p.price ?? p.unitPrice ?? 0});setSelId(p.id);setModal("product");}} variant="secondary" size="sm">✏️</CPBtn>
                     <CPBtn onClick={()=>setProducts(prev=>prev.map(x=>x.id===p.id?{...x,stock:x.stock+1}:x))} variant="success" size="sm">＋1</CPBtn>
                     <CPBtn onClick={()=>setProducts(prev=>prev.map(x=>x.id===p.id?{...x,stock:Math.max(0,x.stock-1)}:x))} variant="secondary" size="sm">−1</CPBtn>
                     {(isLow||isOut)&&<CPBtn onClick={()=>quickOrder(p)} variant="warning" size="sm">🚚 {t.quickOrder||"Order"}</CPBtn>}
@@ -8331,7 +8437,10 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
     notify(L("Vertrag gelöscht","Contrato eliminado","Contract deleted","Contratto eliminato"),"success");
   };
 
-  const filtered = contracts.filter(c=>filter==="all"?true:c.type===filter);
+  const [cSearch,setCSearch] = useState("");
+  const filtered = contracts.filter(c=>filter==="all"?true:c.type===filter)
+    .filter(c=>{ const q=cSearch.trim().toLowerCase(); if(!q) return true;
+      return [c.entityName,c.startDate,c.contractDate,c.status,c.notes].some(v=>String(v||"").toLowerCase().includes(q)); });
 
   const statusColor = (s) => s==="signed"?"green":s==="active"?"blue":s==="expired"?"red":s==="terminated"?"red":"gray";
   const statusLabel = (s) => s==="signed"?t.contractSigned:s==="active"?t.contractActive:s==="expired"?t.contractExpired:s==="terminated"?t.contractTerminated:t.contractDraft;
@@ -8686,6 +8795,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
         </div>
       }
     >
+      <div style={{marginBottom:12}}><CPInput value={cSearch} onChange={e=>setCSearch(e.target.value)} placeholder={`🔍 ${L("Vertrag suchen (Name, Datum, Status…)","Buscar contrato (nombre, fecha, estado…)","Search contract (name, date, status…)","Cerca contratto (nome, data, stato…)")}`}/></div>
       {/* Filter tabs */}
       <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
         {[["all",L("Alle","Todos","All","Tutti")],["client",L("Kunden","Clientes","Clients","Clienti")],["employee",L("Mitarbeiter","Empleados","Employees","Dipendenti")]].map(([k,label])=>(
