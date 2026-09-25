@@ -5161,10 +5161,11 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
 }
 
 // ─── REPORTS ─────────────────────────────────────────────────
-function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timeclock,companySettings}){
+function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timeclock,companySettings,products=[],setProducts,suppliers=[]}){
   const L = makeL(lang);
   const cs = companySettings||{name:"Patjac Reinigung Garten & Services",email:"patjacservices@outlook.com",uid:"CHE-123.456.789",mwstNr:"CHE-123.456.789 MWST",iban:"CH56 0483 5012 3456 7800 9",street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich"};
-  const [preview,setPreview] = useState(null); // null | "monthly"|"annual"|"tax"|"payroll"
+  const [preview,setPreview] = useState(null); // null | "monthly"|"annual"|"tax"|"payroll"|"inventory"
+  const [counts,setCounts] = useState({}); // physical stock count entered during an inventory
   const now = new Date();
   const income = invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+(i.total||0),0);
   const pending = invoices.filter(i=>i.status==="pending").reduce((s,i)=>s+(i.total||0),0);
@@ -5181,6 +5182,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
     {l:t.annualReport||L("Jahresbericht","Informe anual","Annual Report","Rapporto annuale"),       i:"📈", type:"annual"},
     {l:t.taxReport||L("Steuerbericht","Informe fiscal","Tax Report","Rapporto fiscale"),            i:"🏛️", type:"tax"},
     {l:t.payslip||L("Lohnabrechnung","Nómina","Payroll","Busta paga"),                             i:"💼", type:"payroll"},
+    {l:L("Inventur","Inventario","Inventory","Inventario"),                                          i:"📦", type:"inventory"},
   ];
   const today = now.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB");
 
@@ -5301,10 +5303,9 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
         <h3 style={{color:CP.textPrimary,fontWeight:700,fontSize:17,marginBottom:16}}>{title} — {period}</h3>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {employees.filter(e=>e.active).map(emp=>{
-            const hrs=timeclock.filter(tc=>tc.employeeId===emp.id&&tc.hours).reduce((h,tc)=>h+(tc.hours||0),0);
-            const gross=emp.type==="hourly"?hrs*(emp.hourlyRate||0):(emp.fixedSalary||0);
-            const ahv=gross*0.053,alv=gross*0.011,nbuv=gross*0.012,bvg=gross*0.07,ktg=gross*0.005;
-            const net=gross-(ahv+alv+nbuv+bvg+ktg);
+            const pay=calcSwissPayroll(emp,timeclock,now.getMonth()+1,now.getFullYear(),jobs,{spesen:getSavedSpesen(emp.id,now.getFullYear(),now.getMonth()+1)});
+            const hrs=Number(pay.hoursWorked), gross=Number(pay.grossTotal), net=Number(pay.net);
+            const ahv=Number(pay.totalDeductEmp),alv=0,nbuv=0,bvg=0,ktg=0;
             return (
               <CPCard key={emp.id}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
@@ -5332,6 +5333,75 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
         </div>
       </div>
     );
+    if(type==="inventory"){
+      const catLbl = c=>({cleaning:L("Reinigung","Limpieza","Cleaning","Pulizia"),gardening:L("Garten","Jardinería","Gardening","Giardinaggio"),equipment:L("Maschinen/Geräte","Maquinaria/equipos","Machines/equipment","Macchine/attrezzi"),safety:L("Sicherheit","Seguridad","Safety","Sicurezza"),construction:L("Kleinbau","Obras pequeñas","Small construction","Piccoli lavori")}[c]||c||"—");
+      const supName = id => suppliers.find(x=>x.id===id)?.name || id || "—";
+      const rows = [...products].sort((a,b)=>(a.category||"").localeCompare(b.category||"")||(a.name||"").localeCompare(b.name||""));
+      const qty = p => counts[p.id]!==undefined && counts[p.id]!=="" ? Number(counts[p.id]) : Number(p.stock||0);
+      const value = rows.reduce((s,p)=>s+qty(p)*Number(p.price ?? p.unitPrice ?? 0),0);
+      const low = rows.filter(p=>qty(p) < Number(p.minStock||0));
+      const out = rows.filter(p=>qty(p) <= 0);
+      const th={padding:"6px 8px",textAlign:"left",borderBottom:"2px solid #333",fontSize:11,background:"#f1f5f9",color:"#111"};
+      const td={padding:"5px 8px",borderBottom:"1px solid #e5e7eb",fontSize:11,color:"#111"};
+      const changed = Object.keys(counts).filter(id=>counts[id]!=="" && Number(counts[id])!==Number(products.find(p=>p.id===id)?.stock||0));
+      return (
+        <div style={{background:"#fff",color:"#111",borderRadius:10,padding:16}}>
+          <h3 style={{color:"#1C7ED6",fontWeight:700,fontSize:17,marginBottom:2}}>📦 {L("Inventur","Inventario","Inventory","Inventario")}</h3>
+          <div style={{color:"#555",fontSize:12,marginBottom:12}}>{cs.name} · {today}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
+            {[[L("Artikel","Artículos","Items","Articoli"),rows.length,"#1C7ED6"],[L("Lagerwert","Valor del stock","Stock value","Valore scorte"),`CHF ${value.toFixed(2)}`,"#0CA678"],[L("Unter Minimum","Bajo mínimo","Below minimum","Sotto minimo"),low.length,"#F08C00"],[L("Leer","Agotados","Out of stock","Esauriti"),out.length,"#C92A2A"]].map(([l,v,c])=>(
+              <div key={l} style={{border:`1px solid ${c}55`,borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:"#555"}}>{l}</div><div style={{fontWeight:700,fontSize:15,color:c}}>{v}</div></div>
+            ))}
+          </div>
+          <div style={{fontSize:11,color:"#1e40af",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:6,padding:"6px 10px",marginBottom:10}}>
+            ✍️ {L("Zählen Sie jeden Artikel und tragen Sie die Menge in «Gezählt» ein. Dann «Inventur speichern» drücken – der Bestand wird aktualisiert.","Cuente cada artículo y escriba la cantidad en la columna «Contado». Después pulse «Guardar inventario» y el stock se actualiza.","Count each item, enter the quantity under «Counted», then press «Save inventory» to update stock.","Contare ogni articolo, inserire la quantità in «Contato» e premere «Salva inventario».")}
+          </div>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>
+              <th style={th}>{L("Artikel","Artículo","Item","Articolo")}</th><th style={th}>{L("Kategorie","Categoría","Category","Categoria")}</th>
+              <th style={{...th,textAlign:"right"}}>{L("System","Sistema","System","Sistema")}</th><th style={{...th,textAlign:"right"}}>{L("Gezählt","Contado","Counted","Contato")}</th>
+              <th style={{...th,textAlign:"right"}}>Min.</th><th style={{...th,textAlign:"right"}}>CHF/{L("Einh.","ud.","unit","unità")}</th><th style={{...th,textAlign:"right"}}>{L("Wert","Valor","Value","Valore")}</th>
+            </tr></thead>
+            <tbody>
+              {rows.map(p=>{const q=qty(p);const isLow=q<Number(p.minStock||0);return(
+                <tr key={p.id} style={{background:q<=0?"#fee2e2":isLow?"#fff7ed":"#fff"}}>
+                  <td style={td}><b>{p.name}</b><div style={{color:"#666",fontSize:10}}>{supName(p.supplier)}</div></td>
+                  <td style={td}>{catLbl(p.category)}</td>
+                  <td style={{...td,textAlign:"right"}}>{Number(p.stock||0)} {p.unit||""}</td>
+                  <td style={{...td,textAlign:"right"}}>
+                    <input type="number" min="0" value={counts[p.id]??""} placeholder={String(p.stock??0)} onChange={e=>setCounts(c=>({...c,[p.id]:e.target.value}))}
+                      style={{width:64,padding:"3px 5px",border:"1px solid #cbd5e1",borderRadius:4,textAlign:"right",fontSize:11}}/>
+                  </td>
+                  <td style={{...td,textAlign:"right"}}>{Number(p.minStock||0)}</td>
+                  <td style={{...td,textAlign:"right"}}>{Number(p.price ?? p.unitPrice ?? 0).toFixed(2)}</td>
+                  <td style={{...td,textAlign:"right",fontWeight:600}}>{(q*Number(p.price ?? p.unitPrice ?? 0)).toFixed(2)}</td>
+                </tr>);})}
+              {rows.length===0&&<tr><td colSpan={7} style={{...td,textAlign:"center",color:"#888",padding:18}}>{L("Keine Artikel im Lager","No hay artículos en el inventario","No items in stock","Nessun articolo")}</td></tr>}
+            </tbody>
+          </table>
+          {low.length>0&&(
+            <div style={{marginTop:14}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#C2410C",marginBottom:6}}>🛒 {L("Nachbestellen","Hay que pedir","To reorder","Da riordinare")}</div>
+              <table style={{width:"100%",borderCollapse:"collapse"}}><tbody>
+                {low.map(p=>{const sug=Math.max(1,Math.ceil(Number(p.minStock||0)*2-qty(p)));return(
+                  <tr key={p.id}><td style={td}>{p.name}</td><td style={td}>{supName(p.supplier)}</td>
+                    <td style={{...td,textAlign:"right"}}>{L("Vorschlag","Sugerido","Suggested","Suggerito")}: <b>{sug} {p.unit||""}</b></td>
+                    <td style={{...td,textAlign:"right"}}>≈ CHF {(sug*Number(p.price ?? p.unitPrice ?? 0)).toFixed(2)}</td></tr>);})}
+              </tbody></table>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14,gap:10,flexWrap:"wrap"}}>
+            <div style={{fontSize:10,color:"#666"}}>{L("Gezählt von","Contado por","Counted by","Contato da")}: ____________________ &nbsp; {L("Datum","Fecha","Date","Data")}: {today}</div>
+            {setProducts&&<CPBtn onClick={()=>{
+              if(!changed.length){ notify(L("Keine Änderungen","No hay cambios","No changes","Nessuna modifica"),"error"); return; }
+              setProducts(prev=>prev.map(p=>counts[p.id]!==undefined&&counts[p.id]!==""?{...p,stock:Number(counts[p.id])}:p));
+              notify(L(`${changed.length} Bestände aktualisiert`,`${changed.length} existencias actualizadas`,`${changed.length} stock levels updated`,`${changed.length} scorte aggiornate`),"success");
+              setCounts({});
+            }}>💾 {L("Inventur speichern","Guardar inventario","Save inventory","Salva inventario")} {changed.length?`(${changed.length})`:""}</CPBtn>}
+          </div>
+        </div>
+      );
+    }
     return null;
   };
 
@@ -7594,6 +7664,7 @@ function HelpModal({t, lang, onClose}){
 }
 
 function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProducts,suppliers,setSuppliers}){
+  const [supCat,setSupCat] = useState("all");
   const L = makeL(lang);
   // orders, products, suppliers come from parent (connected to Supabase)
   const [view,setView] = useState("stock"); // stock | orders | suppliers
@@ -7611,6 +7682,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
     {id:"cleaning", label:t.catCleaning||"Cleaning", icon:"🧴"},
     {id:"gardening",label:t.catGardening||"Gardening",icon:"🌿"},
     {id:"equipment",label:t.catEquipment||"Equipment",icon:"🔧"},
+    {id:"construction",label:L("Kleinbau","Obras pequeñas","Small construction","Piccoli lavori"),icon:"🧱"},
     {id:"safety",   label:t.catSafety||"Safety",     icon:"🦺"},
   ];
 
@@ -7624,7 +7696,8 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
 
   const lowStockProducts = products.filter(p=>p.stock<=p.minStock);
   const outOfStockProducts = products.filter(p=>p.stock===0);
-  const totalStockValue = products.reduce((s,p)=>s+p.stock*p.price,0);
+  const prPrice = p => Number(p.price ?? p.unitPrice ?? 0);
+  const totalStockValue = products.reduce((s,p)=>s+Number(p.stock||0)*prPrice(p),0);
   const pendingOrders = orders.filter(o=>o.status==="pending").length;
 
   const statusColor=(s)=>s==="delivered"?"green":s==="pending"?"yellow":"red";
@@ -7668,8 +7741,8 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       date:ymd(new Date()),
       deliveryDate:new Date(Date.now()+7*86400000).toISOString().split("T")[0],
       status:"pending",
-      items:[{productId:p.id,productName:pName(p),qty,price:p.price,total:qty*p.price}],
-      total:qty*p.price,notes:L("Automatische Nachbestellung","Reposición automática","Auto reorder","Riordino automatico"),
+      items:[{productId:p.id,productName:pName(p),qty,price:prPrice(p),total:qty*prPrice(p)}],
+      total:qty*prPrice(p),notes:L("Automatische Nachbestellung","Reposición automática","Auto reorder","Riordino automatico"),
     };
     setOrders(prev=>[newOrder,...prev]);
     notify(`${t.quickOrder||"Quick order"}: ${pName(p)} × ${qty} → ${sup?.name||"?"}`,"success");
@@ -7679,7 +7752,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
     <CPScreen title={t.stockTitle||"Inventory"} icon="📦" onBack={onBack} t={t}
       actions={
         <div style={{display:"flex",gap:8}}>
-          {view==="stock"&&<CPBtn onClick={()=>{setForm({name:"",category:"cleaning",unit:"Liter",stock:0,minStock:5,price:0,supplier:"1f308250-7d3c-4765-8af0-35d1285255d0",description:"",location:"",icon:"🧴"});setSelId(null);setModal("product");}} size="sm">＋ {t.addProduct||"Add"}</CPBtn>}
+          {view==="stock"&&<CPBtn onClick={()=>{setForm({name:"",category:"cleaning",unit:"Liter",stock:0,minStock:5,price:0,supplier:suppliers[0]?.id||"",description:"",location:"",icon:"🧴"});setSelId(null);setModal("product");}} size="sm">＋ {t.addProduct||"Add"}</CPBtn>}
           {view==="orders"&&<CPBtn onClick={()=>{setForm({supplierId:"1f308250-7d3c-4765-8af0-35d1285255d0",date:ymd(new Date()),deliveryDate:new Date(Date.now()+7*86400000).toISOString().split("T")[0],items:[],notes:""});setModal("order");}} size="sm">＋ {t.addOrder||"Order"}</CPBtn>}
           {view==="suppliers"&&<CPBtn onClick={()=>{setForm({name:"",contact:"",phone:"",email:"",address:"",category:"cleaning",paymentDays:30});setModal("supplier");}} size="sm">＋ {t.addSupplier||"Add"}</CPBtn>}
         </div>
@@ -7781,7 +7854,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     </div>
                     <div style={{background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 8px"}}>
                       <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>WERT</div>
-                      <div style={{color:"#74C0FC",fontWeight:700,fontSize:13}}>CHF {(p.stock*p.price).toFixed(0)}</div>
+                      <div style={{color:"#74C0FC",fontWeight:700,fontSize:13}}>CHF {(Number(p.stock||0)*prPrice(p)).toFixed(0)}</div>
                     </div>
                   </div>
 
@@ -7878,7 +7951,13 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       {/* ── SUPPLIERS VIEW ── */}
       {view==="suppliers"&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {suppliers.map(sup=>(
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {cats.filter(c=>c.id!=="safety"||suppliers.some(s=>s.category==="safety")).map(c=>(
+              <button key={c.id} onClick={()=>setSupCat(c.id)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
+                background:supCat===c.id?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{c.icon} {c.label} ({c.id==="all"?suppliers.length:suppliers.filter(s=>s.category===c.id).length})</button>
+            ))}
+          </div>
+          {suppliers.filter(s=>supCat==="all"||s.category===supCat).sort((a,b)=>(a.category||"").localeCompare(b.category||"")||(a.name||"").localeCompare(b.name||"")).map(sup=>(
             <CPCard key={sup.id}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
@@ -7886,12 +7965,13 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                   <div>
                     <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16,marginBottom:4}}>{sup.name}</div>
                     <div style={{color:CP.textSecondary,fontSize:13}}>{sup.contact}</div>
-                    <div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{sup.phone} · {sup.email}</div>
+                    {(sup.phone||sup.email)&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{[sup.phone,sup.email].filter(Boolean).join(" · ")}</div>}
                     <div style={{color:CP.textTertiary,fontSize:12,marginTop:1}}>{sup.address}</div>
+                    {sup.notes&&<div style={{color:"#74C0FC",fontSize:12,marginTop:4}}>💡 {sup.notes}</div>}
                     <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
                       <CPBadge text={cats.find(c=>c.id===sup.category)?.label||sup.category} color="blue"/>
-                      <CPBadge text={`${t.paymentTerms}: ${sup.paymentDays} ${L("Tage","días","days","giorni")}`} color="gray"/>
-                      <CPBadge text={"⭐".repeat(sup.rating)} color="gray"/>
+                      {sup.paymentDays&&<CPBadge text={`${t.paymentTerms}: ${sup.paymentDays} ${L("Tage","días","days","giorni")}`} color="gray"/>}
+                      {sup.rating>0&&<CPBadge text={"⭐".repeat(Math.round(sup.rating))} color="gray"/>}
                     </div>
                   </div>
                 </div>
@@ -7901,7 +7981,8 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     subject: `${L("Bestellung","Pedido","Order","Ordine")} — Patjac Reinigung Garten & Services`,
                     body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${sup.name},\n\n${L("Wir möchten eine Bestellung aufgeben.","Nos gustaría realizar un pedido.","We would like to place an order.","Vorremmo effettuare un ordine.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
                   })} variant="secondary" size="sm">📧</CPBtn>
-                  <CPBtn onClick={()=>window.open(`tel:${sup.phone}`,"_self")} variant="secondary" size="sm">📞</CPBtn>
+                  {sup.website&&<CPBtn onClick={()=>window.open(sup.website.startsWith("http")?sup.website:`https://${sup.website}`,"_blank")} variant="secondary" size="sm">🌐</CPBtn>}
+                  {sup.phone&&<CPBtn onClick={()=>window.open(`tel:${sup.phone}`,"_self")} variant="secondary" size="sm">📞</CPBtn>}
                   <CPBtn onClick={()=>{setForm({...sup});setSelId(sup.id);setModal("supplier");}} variant="secondary" size="sm">✏️</CPBtn>
                   <CPBtn onClick={()=>setDeleteSupplierId(sup.id)} variant="danger" size="sm">🗑️</CPBtn>
                 </div>
@@ -8006,12 +8087,19 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
           <CPField label={t.address||"Address"}>
             <CPInput value={form.address||""} onChange={e=>setForm(f=>({...f,address:e.target.value}))}/>
           </CPField>
+          <CPField label={L("Webseite","Página web","Website","Sito web")}>
+            <CPInput value={form.website||""} onChange={e=>setForm(f=>({...f,website:e.target.value}))} placeholder="https://"/>
+          </CPField>
+          <CPField label={L("Notizen / Angebote","Notas / ofertas","Notes / offers","Note / offerte")}>
+            <CPInput value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/>
+          </CPField>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.productCategory||"Category"}>
               <CPSelect value={form.category||"cleaning"} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
                 <option value="cleaning">{t.catCleaning}</option>
                 <option value="gardening">{t.catGardening}</option>
                 <option value="equipment">{t.catEquipment}</option>
+                <option value="construction">{L("Kleinbau","Obras pequeñas","Small construction","Piccoli lavori")}</option>
               </CPSelect>
             </CPField>
             <CPField label={L("Zahlungsziel (Tage)","Plazo pago (días)","Payment days","Giorni pagamento")}>
