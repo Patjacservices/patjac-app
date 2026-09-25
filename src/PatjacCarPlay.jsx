@@ -1338,7 +1338,7 @@ export default function PatjacCarPlay(){
         const end = new Date(maxD); end.setDate(end.getDate()+12*7);
         while(cursor<=end){
           if(sample.recurWeekdays.includes(cursor.getDay())){
-            toAdd.push({...sample,id:gid(),date:ymd(cursor),status:"pending",actualStart:null,actualEnd:null,actualHours:null,photos:[],signature:null,reminderSent:false});
+            toAdd.push({...sample,id:gid(),date:ymd(cursor),teamId:sample.teamId?`${String(sample.teamId).split("_")[0]}_${ymd(cursor)}`:null,status:"pending",actualStart:null,actualEnd:null,actualHours:null,photos:[],signature:null,reminderSent:false});
           }
           cursor.setDate(cursor.getDate()+1);
         }
@@ -1348,7 +1348,7 @@ export default function PatjacCarPlay(){
           const d = new Date(maxD.getFullYear(), maxD.getMonth()+i, 1);
           const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
           d.setDate(Math.min(dayOfMonth,lastDay));
-          toAdd.push({...sample,id:gid(),date:ymd(d),status:"pending",actualStart:null,actualEnd:null,actualHours:null,photos:[],signature:null,reminderSent:false});
+          toAdd.push({...sample,id:gid(),date:ymd(d),teamId:sample.teamId?`${String(sample.teamId).split("_")[0]}_${ymd(d)}`:null,status:"pending",actualStart:null,actualEnd:null,actualHours:null,photos:[],signature:null,reminderSent:false});
         }
       }
     });
@@ -3590,19 +3590,49 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
   const bulk = useBulkSelect();
   // Client price is CHF per hour → job amount = rate × planned hours
   const withAutoAmount = (f) => ({...f, amount: jobAmountFor(clients.find(c=>c.id===f.clientId), f.timeStart, f.timeEnd)});
+  // Total work hours are shared between the people on the job: 5 h with 2 people → each works 2.5 h,
+  // the job ends earlier, each person is paid (and the client billed) for their share.
+  const addHours = (start, h) => { const [hh,mm]=(start||"08:00").split(":").map(Number); const t=Math.round(hh*60+mm+h*60); const m=((t%1440)+1440)%1440; return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`; };
+  const teamSize = (f) => Math.max(1,(f.employeeIds||[]).length);
+  const splitHours = (f) => { const tot=Number(f.totalHours)||0; return tot>0 ? withAutoAmount({...f, timeEnd:addHours(f.timeStart, tot/teamSize(f))}) : withAutoAmount(f); };
   const statusLabel=(s)=>s==="completed"?t.completed:s==="inProgress"?t.inProgress:t.pending;
   const statusColor=(s)=>s==="completed"?"green":s==="inProgress"?"blue":"yellow";
 
+  // A job can have several people. Internally each person gets their own copy of the job
+  // (own clock-in/out, pay, reminder, work sheet), linked together by a shared teamId.
+  const teamOf = (job) => job?.teamId ? jobs.filter(j=>j.teamId===job.teamId) : (job?[job]:[]);
   const save=()=>{
     const c=clients.find(x=>x.id===form.clientId);
-    const e=employees.find(x=>x.id===form.employeeId);
-    const base = {...form,clientName:c?.name||"",employeeName:e?.name||""};
+    const ids = (form.employeeIds&&form.employeeIds.length) ? form.employeeIds : (form.employeeId?[form.employeeId]:[]);
+    if(!ids.length){ notify(L("Mindestens eine Person wählen","Elija al menos una persona","Choose at least one person","Scegli almeno una persona"),"error"); return; }
+    const {employeeIds, totalHours, ...clean} = form; // form-only helpers, not stored
+    const common = {...clean, clientName:c?.name||""};
+    const forEmp = (empId, extra={}) => { const e=employees.find(x=>x.id===empId); return {...common, employeeId:empId, employeeName:e?.name||"", ...extra}; };
+    const batch = gid();
+    const teamIdFor = (date) => ids.length>1 ? `${batch}_${date}` : null;
 
     if(form.id){
       const prevJob = jobs.find(j=>j.id===form.id);
-      const timeChanged = prevJob && (prevJob.date!==form.date || prevJob.timeStart!==form.timeStart || prevJob.employeeId!==form.employeeId);
-      const upd = timeChanged ? {...base, reminderSent:false} : base;
-      setJobs(p=>p.map(j=>j.id===form.id?upd:j));
+      const team = teamOf(prevJob);
+      const timeChanged = prevJob && (prevJob.date!==form.date || prevJob.timeStart!==form.timeStart);
+      const teamId = ids.length>1 ? (prevJob?.teamId || `${batch}_${form.date}`) : null;
+      const shared = ({id,employeeId,employeeName,actualStart,actualEnd,actualHours,status,photos,signature,reminderSent,recurringId,...rest})=>rest;
+      setJobs(p=>{
+        let next = [...p];
+        // update or remove existing team members
+        team.forEach(m=>{
+          if(ids.includes(m.employeeId)){
+            next = next.map(j=>j.id===m.id ? {...j, ...shared(common), teamId, ...(timeChanged?{reminderSent:false}:{})} : j);
+          } else {
+            next = next.filter(j=>j.id!==m.id);
+          }
+        });
+        // add new members
+        ids.filter(id=>!team.some(m=>m.employeeId===id)).forEach(id=>{
+          next.push(forEmp(id,{id:gid(), teamId, recurringId:null, status:"pending", actualStart:null, actualEnd:null, actualHours:null, photos:[], signature:null, reminderSent:false}));
+        });
+        return next;
+      });
       notify(t.success); setModal(null); return;
     }
 
@@ -3610,37 +3640,29 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
       notify(L("Wähle mindestens einen Wochentag","Elige al menos un día de la semana","Pick at least one weekday","Scegli almeno un giorno"),"error");
       return;
     }
-    if(form.recurrence==="weekly" && (form.recurWeekdays||[]).length){
-      const recurringId = gid();
+    const dates = [];
+    if(form.recurrence==="weekly"){
       const startD = new Date(form.date+"T00:00:00");
       const horizonEnd = new Date(startD); horizonEnd.setDate(horizonEnd.getDate()+12*7); // ~3 months ahead
-      const occurrences = [];
       let cursor = new Date(startD);
-      while(cursor<=horizonEnd){
-        if(form.recurWeekdays.includes(cursor.getDay())){
-          occurrences.push({...base,id:gid(),recurringId,date:ymd(cursor),photos:[],signature:null});
-        }
-        cursor.setDate(cursor.getDate()+1);
-      }
-      setJobs(p=>[...p,...occurrences]);
-      notify(`${t.success} (${occurrences.length} ${L("Termine erstellt","trabajos creados","jobs created","lavori creati")})`);
+      while(cursor<=horizonEnd){ if(form.recurWeekdays.includes(cursor.getDay())) dates.push(ymd(cursor)); cursor.setDate(cursor.getDate()+1); }
     } else if(form.recurrence==="monthly"){
-      const recurringId = gid();
       const startD = new Date(form.date+"T00:00:00");
       const dayOfMonth = startD.getDate();
-      const occurrences = [];
       for(let i=0;i<6;i++){ // ~6 months ahead
         const d = new Date(startD.getFullYear(), startD.getMonth()+i, 1);
         const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-        d.setDate(Math.min(dayOfMonth,lastDay));
-        occurrences.push({...base,id:gid(),recurringId,date:ymd(d),photos:[],signature:null});
+        d.setDate(Math.min(dayOfMonth,lastDay)); dates.push(ymd(d));
       }
-      setJobs(p=>[...p,...occurrences]);
-      notify(`${t.success} (${occurrences.length} ${L("Termine erstellt","trabajos creados","jobs created","lavori creati")})`);
-    } else {
-      setJobs(p=>[...p,{...base,id:gid(),photos:[],signature:null}]);
-      notify(t.success);
-    }
+    } else dates.push(form.date);
+    const recurring = form.recurrence==="weekly"||form.recurrence==="monthly";
+    const created = [];
+    ids.forEach(empId=>{
+      const recurringId = recurring ? gid() : null; // one series per person
+      dates.forEach(date=>created.push(forEmp(empId,{id:gid(), recurringId, teamId:teamIdFor(date), date, photos:[], signature:null})));
+    });
+    setJobs(p=>[...p,...created]);
+    notify(created.length>1 ? `${t.success} (${created.length} ${L("Einsätze erstellt","trabajos creados","jobs created","lavori creati")})` : t.success);
     setModal(null);
   };
 
@@ -3802,7 +3824,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             <button key={s} onClick={()=>setFilter(s)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filter===s?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{s==="all"?"All":statusLabel(s)}</button>
           ))}
         </div>
-        {<CPBtn onClick={()=>{setForm(withAutoAmount({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",serviceType:"cleaning",description:"",date:ymd(new Date()),timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]}));setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
+        {<CPBtn onClick={()=>{setForm(withAutoAmount({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",employeeIds:employees[0]?[employees[0].id]:[],totalHours:2,serviceType:"cleaning",description:"",date:ymd(new Date()),timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]}));setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
       </>}
     >
       {isAdmin&&<BulkBar bulk={bulk} visibleIds={ff.map(j=>j.id)} lang={lang}
@@ -3820,6 +3842,9 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                   <CPBadge text={statusLabel(job.status)} color={statusColor(job.status)}/>
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {job.date} · {job.timeStart}–{job.timeEnd}</div>
+                {job.teamId&&(()=>{const team=teamOf(job);return team.length>1?(
+                  <div style={{color:"#69DB7C",fontSize:12,marginTop:2}}>👥 {L("Team","Equipo","Team","Squadra")} ({team.length}): {team.map(m=>m.employeeName).join(", ")}</div>
+                ):null;})()}
                 {job.description&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{job.description}</div>}
                 <div style={{color:"#FFD43B",fontWeight:700,fontSize:13,marginTop:4}}>CHF {(Number(job.amount)||0).toFixed(2)} <span style={{color:CP.textTertiary,fontWeight:500,fontSize:11}}>({hoursBetween(job.timeStart,job.timeEnd)} h)</span>{job.recurringId&&<span style={{color:"#74C0FC",fontWeight:600,fontSize:11}}> · 🔁</span>}</div>
                 {bulk.selectMode&&job.recurringId&&(
@@ -3829,7 +3854,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                 )}
               </div>
               {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexShrink:0}}>
-                {<CPBtn onClick={()=>{setForm({...job});setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>}
+                {<CPBtn onClick={()=>{setForm({...job, employeeIds:teamOf(job).map(m=>m.employeeId), totalHours:Math.round(hoursBetween(job.timeStart,job.timeEnd)*teamOf(job).length*100)/100});setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>}
                 {job.status!=="completed"&&<CPBtn onClick={()=>{setJobs(p=>p.map(j=>j.id===job.id?{...j,status:job.status==="pending"?"inProgress":"completed"}:j));notify(t.success);}} variant={job.status==="pending"?"warning":"success"} size="sm">{job.status==="pending"?"▶":"✓"}</CPBtn>}
                 <CPBtn onClick={()=>setDeleteJobId(job.id)} variant="danger" size="sm">🗑️</CPBtn>
               </div>}
@@ -3846,12 +3871,38 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
               <CPSelect value={form.clientId} onChange={e=>setForm(f=>withAutoAmount({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</CPSelect>
               {(()=>{const c=clients.find(x=>x.id===form.clientId);const addr=c?`${c.street||""} ${c.number||""}, ${c.postalCode||""} ${c.city||""}`.trim().replace(/^,\s*/,""):"";return addr?(<div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📍 {addr}</div>):null;})()}
             </CPField>
-            <CPField label={t.employees}><CPSelect value={form.employeeId} onChange={e=>setForm(f=>({...f,employeeId:e.target.value}))}>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</CPSelect></CPField>
+            <CPField label={`${t.employees} (${(form.employeeIds||[]).length})`}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {employees.filter(e=>e.active!==false).map(e=>{
+                  const on=(form.employeeIds||[]).includes(e.id);
+                  return (
+                    <button key={e.id} type="button" onClick={()=>setForm(f=>{const cur=f.employeeIds||[];const next=on?cur.filter(x=>x!==e.id):[...cur,e.id];return splitHours({...f,employeeIds:next,employeeId:next[0]||""});})}
+                      style={{padding:"6px 10px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,
+                        border:on?"1px solid rgba(12,166,120,0.7)":`1px solid ${CP.border}`,
+                        background:on?"rgba(12,166,120,0.22)":"rgba(255,255,255,0.05)",color:on?"#69DB7C":CP.textSecondary}}>
+                      {on?"✓ ":""}{e.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{color:CP.textTertiary,fontSize:11,marginTop:4}}>{L("Mehrere Personen möglich – jede erhält ihren eigenen Einsatz (Stempeln, Lohn, Erinnerung).","Puede elegir varias personas. Cada una tendrá su propio trabajo para fichar, cobrar su salario y recibir el aviso.","Several people possible – each gets their own job (clock-in, pay, reminder).","Più persone possibili – ognuna ha il proprio lavoro (timbratura, paga, promemoria).")}</div>
+            </CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 12px"}}>
             <CPField label={t.date}><CPInput type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
-            <CPField label="Start"><CPInput type="time" value={form.timeStart} onChange={e=>setForm(f=>withAutoAmount({...f,timeStart:e.target.value}))}/></CPField>
-            <CPField label={L("Ende","Fin","End","Fine")}><CPInput type="time" value={form.timeEnd} onChange={e=>setForm(f=>withAutoAmount({...f,timeEnd:e.target.value}))}/></CPField>
+            <CPField label="Start"><CPInput type="time" value={form.timeStart} onChange={e=>setForm(f=>splitHours({...f,timeStart:e.target.value}))}/></CPField>
+            <CPField label={L("Ende","Fin","End","Fine")}><CPInput type="time" value={form.timeEnd} onChange={e=>setForm(f=>withAutoAmount({...f,timeEnd:e.target.value,totalHours:Math.round(hoursBetween(f.timeStart,e.target.value)*teamSize(f)*100)/100}))}/></CPField>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:"0 12px",alignItems:"end"}}>
+            <CPField label={L("Arbeitsstunden total","Horas de trabajo totales","Total work hours","Ore di lavoro totali")}>
+              <CPInput type="number" value={form.totalHours??""} onChange={e=>{const v=parseFloat(String(e.target.value).replace(",","."));setForm(f=>splitHours({...f,totalHours:isNaN(v)?"":v}));}}/>
+            </CPField>
+            <div style={{color:"#74C0FC",fontSize:12,marginBottom:14,lineHeight:1.5}}>
+              {(()=>{const n=teamSize(form);const per=hoursBetween(form.timeStart,form.timeEnd);
+                return n>1
+                  ? <>👥 {form.totalHours||0} h ÷ {n} {L("Personen","personas","people","persone")} = <b>{per} h {L("pro Person","cada una","each","a testa")}</b> · {L("fertig um","terminan a las","done at","finito alle")} <b>{form.timeEnd}</b></>
+                  : <>👤 {per} h · {L("fertig um","termina a las","done at","finito alle")} <b>{form.timeEnd}</b></>;})()}
+            </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.service||"Service"}><CPSelect value={form.serviceType} onChange={e=>setForm(f=>({...f,serviceType:e.target.value}))}><option value="cleaning">{t.cleaning}</option><option value="gardening">{t.gardening}</option><option value="other">{t.other}</option></CPSelect></CPField>
@@ -3859,7 +3910,9 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
               <CPInput type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:parseFloat(e.target.value)||""}))}/>
               {(()=>{const c=clients.find(x=>x.id===form.clientId);const rate=parseFloat(c?.price)||0;const h=hoursBetween(form.timeStart,form.timeEnd);
                 return rate
-                  ? <div style={{color:"#74C0FC",fontSize:11,marginTop:4}}>CHF {rate.toFixed(2)}/h × {h} h = CHF {(rate*h).toFixed(2)}</div>
+                  ? <div style={{color:"#74C0FC",fontSize:11,marginTop:4}}>CHF {rate.toFixed(2)}/h × {h} h = CHF {(rate*h).toFixed(2)} {L("pro Person","por persona","per person","per persona")}
+                      {(form.employeeIds||[]).length>1&&<div style={{color:"#FFD43B",fontWeight:700}}>{L("Total Kunde","Total cliente","Client total","Totale cliente")}: {Math.round(h*(form.employeeIds||[]).length*100)/100} h × CHF {rate.toFixed(2)} = CHF {((form.employeeIds||[]).length*rate*h).toFixed(2)}</div>}
+                    </div>
                   : <div style={{color:"#FFA94D",fontSize:11,marginTop:4}}>{L("Kunde hat keinen Stundensatz","El cliente no tiene precio por hora","Client has no hourly rate","Il cliente non ha tariffa oraria")}</div>;})()}
             </CPField>
           </div>
