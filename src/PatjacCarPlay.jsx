@@ -657,9 +657,19 @@ const gPinUnique = (existingEmployees, excludeId) => {
 // ─── SEND BY EMAIL (opens Outlook/Gmail with prefilled content) ───
 const sendByEmail = ({to="", subject="", body=""}) => {
   const from = "patjacservices@outlook.com";
-  const mailto = `mailto:${encodeURIComponent(to)}?from=${encodeURIComponent(from)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.open(mailto, "_blank");
+  const mailto = `mailto:${encodeURIComponent(to).replace(/%40/g,"@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // A link click (not window.open) is what phones and browsers reliably hand over to the mail app
+  const a = document.createElement("a"); a.href = mailto; a.rel = "noopener"; a.style.display = "none";
+  document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(), 500);
+  void from;
 };
+// Web mail composers: work on any computer even when no mail program is set up
+const outlookWebUrl = ({to="",subject="",body=""}) => `https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+const gmailWebUrl = ({to="",subject="",body=""}) => `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+// SMS link: iPhone uses "&body=", Android uses "?body="
+const isIOS = () => /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent||"") && ("ontouchend" in document || /iPhone|iPad|iPod/.test(navigator.userAgent||""));
+const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||"") || isIOS();
+const smsUrl = (phone, body) => { const n = String(phone||"").replace(/[^\d+]/g,""); return isIOS() ? `sms:${n}&body=${encodeURIComponent(body)}` : `sms:${n}?body=${encodeURIComponent(body)}`; };
 
 // ─── GAV LOHNKATEGORIEN ──────────────────────────────────────
 const GAV_CATEGORIES = [
@@ -2812,10 +2822,13 @@ td:last-child{text-align:right;font-weight:600}
 }
 
 // ── NEW-EMPLOYEE ACCESS MESSAGE: app link + PIN + confidentiality warning ──
+// Public production address of the app. Deployment/preview addresses (e.g. patjac-app-xxxx-patjacservices.vercel.app)
+// are protected by Vercel and send visitors to the Vercel login page, so the invitation always uses this one.
+const APP_PUBLIC_URL = "https://patjac-app.vercel.app";
 const swissWa = (phone) => { let d=String(phone||"").replace(/[^\d+]/g,""); if(d.startsWith("+")) d=d.slice(1); else if(d.startsWith("00")) d=d.slice(2); else if(d.startsWith("0")) d="41"+d.slice(1); return d; };
 const accessMessage = (emp, lang) => {
   const L = makeL(lang);
-  const link = (typeof window!=="undefined" ? window.location.origin : "");
+  const link = APP_PUBLIC_URL;
   return {
     subject: L("Ihr Zugang zur Patjac-App","Tu acceso a la app de Patjac","Your access to the Patjac app","Il tuo accesso all'app Patjac"),
     body: L(
@@ -2878,9 +2891,15 @@ function AccessInviteModal({emp, lang, onClose}){
     <CPModal title={`🔑 ${L("Zugang senden","Enviar acceso","Send access","Invia accesso")} – ${emp.name}`} onClose={onClose} width={520}>
       <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10}}>{L("Wählen Sie, wie die Zugangsdaten gesendet werden sollen:","Elija cómo enviar los datos de acceso:","Choose how to send the access details:","Scegli come inviare i dati di accesso:")}</div>
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-        <button disabled={!emp.email} onClick={()=>sendByEmail({to:emp.email,subject:msg.subject,body:msg.body})} style={{...btn("#1C7ED6"),opacity:emp.email?1:.4}}>📧 E-mail {emp.email?`→ ${emp.email}`:`(${L("keine E-Mail erfasst","sin e-mail guardado","no email saved","nessuna e-mail")})`}</button>
         <button disabled={!wa} onClick={()=>window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg.body)}`,"_blank")} style={{...btn("#25D366"),opacity:wa?1:.4}}>💬 WhatsApp {emp.phone?`→ ${emp.phone}`:`(${L("keine Nummer","sin teléfono","no number","nessun numero")})`}</button>
-        <button disabled={!emp.phone} onClick={()=>window.open(`sms:${String(emp.phone||"").replace(/\s/g,"")}?&body=${encodeURIComponent(msg.body)}`,"_self")} style={{...btn("#7048E8"),opacity:emp.phone?1:.4}}>📱 SMS {emp.phone?`→ ${emp.phone}`:""}</button>
+        <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📧 E-mail {emp.email?`→ ${emp.email}`:`(${L("keine E-Mail erfasst – bitte im Mitarbeiter speichern","sin e-mail guardado – agréguelo en la ficha del empleado","no email saved","nessuna e-mail")})`}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,opacity:emp.email?1:.4}}>
+          <a href={emp.email?outlookWebUrl({to:emp.email,subject:msg.subject,body:msg.body}):undefined} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!emp.email)e.preventDefault();}} style={{...btn("#0F6CBD"),textAlign:"center",textDecoration:"none",boxSizing:"border-box"}}>Outlook</a>
+          <a href={emp.email?gmailWebUrl({to:emp.email,subject:msg.subject,body:msg.body}):undefined} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!emp.email)e.preventDefault();}} style={{...btn("#D93025"),textAlign:"center",textDecoration:"none",boxSizing:"border-box"}}>Gmail</a>
+          <a href={emp.email?`mailto:${emp.email}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`:undefined} onClick={e=>{if(!emp.email)e.preventDefault();}} style={{...btn("#1C7ED6"),textAlign:"center",textDecoration:"none",boxSizing:"border-box"}}>{L("Mail-App","App de correo","Mail app","App mail")}</a>
+        </div>
+        <a href={emp.phone?smsUrl(emp.phone,msg.body):undefined} onClick={e=>{if(!emp.phone)e.preventDefault();}} style={{...btn("#7048E8"),opacity:emp.phone?1:.4,textDecoration:"none",boxSizing:"border-box",marginTop:4}}>📱 SMS {emp.phone?`→ ${emp.phone}`:""}</a>
+        {!isMobile()&&<div style={{color:"#FAB005",fontSize:12}}>ℹ️ {L("SMS funktioniert nur vom Handy aus. Öffnen Sie die App auf dem Handy oder nutzen Sie WhatsApp / E-Mail.","El SMS solo funciona desde el móvil. Abra la app en su teléfono o use WhatsApp / e-mail.","SMS only works from a phone. Open the app on your phone or use WhatsApp / email.","L'SMS funziona solo dal telefono. Apri l'app sul telefono o usa WhatsApp / e-mail.")}</div>}
         <button onClick={()=>{ try{ navigator.clipboard.writeText(msg.body); }catch(e){} }} style={btn("rgba(255,255,255,.12)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
       </div>
       <pre style={{whiteSpace:"pre-wrap",background:"rgba(0,0,0,.3)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 12px",color:CP.textSecondary,fontSize:12,maxHeight:220,overflow:"auto",fontFamily:"inherit"}}>{msg.body}</pre>
@@ -2924,8 +2943,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
       const newEmp={...form,id:gid(),name:n,code,pin,role:"employee"};
       setEmployees(p=>[...p,newEmp]);
       notify(`${t.userCode}: ${code} | ${t.pin}: ${pin}`,"info");
-      // Send the access message right away (opens the e-mail app pre-filled) and show all send options
-      if(newEmp.email){ const m=accessMessage(newEmp,lang); sendByEmail({to:newEmp.email,subject:m.subject,body:m.body}); }
+      // Show the send options right away (browsers block mail/SMS opened without a click, so the admin taps one)
       setInviteEmp(newEmp);
     }
     setModal(null);
