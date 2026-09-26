@@ -6014,6 +6014,24 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
 
 // SVG illustrations per topic (inline, no external URLs needed)
 const ACADEMY_ILLUSTRATIONS = {
+  app_phone: `
+    <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+      <rect width="320" height="180" rx="14" fill="#0b2a24"/>
+      <circle cx="60" cy="40" r="28" fill="#0CA678" opacity="0.18"/>
+      <circle cx="270" cy="140" r="36" fill="#1C7ED6" opacity="0.15"/>
+      <rect x="118" y="14" width="84" height="152" rx="14" fill="#10151f" stroke="#0CA678" stroke-width="3"/>
+      <rect x="126" y="30" width="68" height="120" rx="6" fill="#16202e"/>
+      <rect x="148" y="20" width="24" height="4" rx="2" fill="#2a3444"/>
+      <rect x="132" y="38" width="26" height="26" rx="7" fill="#1C7ED6"/><text x="145" y="57" font-size="14" text-anchor="middle">📋</text>
+      <rect x="162" y="38" width="26" height="26" rx="7" fill="#0CA678"/><text x="175" y="57" font-size="14" text-anchor="middle">⏱️</text>
+      <rect x="132" y="70" width="26" height="26" rx="7" fill="#7048E8"/><text x="145" y="89" font-size="14" text-anchor="middle">💬</text>
+      <rect x="162" y="70" width="26" height="26" rx="7" fill="#E67700"/><text x="175" y="89" font-size="14" text-anchor="middle">🎓</text>
+      <rect x="132" y="102" width="26" height="26" rx="7" fill="#2F9E44"/><text x="145" y="121" font-size="14" text-anchor="middle">💵</text>
+      <rect x="162" y="102" width="26" height="26" rx="7" fill="#C92A2A"/><text x="175" y="121" font-size="14" text-anchor="middle">📍</text>
+      <circle cx="160" cy="158" r="4" fill="#2a3444"/>
+      <rect x="222" y="40" width="72" height="30" rx="12" fill="#0CA678"/><text x="258" y="60" font-size="14" text-anchor="middle" fill="white" font-weight="bold">🔑 PIN</text>
+      <rect x="26" y="96" width="74" height="30" rx="12" fill="#1C7ED6"/><text x="63" y="116" font-size="14" text-anchor="middle" fill="white" font-weight="bold">✓ OK</text>
+    </svg>`,
   cleaning: `
     <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
       <rect width="320" height="180" rx="14" fill="#0d1a2e"/>
@@ -6654,88 +6672,679 @@ const ACADEMY_COURSES_V2 = [
       {q:{DE:"Welche Schweizer Notfallnummer gilt bei Vergiftungen?",ES:"¿Qué número de emergencia suizo aplica en caso de intoxicación?",EN:"Which Swiss emergency number applies for poisonings?",IT:"Quale numero di emergenza svizzero si applica in caso di avvelenamento?"},opts:{DE:["145 (Tox Info Suisse)","117 (Polizei)","144 (Sanitätsnotruf)","112 (Europanotruf)"],ES:["145 (Tox Info Suisse)","117 (Policía)","144 (Emergencias)","112 (Europeo)"],EN:["145 (Tox Info Suisse)","117 (Police)","144 (Emergency medical)","112 (European)"],IT:["145 (Tox Info Suisse)","117 (Polizia)","144 (Emergenza sanitaria)","112 (Europeo)"]},ans:0},
     ],
   },
-  // ── MANAGEMENT: PATJAC BUSINESS SUITE ────────────────
+  // ── APP GUIDE FOR EMPLOYEES (simple, no jargon) ──────
   {
-    id:"ac6", category:"management", badge:"new",
-    emoji:"💼", color:"#7048E8", illustrationKey:"management_invoice",
-    titleKey:{
-      DE:"Patjac Business Suite — Administratorhandbuch v2",
-      ES:"Patjac Business Suite — Manual del Administrador v2",
-      EN:"Patjac Business Suite — Administrator Guide v2",
-      IT:"Patjac Business Suite — Guida Amministratore v2",
+   "id": "ac7",
+   "category": "app",
+   "badge": "featured",
+   "emoji": "📱",
+   "color": "#0CA678",
+   "illustrationKey": "app_phone",
+   "titleKey": {
+    "DE": "App-Anleitung für Mitarbeiter",
+    "ES": "Guía de la app para empleados",
+    "EN": "App guide for employees",
+    "IT": "Guida all'app per dipendenti"
+   },
+   "descKey": {
+    "DE": "Einfach erklärt, Schritt für Schritt: anmelden, Aufträge ansehen, ein- und ausstempeln, Nachrichten, Lohn und Monatsrapport. Ohne Fachwörter.",
+    "ES": "Explicado fácil, paso a paso: entrar, ver tus trabajos, fichar entrada y salida, mensajes, nómina y hoja mensual. Sin palabras técnicas.",
+    "EN": "Explained simply, step by step: log in, see your jobs, clock in and out, messages, payslip and monthly sheet. No technical words.",
+    "IT": "Spiegato in modo semplice, passo dopo passo: accedere, vedere i lavori, timbrare, messaggi, busta paga e rapporto mensile. Senza parole tecniche."
+   },
+   "duration": {
+    "DE": "30 min",
+    "ES": "30 min",
+    "EN": "30 min",
+    "IT": "30 min"
+   },
+   "level": "beginner",
+   "progress": 0,
+   "lessons_list": [
+    {
+     "id": "ac7l1",
+     "titleKey": {
+      "DE": "1. So kommen Sie in die App",
+      "ES": "1. Cómo entrar en la app",
+      "EN": "1. How to get into the app",
+      "IT": "1. Come entrare nell'app"
+     },
+     "done": false,
+     "illustrationKey": "app_phone",
+     "contentKey": {
+      "DE": "📲 DER LINK\nSie erhalten von der Firma eine Nachricht (WhatsApp, E-Mail oder SMS) mit dem Link zur App und Ihrem PIN.\nDie App-Adresse ist: patjac-app.vercel.app\n\n🔑 ANMELDEN – 3 Schritte\n1. Link antippen.\n2. «Mitarbeiter» wählen.\n3. Ihren 4-stelligen PIN eingeben. Fertig!\n\n📱 TIPP: APP AUF DEN STARTBILDSCHIRM\n• iPhone: in Safari auf «Teilen» ⬆️ tippen → «Zum Home-Bildschirm».\n• Android: in Chrome auf ⋮ tippen → «Zum Startbildschirm hinzufügen».\nSo öffnen Sie die App wie jede andere App mit einem Tipp.\n\n⚠️ IHR PIN IST GEHEIM\n• Geben Sie Ihren PIN niemandem – auch nicht Kolleginnen oder Kollegen.\n• Niemand darf mit Ihrem PIN für Sie stempeln.\n• PIN vergessen oder verloren? Sofort der Firma melden. Sie bekommen einen neuen.\n\n🚪 ABMELDEN\nOben rechts auf «Abmelden» tippen – besonders wichtig auf fremden Geräten.",
+      "ES": "📲 EL ENLACE\nLa empresa te envía un mensaje (WhatsApp, e-mail o SMS) con el enlace de la app y tu PIN.\nLa dirección de la app es: patjac-app.vercel.app\n\n🔑 ENTRAR – 3 pasos\n1. Toca el enlace.\n2. Elige «Empleado».\n3. Escribe tu PIN de 4 números. ¡Listo!\n\n📱 CONSEJO: PON LA APP EN TU PANTALLA DE INICIO\n• iPhone: en Safari toca «Compartir» ⬆️ → «Añadir a pantalla de inicio».\n• Android: en Chrome toca ⋮ → «Añadir a pantalla de inicio».\nAsí abres la app con un solo toque, como cualquier otra app.\n\n⚠️ TU PIN ES SECRETO\n• No le des tu PIN a nadie, tampoco a tus compañeros.\n• Nadie puede fichar por ti con tu PIN.\n• ¿Olvidaste o perdiste tu PIN? Avisa a la empresa enseguida y te dará uno nuevo.\n\n🚪 SALIR\nToca «Salir» arriba a la derecha. Es muy importante si usas un teléfono que no es tuyo.",
+      "EN": "📲 THE LINK\nThe company sends you a message (WhatsApp, email or SMS) with the app link and your PIN.\nThe app address is: patjac-app.vercel.app\n\n🔑 LOG IN – 3 steps\n1. Tap the link.\n2. Choose «Employee».\n3. Type your 4-digit PIN. Done!\n\n📱 TIP: PUT THE APP ON YOUR HOME SCREEN\n• iPhone: in Safari tap «Share» ⬆️ → «Add to Home Screen».\n• Android: in Chrome tap ⋮ → «Add to Home screen».\nThen you open the app with one tap, like any other app.\n\n⚠️ YOUR PIN IS SECRET\n• Never give your PIN to anyone, not even colleagues.\n• Nobody may clock in for you with your PIN.\n• Forgot or lost your PIN? Tell the company right away and you will get a new one.\n\n🚪 LOG OUT\nTap «Logout» at the top right – very important on a phone that is not yours.",
+      "IT": "📲 IL LINK\nL'azienda ti invia un messaggio (WhatsApp, e-mail o SMS) con il link dell'app e il tuo PIN.\nL'indirizzo dell'app è: patjac-app.vercel.app\n\n🔑 ACCEDERE – 3 passi\n1. Tocca il link.\n2. Scegli «Dipendente».\n3. Scrivi il tuo PIN di 4 cifre. Fatto!\n\n📱 CONSIGLIO: METTI L'APP SULLA SCHERMATA HOME\n• iPhone: in Safari tocca «Condividi» ⬆️ → «Aggiungi alla schermata Home».\n• Android: in Chrome tocca ⋮ → «Aggiungi a schermata Home».\nCosì apri l'app con un tocco, come qualsiasi altra app.\n\n⚠️ IL TUO PIN È SEGRETO\n• Non dare il tuo PIN a nessuno, nemmeno ai colleghi.\n• Nessuno può timbrare per te con il tuo PIN.\n• PIN dimenticato o perso? Avvisa subito l'azienda e ne riceverai uno nuovo.\n\n🚪 USCIRE\nTocca «Esci» in alto a destra – molto importante su un telefono che non è tuo."
+     }
     },
-    descKey:{
-      DE:"Vollständige und aktualisierte Anleitung zur Verwaltung der Patjac Business Suite. Alle Module inkl. Neuheiten: GAV-Lohnkategorien, Echtzeit-Nachrichten mit Fotos, E-Mail-Versand aus allen Modulen, Supabase-Cloud-Synchronisation, Mehrsprachigkeit DE/ES/EN/IT und iOS/Android-Kompatibilität.",
-      ES:"Guía completa y actualizada para administrar la Patjac Business Suite. Todos los módulos incl. novedades: categorías salariales GAV, mensajes en tiempo real con fotos, envío de correo desde todos los módulos, sincronización Supabase Cloud, multilingüismo DE/ES/EN/IT y compatibilidad iOS/Android.",
-      EN:"Complete and updated guide to managing the Patjac Business Suite. All modules incl. new features: GAV wage categories, real-time messages with photos, email sending from all modules, Supabase cloud sync, DE/ES/EN/IT multilingual support and iOS/Android compatibility.",
-      IT:"Guida completa e aggiornata per gestire la Patjac Business Suite. Tutti i moduli incl. novità: categorie salariali GAV, messaggi in tempo reale con foto, invio email da tutti i moduli, sincronizzazione cloud Supabase, multilingua DE/ES/EN/IT e compatibilità iOS/Android.",
+    {
+     "id": "ac7l2",
+     "titleKey": {
+      "DE": "2. Meine Aufträge ansehen",
+      "ES": "2. Ver mis trabajos",
+      "EN": "2. See my jobs",
+      "IT": "2. Vedere i miei lavori"
+     },
+     "done": false,
+     "illustrationKey": "cleaning",
+     "contentKey": {
+      "DE": "📋 WO?\nTippen Sie auf das Symbol 📋 «Aufträge».\n\n👀 WAS SEHE ICH?\nNur Ihre eigenen Aufträge. Für jeden Auftrag:\n• Kunde und Adresse 📍\n• Datum und Uhrzeit (Beginn – Ende)\n• Art der Arbeit: 🧹 Reinigung oder 🌿 Garten\nAufträge von heute sind blau markiert mit «📅 Heute».\n\n🔘 FILTER OBEN\n«Alle» · «Ausstehend» · «In Bearbeitung» · «Abgeschlossen» – so finden Sie schnell, was Sie suchen.\n\n🗺️ HINFAHREN\nTippen Sie auf «Navigation». Die Karte öffnet sich mit dem Weg zum Kunden.\n\n👥 ARBEIT IM TEAM\nManchmal arbeiten 2 oder mehr Personen im selben Auftrag. Die Arbeitsstunden werden aufgeteilt.\nBeispiel: 5 Stunden Arbeit mit 2 Personen → jede Person arbeitet 2½ Stunden und wird für ihren Teil bezahlt.\nIn Ihrem Auftrag sehen Sie nur Ihre eigene Zeit.",
+      "ES": "📋 ¿DÓNDE?\nToca el icono 📋 «Trabajos».\n\n👀 ¿QUÉ VEO?\nSolo tus propios trabajos. En cada trabajo ves:\n• Cliente y dirección 📍\n• Fecha y hora (inicio – fin)\n• Tipo de trabajo: 🧹 limpieza o 🌿 jardín\nLos trabajos de hoy salen en azul con «📅 Hoy».\n\n🔘 FILTROS ARRIBA\n«Todos» · «Pendiente» · «En curso» · «Completado». Así encuentras rápido lo que buscas.\n\n🗺️ CÓMO LLEGAR\nToca «Navegar». Se abre el mapa con el camino hasta el cliente.\n\n👥 TRABAJO EN EQUIPO\nA veces van 2 o más personas al mismo trabajo. Las horas se reparten.\nEjemplo: un trabajo de 5 horas con 2 personas → cada una trabaja 2 horas y media y cobra su parte.\nEn tu trabajo solo ves tu propio horario.",
+      "EN": "📋 WHERE?\nTap the 📋 «Jobs» icon.\n\n👀 WHAT DO I SEE?\nOnly your own jobs. For each job:\n• Client and address 📍\n• Date and time (start – end)\n• Type of work: 🧹 cleaning or 🌿 garden\nToday's jobs are shown in blue with «📅 Today».\n\n🔘 FILTERS AT THE TOP\n«All» · «Pending» · «In progress» · «Completed» – to find things quickly.\n\n🗺️ GETTING THERE\nTap «Navigate». The map opens with the way to the client.\n\n👥 TEAMWORK\nSometimes 2 or more people work on the same job. The hours are shared.\nExample: a 5-hour job with 2 people → each person works 2½ hours and is paid for their part.\nIn your job you only see your own time.",
+      "IT": "📋 DOVE?\nTocca l'icona 📋 «Lavori».\n\n👀 COSA VEDO?\nSolo i tuoi lavori. Per ogni lavoro:\n• Cliente e indirizzo 📍\n• Data e ora (inizio – fine)\n• Tipo di lavoro: 🧹 pulizia o 🌿 giardino\nI lavori di oggi sono in blu con «📅 Oggi».\n\n🔘 FILTRI IN ALTO\n«Tutti» · «In attesa» · «In corso» · «Completato» – per trovare subito ciò che cerchi.\n\n🗺️ COME ARRIVARE\nTocca «Naviga». Si apre la mappa con la strada fino al cliente.\n\n👥 LAVORO IN SQUADRA\nA volte 2 o più persone lavorano allo stesso lavoro. Le ore vengono divise.\nEsempio: un lavoro di 5 ore con 2 persone → ognuno lavora 2 ore e mezza ed è pagato per la sua parte.\nNel tuo lavoro vedi solo il tuo orario."
+     }
     },
-    duration:{DE:"3h 00min",ES:"3h 00min",EN:"3h 00min",IT:"3h 00min"},
-    level:"intermediate", progress:0,
-    lessons_list:[
-      {
-        id:"ac6l1",
-        titleKey:{DE:"Kunden, Aufträge & Verträge",ES:"Clientes, Trabajos y Contratos",EN:"Clients, Jobs & Contracts",IT:"Clienti, Lavori e Contratti"},
-        done:false, illustrationKey:"management_customer",
-        contentKey:{
-          DE:"📋 KUNDEN VERWALTEN\n\n🔹 NEUER KUNDE: Klicken Sie auf '+ Hinzufügen'. Füllen Sie Name, Adresse, Telefon, E-Mail, Abrechnungstyp (pro Stunde / Monatspauschale), Preis und Reinigungsfrequenz aus.\n\n🔹 AUFTRÄGE: Planen Sie Einsätze pro Kunde. Weisen Sie Mitarbeiter zu, definieren Sie Datum, Uhrzeit und Servicetyp. Status: Geplant → In Bearbeitung → Abgeschlossen.\n\n📄 VERTRÄGE (NEU)\n\n🔹 VERTRAGSTYP: Wählen Sie Kunden- oder Mitarbeitervertrag.\n\n🔹 GAV-TÄTIGKEIT (NEU): Wählen Sie die Tätigkeit:\n• 🧹 Reinigung → Kategorien A bis H\n• 🌿 Gartenbau → Kategorien A bis F\nDer Mindestlohn gemäss GAV Zürich wird automatisch eingetragen.\n\n🔹 E-MAIL VERSAND: Klicken Sie auf 📧 — öffnet Outlook/Gmail mit vorausgefülltem Empfänger und Vertragsdetails.\n\n🔸 TIPP: Alle Daten werden in Echtzeit in Supabase gespeichert und auf allen Geräten synchronisiert.",
-          ES:"📋 GESTIONAR CLIENTES\n\n🔹 NUEVO CLIENTE: Haga clic en '+ Añadir'. Complete nombre, dirección, teléfono, email, tipo de facturación (por hora / mensual), precio y frecuencia de limpieza.\n\n🔹 TRABAJOS: Planifique servicios por cliente. Asigne empleados, defina fecha, hora y tipo de servicio. Estado: Planificado → En curso → Completado.\n\n📄 CONTRATOS (NUEVO)\n\n🔹 TIPO DE CONTRATO: Seleccione contrato de cliente o de empleado.\n\n🔹 ACTIVIDAD GAV (NUEVO): Seleccione la actividad:\n• 🧹 Limpieza → Categorías A hasta H\n• 🌿 Jardinería → Categorías A hasta F\nEl salario mínimo según GAV Zúrich se rellena automáticamente.\n\n🔹 ENVÍO POR CORREO: Haga clic en 📧 — abre Outlook/Gmail con destinatario y detalles del contrato prellenados.\n\n🔸 CONSEJO: Todos los datos se guardan en tiempo real en Supabase y se sincronizan en todos los dispositivos.",
-          EN:"📋 MANAGING CLIENTS\n\n🔹 NEW CLIENT: Click '+ Add'. Fill in name, address, phone, email, billing type (per hour / monthly flat rate), price and cleaning frequency.\n\n🔹 JOBS: Schedule assignments per client. Assign employees, define date, time and service type. Status: Planned → In Progress → Completed.\n\n📄 CONTRACTS (NEW)\n\n🔹 CONTRACT TYPE: Select client or employee contract.\n\n🔹 GAV ACTIVITY (NEW): Select the activity:\n• 🧹 Cleaning → Categories A to H\n• 🌿 Gardening → Categories A to F\nThe minimum wage per GAV Zurich is filled in automatically.\n\n🔹 EMAIL SENDING: Click 📧 — opens Outlook/Gmail with pre-filled recipient and contract details.\n\n🔸 TIP: All data is saved in real time in Supabase and synchronised on all devices.",
-          IT:"📋 GESTIONE CLIENTI\n\n🔹 NUOVO CLIENTE: Clicca '+ Aggiungi'. Compila nome, indirizzo, telefono, email, tipo fatturazione (orario / mensile), prezzo e frequenza di pulizia.\n\n🔹 LAVORI: Pianifica interventi per cliente. Assegna dipendenti, definisci data, ora e tipo di servizio. Stato: Pianificato → In corso → Completato.\n\n📄 CONTRATTI (NUOVO)\n\n🔹 TIPO DI CONTRATTO: Seleziona contratto cliente o dipendente.\n\n🔹 ATTIVITÀ GAV (NUOVO): Seleziona l'attività:\n• 🧹 Pulizie → Categorie A fino a H\n• 🌿 Giardinaggio → Categorie A fino a F\nIl salario minimo secondo GAV Zurigo viene compilato automaticamente.\n\n🔹 INVIO EMAIL: Clicca 📧 — apre Outlook/Gmail con destinatario e dettagli contratto precompilati.\n\n🔸 SUGGERIMENTO: Tutti i dati vengono salvati in tempo reale in Supabase e sincronizzati su tutti i dispositivi.",
-        },
-      },
-      {
-        id:"ac6l2",
-        titleKey:{DE:"Mitarbeiter & GAV-Lohnkategorien",ES:"Empleados y Categorías Salariales GAV",EN:"Employees & GAV Wage Categories",IT:"Dipendenti e Categorie Salariali GAV"},
-        done:false, illustrationKey:"management_customer",
-        contentKey:{
-          DE:"👥 MITARBEITER VERWALTEN\n\n🔹 NEUER MITARBEITER: Name, Adresse, AHV-Nummer, Eintrittsdatum, Lohntyp (Stunden- oder Festlohn).\n\n🔹 GAV-LOHNKATEGORIE (NEU):\nSchritt 1 — Tätigkeit wählen:\n• 🧹 Reinigung\n• 🌿 Gartenbau\n\nSchritt 2 — Kategorie wählen:\n\nReinigung (GAV Allpura 2025):\n• A – Unterhaltsreinigung I → CHF 21.45/h\n• B – Unterhaltsreinigung II → CHF 22.10/h\n• C – Spezialreinigung → CHF 23.20/h\n• D – Spitalreinigung → CHF 23.90/h\n• E – Glasreinigung → CHF 24.50/h\n• F – Industrie/Bau → CHF 24.90/h\n• G – Vorarbeiter/in → CHF 26.50/h\n• H – Gruppenleiter/in → CHF 28.00/h\n\nGartenbau (GAV JardinSuisse 2025):\n• A – Ungelernt → CHF 20.50/h\n• B – Angelernt → CHF 21.50/h\n• C – EBA Gärtner/in → CHF 23.00/h\n• D – EFZ Gärtner/in → CHF 25.00/h\n• E – Vorarbeiter/in → CHF 27.50/h\n• F – Teamleiter/in → CHF 30.00/h\n\n🔹 CODE & PIN: Automatisch generiert (z.B. PJ-AB1234 / 4567). Mitarbeiter verwendet dies zum Login auf eigenem Gerät (iOS/Android/PC).\n\n🔹 LOHNABRECHNUNG: Automatisch nach Schweizer Standard (AHV 8.7%, ALV 1.1%, NBUV, BVG, KTG) berechnet.\n\n🔸 13. MONATSLOHN: Aktivierbar per Checkbox im Mitarbeiterformular.",
-          ES:"👥 GESTIONAR EMPLEADOS\n\n🔹 NUEVO EMPLEADO: Nombre, dirección, número AHV, fecha de inicio, tipo de salario (por hora o fijo).\n\n🔹 CATEGORÍA SALARIAL GAV (NUEVO):\nPaso 1 — Seleccionar actividad:\n• 🧹 Limpieza\n• 🌿 Jardinería\n\nPaso 2 — Seleccionar categoría:\n\nLimpieza (GAV Allpura 2025):\n• A – Limpieza mantenimiento I → CHF 21.45/h\n• B – Limpieza mantenimiento II → CHF 22.10/h\n• C – Limpieza especial → CHF 23.20/h\n• D – Limpieza hospitalaria → CHF 23.90/h\n• E – Limpieza de vidrios → CHF 24.50/h\n• F – Industrial/Construcción → CHF 24.90/h\n• G – Encargado/a → CHF 26.50/h\n• H – Jefe de grupo → CHF 28.00/h\n\nJardinería (GAV JardinSuisse 2025):\n• A – Sin formación → CHF 20.50/h\n• B – Semicalificado → CHF 21.50/h\n• C – EBA Jardinero/a → CHF 23.00/h\n• D – EFZ Jardinero/a → CHF 25.00/h\n• E – Encargado/a → CHF 27.50/h\n• F – Jefe de equipo → CHF 30.00/h\n\n🔹 CÓDIGO & PIN: Generado automáticamente (ej. PJ-AB1234 / 4567). El empleado lo usa para iniciar sesión en su dispositivo (iOS/Android/PC).\n\n🔹 NÓMINA: Calculada automáticamente según estándar suizo (AHV 8.7%, ALV 1.1%, NBUV, BVG, KTG).\n\n🔸 13.° SALARIO: Activable con casilla en el formulario del empleado.",
-          EN:"👥 MANAGING EMPLOYEES\n\n🔹 NEW EMPLOYEE: Name, address, AHV number, start date, wage type (hourly or fixed).\n\n🔹 GAV WAGE CATEGORY (NEW):\nStep 1 — Select activity:\n• 🧹 Cleaning\n• 🌿 Gardening\n\nStep 2 — Select category:\n\nCleaning (GAV Allpura 2025):\n• A – Maintenance Cleaning I → CHF 21.45/h\n• B – Maintenance Cleaning II → CHF 22.10/h\n• C – Special Cleaning → CHF 23.20/h\n• D – Hospital Cleaning → CHF 23.90/h\n• E – Glass Cleaning → CHF 24.50/h\n• F – Industrial/Construction → CHF 24.90/h\n• G – Supervisor → CHF 26.50/h\n• H – Group Leader → CHF 28.00/h\n\nGardening (GAV JardinSuisse 2025):\n• A – Unskilled → CHF 20.50/h\n• B – Semi-skilled → CHF 21.50/h\n• C – EBA Gardener → CHF 23.00/h\n• D – EFZ Gardener → CHF 25.00/h\n• E – Supervisor → CHF 27.50/h\n• F – Team Leader → CHF 30.00/h\n\n🔹 CODE & PIN: Generated automatically (e.g. PJ-AB1234 / 4567). Employee uses this to log in on their device (iOS/Android/PC).\n\n🔹 PAYROLL: Calculated automatically per Swiss standard (AHV 8.7%, ALV 1.1%, NBUV, BVG, KTG).\n\n🔸 13TH SALARY: Activatable via checkbox in the employee form.",
-          IT:"👥 GESTIONE DIPENDENTI\n\n🔹 NUOVO DIPENDENTE: Nome, indirizzo, numero AVS, data di inizio, tipo di salario (orario o fisso).\n\n🔹 CATEGORIA SALARIALE GAV (NUOVO):\nPasso 1 — Seleziona attività:\n• 🧹 Pulizie\n• 🌿 Giardinaggio\n\nPasso 2 — Seleziona categoria:\n\nPulizie (GAV Allpura 2025):\n• A – Pulizie manutenzione I → CHF 21.45/h\n• B – Pulizie manutenzione II → CHF 22.10/h\n• C – Pulizie speciali → CHF 23.20/h\n• D – Pulizie ospedaliere → CHF 23.90/h\n• E – Pulizie vetri → CHF 24.50/h\n• F – Industriale/Edilizia → CHF 24.90/h\n• G – Caposquadra → CHF 26.50/h\n• H – Capogruppo → CHF 28.00/h\n\nGiardinaggio (GAV JardinSuisse 2025):\n• A – Non qualificato → CHF 20.50/h\n• B – Semiqualificato → CHF 21.50/h\n• C – EBA Giardiniere → CHF 23.00/h\n• D – EFZ Giardiniere → CHF 25.00/h\n• E – Caposquadra → CHF 27.50/h\n• F – Responsabile team → CHF 30.00/h\n\n🔹 CODICE & PIN: Generati automaticamente (es. PJ-AB1234 / 4567). Il dipendente lo usa per accedere sul suo dispositivo (iOS/Android/PC).\n\n🔹 BUSTA PAGA: Calcolata automaticamente secondo standard svizzero (AVS 8.7%, AD 1.1%, AINF, LPP, IS).\n\n🔸 13a MENSILITÀ: Attivabile tramite casella nel modulo dipendente.",
-        },
-      },
-      {
-        id:"ac6l3",
-        titleKey:{DE:"Rechnungen, Finanzen & E-Mail-Versand",ES:"Facturas, Finanzas y Envío por Correo",EN:"Invoices, Finance & Email Sending",IT:"Fatture, Finanze e Invio Email"},
-        done:false, illustrationKey:"management_invoice",
-        contentKey:{
-          DE:"💰 RECHNUNGEN\n\n🔹 RECHNUNG ERSTELLEN: Kunde wählen → Positionen hinzufügen (Beschreibung, Menge, Preis) → MwSt. 8.1% wird automatisch berechnet.\n\n🔹 STATUS: Offen → Fällig → Bezahlt. Überfällige Rechnungen werden farblich markiert.\n\n📧 E-MAIL VERSAND (NEU — in allen Modulen)\n\nDas 📧-Symbol ist jetzt in allen Dokumenten verfügbar:\n\n• 📄 Rechnungen → öffnet E-Mail an Kunden mit Rechnungsnummer, Betrag und Fälligkeitsdatum\n• 💰 Lohnabrechnung → öffnet E-Mail an Mitarbeiter mit Brutto-/Nettolohn\n• 📋 Verträge → öffnet E-Mail an Mitarbeiter/Kunden mit Vertragsdetails\n• 📦 Bestellungen → öffnet E-Mail an Lieferanten\n• 📊 Berichte → öffnet E-Mail mit Berichtszusammenfassung\n\nAlle E-Mails werden von patjacservices@outlook.com gesendet und in Outlook/Gmail vorausgefüllt geöffnet.\n\n💹 FINANZEN\n\n🔹 Dashboard: Einnahmen, Ausgaben, Gewinn. Monats- und Jahresvergleich.\n\n🔹 Berichte: Lohnausweis, MWST-Abrechnung, Jahresabschluss, Stundennachweis.\n\n🔸 SUPABASE: Alle Daten in Echtzeit synchronisiert — Zugriff von PC, Tablet, iPhone und Android.",
-          ES:"💰 FACTURAS\n\n🔹 CREAR FACTURA: Seleccionar cliente → añadir líneas (descripción, cantidad, precio) → IVA 8.1% calculado automáticamente.\n\n🔹 ESTADO: Pendiente → Vencida → Pagada. Las facturas vencidas se marcan con color.\n\n📧 ENVÍO POR CORREO (NUEVO — en todos los módulos)\n\nEl símbolo 📧 está disponible ahora en todos los documentos:\n\n• 📄 Facturas → abre email al cliente con número, importe y vencimiento\n• 💰 Nómina → abre email al empleado con salario bruto/neto\n• 📋 Contratos → abre email al empleado/cliente con detalles del contrato\n• 📦 Pedidos → abre email al proveedor\n• 📊 Informes → abre email con resumen del informe\n\nTodos los emails se envían desde patjacservices@outlook.com y se abren prellenados en Outlook/Gmail.\n\n💹 FINANZAS\n\n🔹 Dashboard: Ingresos, gastos, beneficio. Comparativa mensual y anual.\n\n🔹 Informes: Nómina, liquidación IVA, cierre anual, registro de horas.\n\n🔸 SUPABASE: Todos los datos sincronizados en tiempo real — acceso desde PC, tablet, iPhone y Android.",
-          EN:"💰 INVOICES\n\n🔹 CREATE INVOICE: Select client → add line items (description, quantity, price) → VAT 8.1% calculated automatically.\n\n🔹 STATUS: Open → Overdue → Paid. Overdue invoices are colour-marked.\n\n📧 EMAIL SENDING (NEW — in all modules)\n\nThe 📧 symbol is now available in all documents:\n\n• 📄 Invoices → opens email to client with invoice number, amount and due date\n• 💰 Payslip → opens email to employee with gross/net salary\n• 📋 Contracts → opens email to employee/client with contract details\n• 📦 Orders → opens email to supplier\n• 📊 Reports → opens email with report summary\n\nAll emails are sent from patjacservices@outlook.com and opened pre-filled in Outlook/Gmail.\n\n💹 FINANCE\n\n🔹 Dashboard: Income, expenses, profit. Monthly and annual comparison.\n\n🔹 Reports: Payslip, VAT return, annual accounts, hours record.\n\n🔸 SUPABASE: All data synchronised in real time — access from PC, tablet, iPhone and Android.",
-          IT:"💰 FATTURE\n\n🔹 CREARE FATTURA: Seleziona cliente → aggiungi voci (descrizione, quantità, prezzo) → IVA 8.1% calcolata automaticamente.\n\n🔹 STATO: Aperta → Scaduta → Pagata. Le fatture scadute vengono evidenziate con colore.\n\n📧 INVIO EMAIL (NUOVO — in tutti i moduli)\n\nIl simbolo 📧 è ora disponibile in tutti i documenti:\n\n• 📄 Fatture → apre email al cliente con numero, importo e scadenza\n• 💰 Busta paga → apre email al dipendente con salario lordo/netto\n• 📋 Contratti → apre email al dipendente/cliente con dettagli contratto\n• 📦 Ordini → apre email al fornitore\n• 📊 Rapporti → apre email con riepilogo rapporto\n\nTutte le email vengono inviate da patjacservices@outlook.com e aperte precompilate in Outlook/Gmail.\n\n💹 FINANZE\n\n🔹 Dashboard: Entrate, uscite, profitto. Confronto mensile e annuale.\n\n🔹 Rapporti: Busta paga, liquidazione IVA, bilancio annuale, registro ore.\n\n🔸 SUPABASE: Tutti i dati sincronizzati in tempo reale — accesso da PC, tablet, iPhone e Android.",
-        },
-      },
-      {
-        id:"ac6l4",
-        titleKey:{DE:"Nachrichten mit Fotos & Lager",ES:"Mensajes con Fotos y Almacén",EN:"Messages with Photos & Warehouse",IT:"Messaggi con Foto e Magazzino"},
-        done:false, illustrationKey:"management_customer",
-        contentKey:{
-          DE:"💬 NACHRICHTEN (AKTUALISIERT)\n\n🔹 ADMINISTRATOR-ANSICHT: Vollständige Liste aller aktiven Mitarbeiter als Gesprächsliste. Klicken Sie auf einen Mitarbeiter, um direkt zu schreiben.\n\n🔹 MITARBEITER-ANSICHT: Mitarbeiter sieht nur seinen Chat mit dem Administrator. Der Chat öffnet sich automatisch beim Login.\n\n🔹 BILDER SENDEN (NEU):\n• 🖼️ Galerie — wählen Sie ein Bild aus der Gerätegalerie\n• 📷 Kamera — direktes Foto aufnehmen (funktioniert auf iOS & Android)\n• Maximale Bildgrösse: 2MB pro Bild\n• Bilder können durch Tippen vergrössert werden\n\n🔹 AUTOMATISCHES LÖSCHEN: Nachrichten und Bilder werden nach 7 Tagen automatisch gelöscht.\n\n🔹 ECHTZEIT-UPDATES: Neue Nachrichten erscheinen alle 15 Sekunden automatisch — kein Neuladen nötig.\n\n📦 LAGER & BESTELLUNGEN\n\n🔹 INVENTAR: Produkte mit Lagerbestand, Minimalbestand und Preis. Automatische Warnung bei Unterschreitung des Mindestbestands.\n\n🔹 BESTELLUNGEN: Erstellen Sie Bestellungen bei Lieferanten mit E-Mail-Versand direkt aus der App.\n\n🔹 LIEFERANTEN: Kundenbasis mit Kontaktdaten, Bewertung und E-Mail-Direktversand.\n\n🔸 ROUTEN: Google Maps Navigation direkt aus der App für effiziente Arbeitsplanung.",
-          ES:"💬 MENSAJES (ACTUALIZADO)\n\n🔹 VISTA ADMINISTRADOR: Lista completa de todos los empleados activos como conversaciones. Haga clic en un empleado para escribirle directamente.\n\n🔹 VISTA EMPLEADO: El empleado solo ve su chat con el administrador. El chat se abre automáticamente al iniciar sesión.\n\n🔹 ENVIAR IMÁGENES (NUEVO):\n• 🖼️ Galería — seleccione una imagen de la galería del dispositivo\n• 📷 Cámara — tome una foto directamente (funciona en iOS y Android)\n• Tamaño máximo: 2MB por imagen\n• Las imágenes se pueden ampliar tocándolas\n\n🔹 ELIMINACIÓN AUTOMÁTICA: Mensajes e imágenes se eliminan automáticamente después de 7 días.\n\n🔹 ACTUALIZACIONES EN TIEMPO REAL: Los nuevos mensajes aparecen automáticamente cada 15 segundos — sin recargar.\n\n📦 ALMACÉN Y PEDIDOS\n\n🔹 INVENTARIO: Productos con stock, stock mínimo y precio. Aviso automático al bajar del stock mínimo.\n\n🔹 PEDIDOS: Cree pedidos a proveedores con envío por email directamente desde la app.\n\n🔹 PROVEEDORES: Base de proveedores con datos de contacto, valoración y envío de email directo.\n\n🔸 RUTAS: Navegación Google Maps directamente desde la app para planificación eficiente.",
-          EN:"💬 MESSAGES (UPDATED)\n\n🔹 ADMINISTRATOR VIEW: Complete list of all active employees as conversations. Click on an employee to write directly.\n\n🔹 EMPLOYEE VIEW: Employee only sees their chat with the administrator. Chat opens automatically on login.\n\n🔹 SEND IMAGES (NEW):\n• 🖼️ Gallery — select an image from the device gallery\n• 📷 Camera — take a photo directly (works on iOS & Android)\n• Maximum size: 2MB per image\n• Images can be enlarged by tapping\n\n🔹 AUTOMATIC DELETION: Messages and images are automatically deleted after 7 days.\n\n🔹 REAL-TIME UPDATES: New messages appear automatically every 15 seconds — no reload needed.\n\n📦 WAREHOUSE & ORDERS\n\n🔹 INVENTORY: Products with stock, minimum stock and price. Automatic warning when below minimum stock.\n\n🔹 ORDERS: Create orders to suppliers with email sending directly from the app.\n\n🔹 SUPPLIERS: Supplier base with contact details, rating and direct email sending.\n\n🔸 ROUTES: Google Maps navigation directly from the app for efficient work planning.",
-          IT:"💬 MESSAGGI (AGGIORNATO)\n\n🔹 VISTA AMMINISTRATORE: Elenco completo di tutti i dipendenti attivi come conversazioni. Clicca su un dipendente per scrivere direttamente.\n\n🔹 VISTA DIPENDENTE: Il dipendente vede solo la sua chat con l'amministratore. La chat si apre automaticamente al login.\n\n🔹 INVIARE IMMAGINI (NUOVO):\n• 🖼️ Galleria — seleziona un'immagine dalla galleria del dispositivo\n• 📷 Fotocamera — scatta una foto direttamente (funziona su iOS e Android)\n• Dimensione massima: 2MB per immagine\n• Le immagini si possono ingrandire toccandole\n\n🔹 ELIMINAZIONE AUTOMATICA: Messaggi e immagini vengono eliminati automaticamente dopo 7 giorni.\n\n🔹 AGGIORNAMENTI IN TEMPO REALE: I nuovi messaggi appaiono automaticamente ogni 15 secondi — nessun ricaricamento necessario.\n\n📦 MAGAZZINO E ORDINI\n\n🔹 INVENTARIO: Prodotti con scorte, scorte minime e prezzo. Avviso automatico sotto le scorte minime.\n\n🔹 ORDINI: Crea ordini ai fornitori con invio email direttamente dall'app.\n\n🔹 FORNITORI: Base fornitori con dati di contatto, valutazione e invio email diretto.\n\n🔸 PERCORSI: Navigazione Google Maps direttamente dall'app per una pianificazione efficiente.",
-        },
-      },
-      {
-        id:"ac6l5",
-        titleKey:{DE:"Zeiterfassung, Routen & Einstellungen",ES:"Fichaje, Rutas y Configuración",EN:"Timeclock, Routes & Settings",IT:"Timbrature, Percorsi e Impostazioni"},
-        done:false, illustrationKey:"management_invoice",
-        contentKey:{
-          DE:"⏱️ ZEITERFASSUNG (TIMECLOCK)\n\n🔹 ADMINISTRATOR: Übersicht aller Ein- und Ausstempelungen aller Mitarbeiter. Filterung nach Mitarbeiter und Datum.\n\n🔹 MITARBEITER: Einstemp eln und Ausstempeln mit einem Klick. Der Standort wird automatisch gespeichert.\n\n🔹 STUNDENÜBERSICHT: Automatische Berechnung der Arbeitsstunden pro Tag und Monat.\n\n🗺️ ROUTEN\n\n🔹 TAGESROUTEN: Zeigt alle Aufträge des Tages auf einer Karte. Optimierte Reihenfolge der Einsätze.\n\n🔹 NAVIGATION: Klicken Sie auf einen Auftrag → öffnet Google Maps Navigation direkt zum Kunden.\n\n🔹 MITARBEITER-ANSICHT: Mitarbeiter sehen nur ihre eigenen Aufträge des Tages.\n\n⚙️ EINSTELLUNGEN\n\n🔹 UNTERNEHMENSDATEN: Name, Adresse, UID-Nummer, MWST-Nummer, IBAN, BIC, E-Mail, Logo.\n\n🔹 MEHRSPRACHIGKEIT: Die App unterstützt DE / ES / EN / IT — wechselbar jederzeit oben rechts.\n\n🔹 DATENSICHERUNG: Alle Daten werden automatisch in Supabase Cloud gesichert. Keine manuelle Sicherung nötig.\n\n🔸 KOMPATIBILITÄT: Die App funktioniert auf PC (Windows/Mac), iPhone, iPad und Android — im Browser, ohne Installation.",
-          ES:"⏱️ FICHAJE (TIMECLOCK)\n\n🔹 ADMINISTRADOR: Vista general de todas las entradas y salidas de todos los empleados. Filtrado por empleado y fecha.\n\n🔹 EMPLEADO: Fichar entrada y salida con un clic. La ubicación se guarda automáticamente.\n\n🔹 RESUMEN DE HORAS: Cálculo automático de horas trabajadas por día y mes.\n\n🗺️ RUTAS\n\n🔹 RUTAS DEL DÍA: Muestra todos los trabajos del día en un mapa. Orden optimizado de servicios.\n\n🔹 NAVEGACIÓN: Haga clic en un trabajo → abre navegación Google Maps directamente al cliente.\n\n🔹 VISTA EMPLEADO: Los empleados solo ven sus propios trabajos del día.\n\n⚙️ CONFIGURACIÓN\n\n🔹 DATOS DE EMPRESA: Nombre, dirección, número UID, número IVA, IBAN, BIC, email, logo.\n\n🔹 MULTILINGÜISMO: La app admite DE / ES / EN / IT — cambio en cualquier momento arriba a la derecha.\n\n🔹 COPIA DE SEGURIDAD: Todos los datos se guardan automáticamente en Supabase Cloud. Sin copia manual.\n\n🔸 COMPATIBILIDAD: La app funciona en PC (Windows/Mac), iPhone, iPad y Android — en el navegador, sin instalación.",
-          EN:"⏱️ TIMECLOCK\n\n🔹 ADMINISTRATOR: Overview of all clock-ins and clock-outs for all employees. Filter by employee and date.\n\n🔹 EMPLOYEE: Clock in and out with one click. Location is saved automatically.\n\n🔹 HOURS SUMMARY: Automatic calculation of working hours per day and month.\n\n🗺️ ROUTES\n\n🔹 DAY ROUTES: Shows all jobs of the day on a map. Optimised order of assignments.\n\n🔹 NAVIGATION: Click on a job → opens Google Maps navigation directly to the client.\n\n🔹 EMPLOYEE VIEW: Employees only see their own jobs for the day.\n\n⚙️ SETTINGS\n\n🔹 COMPANY DATA: Name, address, UID number, VAT number, IBAN, BIC, email, logo.\n\n🔹 MULTILINGUAL: The app supports DE / ES / EN / IT — switchable at any time top right.\n\n🔹 DATA BACKUP: All data is automatically backed up in Supabase Cloud. No manual backup needed.\n\n🔸 COMPATIBILITY: The app works on PC (Windows/Mac), iPhone, iPad and Android — in the browser, no installation needed.",
-          IT:"⏱️ TIMBRATURE\n\n🔹 AMMINISTRATORE: Panoramica di tutte le timbrature di entrata e uscita di tutti i dipendenti. Filtro per dipendente e data.\n\n🔹 DIPENDENTE: Timbra entrata e uscita con un clic. La posizione viene salvata automaticamente.\n\n🔹 RIEPILOGO ORE: Calcolo automatico delle ore di lavoro per giorno e mese.\n\n🗺️ PERCORSI\n\n🔹 PERCORSI GIORNALIERI: Mostra tutti i lavori del giorno su una mappa. Ordine ottimizzato degli interventi.\n\n🔹 NAVIGAZIONE: Clicca su un lavoro → apre la navigazione Google Maps direttamente al cliente.\n\n🔹 VISTA DIPENDENTE: I dipendenti vedono solo i propri lavori del giorno.\n\n⚙️ IMPOSTAZIONI\n\n🔹 DATI AZIENDALI: Nome, indirizzo, numero UID, numero IVA, IBAN, BIC, email, logo.\n\n🔹 MULTILINGUA: L'app supporta DE / ES / EN / IT — modificabile in qualsiasi momento in alto a destra.\n\n🔹 BACKUP DATI: Tutti i dati vengono salvati automaticamente nel cloud Supabase. Nessun backup manuale necessario.\n\n🔸 COMPATIBILITÀ: L'app funziona su PC (Windows/Mac), iPhone, iPad e Android — nel browser, senza installazione.",
-        },
-      },
-    ],
-    quiz:[
-      {q:{DE:"Wie loggt sich ein Mitarbeiter in die App ein?",ES:"¿Cómo inicia sesión un empleado en la app?",EN:"How does an employee log into the app?",IT:"Come accede un dipendente all'app?"},opts:{DE:["Nur mit PIN","Mit E-Mail und Passwort","Mit Fingerabdruck","Mit QR-Code"],ES:["Solo con PIN","Con email y contraseña","Con huella dactilar","Con código QR"],EN:["With PIN only","With email and password","With fingerprint","With QR code"],IT:["Solo con PIN","Con email e password","Con impronta digitale","Con codice QR"]},ans:0},
-      {q:{DE:"Was ist der Mindestlohn für Reinigung Kategorie A (GAV 2025)?",ES:"¿Cuál es el salario mínimo para Limpieza Categoría A (GAV 2025)?",EN:"What is the minimum wage for Cleaning Category A (GAV 2025)?",IT:"Qual è il salario minimo per Pulizie Categoria A (GAV 2025)?"},opts:{DE:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"],ES:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"],EN:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"],IT:["CHF 21.45/h","CHF 20.00/h","CHF 23.00/h","CHF 19.50/h"]},ans:0},
-      {q:{DE:"Wie lange werden Nachrichten und Bilder in der App gespeichert?",ES:"¿Cuánto tiempo se guardan los mensajes e imágenes en la app?",EN:"How long are messages and images stored in the app?",IT:"Per quanto tempo vengono conservati messaggi e immagini nell'app?"},opts:{DE:["7 Tage","30 Tage","1 Jahr","Unbegrenzt"],ES:["7 días","30 días","1 año","Sin límite"],EN:["7 days","30 days","1 year","Unlimited"],IT:["7 giorni","30 giorni","1 anno","Illimitato"]},ans:0},
-      {q:{DE:"Was öffnet sich beim Klick auf 📧 in der App?",ES:"¿Qué se abre al hacer clic en 📧 en la app?",EN:"What opens when clicking 📧 in the app?",IT:"Cosa si apre cliccando su 📧 nell'app?"},opts:{DE:["Outlook/Gmail mit vorausgefüllter E-Mail","Ein PDF-Dokument","Der Drucker","WhatsApp"],ES:["Outlook/Gmail con email prellenado","Un documento PDF","La impresora","WhatsApp"],EN:["Outlook/Gmail with pre-filled email","A PDF document","The printer","WhatsApp"],IT:["Outlook/Gmail con email precompilata","Un documento PDF","La stampante","WhatsApp"]},ans:0},
-      {q:{DE:"Auf welchen Geräten funktioniert die Patjac Business Suite?",ES:"¿En qué dispositivos funciona la Patjac Business Suite?",EN:"On which devices does the Patjac Business Suite work?",IT:"Su quali dispositivi funziona la Patjac Business Suite?"},opts:{DE:["PC, iPhone, iPad und Android","Nur PC","Nur iPhone","Nur Android"],ES:["PC, iPhone, iPad y Android","Solo PC","Solo iPhone","Solo Android"],EN:["PC, iPhone, iPad and Android","PC only","iPhone only","Android only"],IT:["PC, iPhone, iPad e Android","Solo PC","Solo iPhone","Solo Android"]},ans:0},
-    ],
+    {
+     "id": "ac7l3",
+     "titleKey": {
+      "DE": "3. Ein- und Ausstempeln",
+      "ES": "3. Fichar entrada y salida",
+      "EN": "3. Clock in and out",
+      "IT": "3. Timbrare entrata e uscita"
+     },
+     "done": false,
+     "illustrationKey": "management_invoice",
+     "contentKey": {
+      "DE": "⏱️ WO?\nTippen Sie auf das Symbol ⏱️ «Zeiterfassung». Sie sehen Ihre Aufträge von heute.\n\n▶️ ANKOMMEN BEIM KUNDEN\nTippen Sie beim richtigen Kunden auf den grünen Knopf «🟢 Arbeitsbeginn». Die Uhrzeit wird gespeichert.\n\n⏹️ ARBEIT FERTIG\nTippen Sie beim selben Kunden auf den roten Knopf «🔴 Arbeitsende». Die App rechnet Ihre Stunden automatisch.\n\n➡️ NÄCHSTER KUNDE\nBeim nächsten Kunden wieder «🟢 Arbeitsbeginn» und am Ende «🔴 Arbeitsende». Jeder Kunde hat seine eigenen Knöpfe.\n\n📍 STANDORT\nBeim Ein- und Ausstempeln speichert die App den Ort, an dem Sie sind.\n• Erlauben Sie der App den Zugriff auf den Standort, wenn das Handy fragt.\n• Stempeln Sie immer VOR ORT beim Kunden – nicht zu Hause oder unterwegs.\n• Sind Sie weit weg von der Kundenadresse, erscheint eine Warnung.\nDas schützt Sie und die Firma: Ihre Arbeitszeit ist klar belegt.\n\n📍 REGISTERKARTE «STANDORTE»\nDort sehen Sie, wo und wann Sie ein- und ausgestempelt haben.\n\n❗ VERGESSEN ZU STEMPELN?\nKein Problem – schreiben Sie sofort der Firma im Chat 💬 die richtige Uhrzeit.",
+      "ES": "⏱️ ¿DÓNDE?\nToca el icono ⏱️ «Fichaje». Ves tus trabajos de hoy.\n\n▶️ AL LLEGAR AL CLIENTE\nToca el botón verde «🟢 Entrada» en el cliente correcto. La hora queda guardada.\n\n⏹️ AL TERMINAR\nToca el botón rojo «🔴 Salida» en el mismo cliente. La app calcula tus horas sola.\n\n➡️ SIGUIENTE CLIENTE\nEn el siguiente cliente, otra vez «🟢 Entrada» y al final «🔴 Salida». Cada cliente tiene sus propios botones.\n\n📍 UBICACIÓN\nAl fichar entrada y salida, la app guarda el lugar donde estás.\n• Cuando el teléfono pregunte, permite que la app use tu ubicación.\n• Ficha siempre EN EL LUGAR del cliente, no en casa ni en el camino.\n• Si estás lejos de la dirección del cliente, sale un aviso.\nEsto te protege a ti y a la empresa: tu tiempo de trabajo queda demostrado.\n\n📍 PESTAÑA «UBICACIONES»\nAhí ves dónde y a qué hora fichaste entrada y salida.\n\n❗ ¿SE TE OLVIDÓ FICHAR?\nNo pasa nada. Escribe enseguida a la empresa en el chat 💬 con la hora correcta.",
+      "EN": "⏱️ WHERE?\nTap the ⏱️ «Time Clock» icon. You see today's jobs.\n\n▶️ WHEN YOU ARRIVE AT THE CLIENT\nTap the green «🟢 Clock In» button on the right client. The time is saved.\n\n⏹️ WHEN YOU FINISH\nTap the red «🔴 Clock Out» button on the same client. The app counts your hours by itself.\n\n➡️ NEXT CLIENT\nAt the next client, again «🟢 Clock In» and at the end «🔴 Clock Out». Each client has its own buttons.\n\n📍 LOCATION\nWhen you clock in and out, the app saves the place where you are.\n• When the phone asks, allow the app to use your location.\n• Always clock in AT the client's place – not at home or on the way.\n• If you are far from the client's address, a warning appears.\nThis protects you and the company: your working time is proven.\n\n📍 «LOCATIONS» TAB\nThere you see where and when you clocked in and out.\n\n❗ FORGOT TO CLOCK?\nNo problem – write to the company in the chat 💬 right away with the correct time.",
+      "IT": "⏱️ DOVE?\nTocca l'icona ⏱️ «Timbrature». Vedi i lavori di oggi.\n\n▶️ QUANDO ARRIVI DAL CLIENTE\nTocca il pulsante verde «🟢 Entrata» sul cliente giusto. L'ora viene salvata.\n\n⏹️ QUANDO FINISCI\nTocca il pulsante rosso «🔴 Uscita» sullo stesso cliente. L'app calcola le ore da sola.\n\n➡️ CLIENTE SUCCESSIVO\nDal cliente successivo, di nuovo «🟢 Entrata» e alla fine «🔴 Uscita». Ogni cliente ha i suoi pulsanti.\n\n📍 POSIZIONE\nQuando timbri, l'app salva il luogo in cui ti trovi.\n• Quando il telefono lo chiede, permetti all'app di usare la posizione.\n• Timbra sempre SUL POSTO dal cliente, non a casa o per strada.\n• Se sei lontano dall'indirizzo del cliente, appare un avviso.\nQuesto protegge te e l'azienda: il tuo tempo di lavoro è dimostrato.\n\n📍 SCHEDA «POSIZIONI»\nLì vedi dove e quando hai timbrato entrata e uscita.\n\n❗ HAI DIMENTICATO DI TIMBRARE?\nNessun problema: scrivi subito all'azienda nella chat 💬 con l'ora giusta."
+     }
+    },
+    {
+     "id": "ac7l4",
+     "titleKey": {
+      "DE": "4. Nachrichten & Erinnerungen",
+      "ES": "4. Mensajes y avisos",
+      "EN": "4. Messages & reminders",
+      "IT": "4. Messaggi e promemoria"
+     },
+     "done": false,
+     "illustrationKey": "app_phone",
+     "contentKey": {
+      "DE": "💬 CHAT MIT DER FIRMA\nTippen Sie auf das Symbol 💬 «Nachrichten». Sie schreiben direkt mit der Firma.\n• Text schreiben und senden.\n• 🖼️ Foto aus der Galerie oder 📷 direkt mit der Kamera senden – z.B. um einen Schaden oder die fertige Arbeit zu zeigen.\n\n⏰ ERINNERUNG 1 STUNDE VORHER\nEine Stunde vor jedem Auftrag bekommen Sie automatisch eine Nachricht mit Kunde, Adresse und Uhrzeit.\n\n🔔 BENACHRICHTIGUNGEN EINSCHALTEN\nWenn die App fragt «Benachrichtigungen erlauben?», tippen Sie auf «Erlauben». So sehen Sie neue Nachrichten sofort.\nTipp: Lassen Sie die App im Hintergrund offen.\n\n🧹 CHAT WIRD AUFGERÄUMT\nJeden Sonntag um 12:00 Uhr werden alle Nachrichten automatisch gelöscht.\nWichtige Infos (z.B. einen Türcode) bitte selbst notieren.\n\n🙂 GUTE REGELN IM CHAT\n• Kurz und klar schreiben.\n• Probleme sofort melden: Verspätung, Krankheit, Schaden, fehlendes Material.\n• Keine Fotos von Kunden oder privaten Sachen der Kunden weitergeben.",
+      "ES": "💬 CHAT CON LA EMPRESA\nToca el icono 💬 «Mensajes». Escribes directamente con la empresa.\n• Escribe un texto y envíalo.\n• Manda una 🖼️ foto de la galería o 📷 hazla con la cámara, por ejemplo para mostrar un daño o el trabajo terminado.\n\n⏰ AVISO 1 HORA ANTES\nUna hora antes de cada trabajo recibes automáticamente un mensaje con el cliente, la dirección y la hora.\n\n🔔 ACTIVA LAS NOTIFICACIONES\nCuando la app pregunte «¿Permitir notificaciones?», toca «Permitir». Así ves los mensajes nuevos al momento.\nConsejo: deja la app abierta en segundo plano.\n\n🧹 EL CHAT SE LIMPIA\nCada domingo a las 12:00 se borran todos los mensajes automáticamente.\nSi hay algo importante (por ejemplo, el código de una puerta), apúntalo tú.\n\n🙂 BUENAS REGLAS EN EL CHAT\n• Escribe corto y claro.\n• Avisa enseguida de cualquier problema: retraso, enfermedad, daño o falta de material.\n• No compartas con nadie fotos de los clientes ni de sus cosas privadas.",
+      "EN": "💬 CHAT WITH THE COMPANY\nTap the 💬 «Messages» icon. You write directly with the company.\n• Write a text and send it.\n• Send a 🖼️ photo from the gallery or 📷 take one with the camera – e.g. to show damage or finished work.\n\n⏰ REMINDER 1 HOUR BEFORE\nOne hour before each job you automatically get a message with client, address and time.\n\n🔔 TURN ON NOTIFICATIONS\nWhen the app asks «Allow notifications?», tap «Allow». Then you see new messages right away.\nTip: leave the app open in the background.\n\n🧹 THE CHAT IS CLEANED\nEvery Sunday at 12:00 all messages are deleted automatically.\nPlease write down important info yourself (e.g. a door code).\n\n🙂 GOOD CHAT RULES\n• Write short and clear.\n• Report problems right away: delay, illness, damage, missing material.\n• Never share photos of clients or their private things.",
+      "IT": "💬 CHAT CON L'AZIENDA\nTocca l'icona 💬 «Messaggi». Scrivi direttamente con l'azienda.\n• Scrivi un testo e invialo.\n• Invia una 🖼️ foto dalla galleria o 📷 scattala con la fotocamera, ad es. per mostrare un danno o il lavoro finito.\n\n⏰ PROMEMORIA 1 ORA PRIMA\nUn'ora prima di ogni lavoro ricevi automaticamente un messaggio con cliente, indirizzo e ora.\n\n🔔 ATTIVA LE NOTIFICHE\nQuando l'app chiede «Consentire le notifiche?», tocca «Consenti». Così vedi subito i nuovi messaggi.\nConsiglio: lascia l'app aperta in background.\n\n🧹 LA CHAT VIENE PULITA\nOgni domenica alle 12:00 tutti i messaggi vengono cancellati automaticamente.\nAnnota tu le informazioni importanti (ad es. un codice della porta).\n\n🙂 BUONE REGOLE NELLA CHAT\n• Scrivi breve e chiaro.\n• Segnala subito i problemi: ritardo, malattia, danno, materiale mancante.\n• Non condividere foto dei clienti o delle loro cose private."
+     }
+    },
+    {
+     "id": "ac7l5",
+     "titleKey": {
+      "DE": "5. Mein Lohn & Monatsrapport",
+      "ES": "5. Mi nómina y hoja mensual",
+      "EN": "5. My payslip & monthly sheet",
+      "IT": "5. La mia busta paga e rapporto mensile"
+     },
+     "done": false,
+     "illustrationKey": "management_invoice",
+     "contentKey": {
+      "DE": "💵 WO?\nTippen Sie auf das Symbol 👤 «Mitarbeiter». Dort sehen Sie nur Ihre eigene Lohnabrechnung. Wählen Sie oben Monat und Jahr.\n\n📄 LOHNABRECHNUNG – EINFACH ERKLÄRT\n• BRUTTOLOHN: alles, was Sie verdient haben (Stunden × Stundenlohn + Zuschläge wie Ferien und Feiertage).\n• ABZÜGE: Beiträge, die das Gesetz verlangt – AHV (Rente), ALV (Arbeitslosigkeit), Unfallversicherung, Pensionskasse (BVG, ab einem bestimmten Lohn) und evtl. Quellensteuer.\n• NETTOLOHN: das Geld, das auf Ihr Konto kommt.\n• FAMILIENZULAGEN: Haben Sie Kinder, kommt Geld für die Kinder dazu.\n\n📋 MONATSRAPPORT\nTippen Sie auf «📋 Arbeitsrapport». Sie sehen für jeden Tag:\n• Datum, Kunde und Ort\n• Ein- und Ausstempelzeit\n• Gefahrene Kilometer\n• Fahrtkosten\n\n🚗 FAHRTKOSTEN\n• Der Weg von zu Hause zum ERSTEN Kunden ist Ihr privater Arbeitsweg.\n• Die Fahrten VON Kunde ZU Kunde bezahlt die Firma:\n  – mit dem Auto: CHF 0.75 pro Kilometer\n  – mit dem ÖV (Bus, Tram, Zug): das Billett.\n\n✅ BITTE KONTROLLIEREN\nSchauen Sie jeden Monat Ihren Rapport an. Stimmt etwas nicht? Schreiben Sie der Firma im Chat 💬.",
+      "ES": "💵 ¿DÓNDE?\nToca el icono 👤 «Empleados». Ahí ves solo tu propia nómina. Arriba eliges el mes y el año.\n\n📄 LA NÓMINA, FÁCIL\n• SALARIO BRUTO: todo lo que ganaste (horas × precio por hora + suplementos como vacaciones y festivos).\n• DEDUCCIONES: lo que pide la ley. AHV (jubilación), ALV (paro), seguro de accidentes, caja de pensiones (BVG, a partir de cierto sueldo) y, si te toca, impuesto en la fuente.\n• SALARIO NETO: el dinero que llega a tu cuenta.\n• ASIGNACIONES FAMILIARES: si tienes hijos, recibes además un dinero por cada hijo.\n\n📋 HOJA MENSUAL\nToca «📋 Hoja mensual». Para cada día ves:\n• Fecha, cliente y lugar\n• Hora de entrada y de salida\n• Kilómetros recorridos\n• Gastos de transporte\n\n🚗 TRANSPORTE\n• El camino de tu casa al PRIMER cliente es tu trayecto privado.\n• Los viajes DE un cliente A otro los paga la empresa:\n  – en coche: CHF 0.75 por kilómetro\n  – en transporte público (bus, tranvía, tren): el billete.\n\n✅ REVÍSALO\nMira tu hoja cada mes. ¿Algo no cuadra? Escribe a la empresa en el chat 💬.",
+      "EN": "💵 WHERE?\nTap the 👤 «Employees» icon. There you only see your own payslip. Choose month and year at the top.\n\n📄 PAYSLIP – MADE EASY\n• GROSS PAY: everything you earned (hours × hourly rate + supplements like holidays and public holidays).\n• DEDUCTIONS: what the law requires – AHV (pension), ALV (unemployment), accident insurance, pension fund (BVG, from a certain salary) and maybe withholding tax.\n• NET PAY: the money that arrives in your account.\n• FAMILY ALLOWANCES: if you have children, you get extra money for each child.\n\n📋 MONTHLY SHEET\nTap «📋 Work sheet». For each day you see:\n• Date, client and place\n• Clock-in and clock-out time\n• Kilometres travelled\n• Travel costs\n\n🚗 TRAVEL\n• The way from home to your FIRST client is your private commute.\n• Trips FROM one client TO another are paid by the company:\n  – by car: CHF 0.75 per kilometre\n  – by public transport (bus, tram, train): the ticket.\n\n✅ PLEASE CHECK\nLook at your sheet every month. Something wrong? Write to the company in the chat 💬.",
+      "IT": "💵 DOVE?\nTocca l'icona 👤 «Dipendenti». Lì vedi solo la tua busta paga. In alto scegli mese e anno.\n\n📄 BUSTA PAGA – SEMPLICE\n• SALARIO LORDO: tutto ciò che hai guadagnato (ore × paga oraria + supplementi come vacanze e festivi).\n• DEDUZIONI: ciò che chiede la legge – AVS (pensione), AD (disoccupazione), assicurazione infortuni, cassa pensione (LPP, da un certo salario) ed eventualmente imposta alla fonte.\n• SALARIO NETTO: i soldi che arrivano sul tuo conto.\n• ASSEGNI FAMILIARI: se hai figli, ricevi in più dei soldi per ogni figlio.\n\n📋 RAPPORTO MENSILE\nTocca «📋 Rapporto». Per ogni giorno vedi:\n• Data, cliente e luogo\n• Ora di entrata e di uscita\n• Chilometri percorsi\n• Spese di trasporto\n\n🚗 TRASPORTO\n• La strada da casa al PRIMO cliente è il tuo tragitto privato.\n• I viaggi DA un cliente A un altro li paga l'azienda:\n  – in auto: CHF 0.75 al chilometro\n  – con i mezzi pubblici (bus, tram, treno): il biglietto.\n\n✅ CONTROLLA\nGuarda il tuo rapporto ogni mese. Qualcosa non va? Scrivi all'azienda nella chat 💬."
+     }
+    },
+    {
+     "id": "ac7l6",
+     "titleKey": {
+      "DE": "6. Academy & goldene Regeln",
+      "ES": "6. Academy y reglas de oro",
+      "EN": "6. Academy & golden rules",
+      "IT": "6. Academy e regole d'oro"
+     },
+     "done": false,
+     "illustrationKey": "cleaning",
+     "contentKey": {
+      "DE": "🎓 PATJAC ACADEMY\nHier lernen Sie Ihren Beruf: Reinigung, Garten und Sicherheit.\n• Kurs antippen → Lektion lesen → «Lektion abschliessen».\n• Am Ende gibt es ein kleines Quiz. Keine Angst – Sie können es wiederholen.\n\n⭐ DIE 8 GOLDENEN REGELN\n1. Pünktlich sein. Verspätung? Sofort im Chat melden.\n2. Immer vor Ort beim Kunden ein- und ausstempeln.\n3. Ihren PIN niemandem geben.\n4. Schutzkleidung tragen (Handschuhe, Schuhe).\n5. Reinigungsmittel nie mischen.\n6. Schäden sofort mit Foto melden – ehrlich sein ist immer besser.\n7. Freundlich sein und die Privatsphäre der Kunden respektieren.\n8. Bei Fragen: fragen! Die Firma hilft Ihnen gerne.\n\n❓ PROBLEM MIT DER APP?\n• Seite neu laden (nach unten ziehen oder ⟳).\n• Abmelden und wieder mit PIN anmelden.\n• Hilft das nicht: der Firma im Chat oder per Telefon Bescheid geben.",
+      "ES": "🎓 PATJAC ACADEMY\nAquí aprendes tu oficio: limpieza, jardín y seguridad.\n• Toca un curso → lee la lección → «Marcar como completada».\n• Al final hay un pequeño test. Tranquilo/a, lo puedes repetir.\n\n⭐ LAS 8 REGLAS DE ORO\n1. Sé puntual. ¿Vas a llegar tarde? Avisa enseguida en el chat.\n2. Ficha siempre en el lugar del cliente, al entrar y al salir.\n3. No le des tu PIN a nadie.\n4. Usa la ropa de protección (guantes, calzado).\n5. Nunca mezcles productos de limpieza.\n6. Si hay un daño, avisa enseguida con una foto. Ser sincero siempre es mejor.\n7. Sé amable y respeta la privacidad del cliente.\n8. Si tienes dudas, ¡pregunta! La empresa te ayuda con gusto.\n\n❓ ¿PROBLEMAS CON LA APP?\n• Recarga la página (desliza hacia abajo o toca ⟳).\n• Sal y vuelve a entrar con tu PIN.\n• Si sigue sin funcionar, avisa a la empresa por el chat o por teléfono.",
+      "EN": "🎓 PATJAC ACADEMY\nHere you learn your job: cleaning, garden and safety.\n• Tap a course → read the lesson → «Mark as Complete».\n• At the end there is a short quiz. Don't worry – you can repeat it.\n\n⭐ THE 8 GOLDEN RULES\n1. Be on time. Running late? Tell us in the chat right away.\n2. Always clock in and out at the client's place.\n3. Never give your PIN to anyone.\n4. Wear protective clothing (gloves, shoes).\n5. Never mix cleaning products.\n6. Report damage right away with a photo – being honest is always better.\n7. Be friendly and respect the client's privacy.\n8. Questions? Ask! The company is happy to help.\n\n❓ PROBLEM WITH THE APP?\n• Reload the page (pull down or tap ⟳).\n• Log out and log in again with your PIN.\n• Still not working? Tell the company in the chat or by phone.",
+      "IT": "🎓 PATJAC ACADEMY\nQui impari il tuo mestiere: pulizie, giardino e sicurezza.\n• Tocca un corso → leggi la lezione → «Segna come completata».\n• Alla fine c'è un piccolo quiz. Tranquillo/a: puoi ripeterlo.\n\n⭐ LE 8 REGOLE D'ORO\n1. Sii puntuale. In ritardo? Avvisa subito nella chat.\n2. Timbra sempre sul posto dal cliente, in entrata e in uscita.\n3. Non dare a nessuno il tuo PIN.\n4. Indossa gli indumenti protettivi (guanti, scarpe).\n5. Non mescolare mai i prodotti di pulizia.\n6. Segnala subito un danno con una foto: essere onesti è sempre meglio.\n7. Sii gentile e rispetta la privacy del cliente.\n8. Hai dubbi? Chiedi! L'azienda ti aiuta volentieri.\n\n❓ PROBLEMI CON L'APP?\n• Ricarica la pagina (scorri verso il basso o tocca ⟳).\n• Esci e rientra con il tuo PIN.\n• Se non funziona ancora, avvisa l'azienda nella chat o per telefono."
+     }
+    }
+   ],
+   "quiz": [
+    {
+     "q": {
+      "DE": "Wie melden Sie sich in der App an?",
+      "ES": "¿Cómo entras en la app?",
+      "EN": "How do you log into the app?",
+      "IT": "Come entri nell'app?"
+     },
+     "opts": {
+      "DE": [
+       "«Mitarbeiter» wählen und PIN eingeben",
+       "Mit dem PIN eines Kollegen",
+       "Mit meinem Facebook-Konto",
+       "Ich rufe jeden Tag die Firma an"
+      ],
+      "ES": [
+       "Elijo «Empleado» y escribo mi PIN",
+       "Con el PIN de un compañero",
+       "Con mi cuenta de Facebook",
+       "Llamo a la empresa cada día"
+      ],
+      "EN": [
+       "Choose «Employee» and type my PIN",
+       "With a colleague's PIN",
+       "With my Facebook account",
+       "I call the company every day"
+      ],
+      "IT": [
+       "Scelgo «Dipendente» e scrivo il PIN",
+       "Con il PIN di un collega",
+       "Con il mio account Facebook",
+       "Chiamo l'azienda ogni giorno"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wo stempeln Sie ein?",
+      "ES": "¿Dónde fichas la entrada?",
+      "EN": "Where do you clock in?",
+      "IT": "Dove timbri l'entrata?"
+     },
+     "opts": {
+      "DE": [
+       "Vor Ort beim Kunden",
+       "Zu Hause beim Frühstück",
+       "Im Bus auf dem Weg",
+       "Am Abend, für den ganzen Tag"
+      ],
+      "ES": [
+       "En el lugar del cliente",
+       "En casa desayunando",
+       "En el autobús de camino",
+       "Por la noche, para todo el día"
+      ],
+      "EN": [
+       "At the client's place",
+       "At home at breakfast",
+       "On the bus on the way",
+       "In the evening, for the whole day"
+      ],
+      "IT": [
+       "Sul posto dal cliente",
+       "A casa a colazione",
+       "Sul bus per strada",
+       "La sera, per tutto il giorno"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wann bekommen Sie eine Erinnerung an einen Auftrag?",
+      "ES": "¿Cuándo recibes el aviso de un trabajo?",
+      "EN": "When do you get a job reminder?",
+      "IT": "Quando ricevi il promemoria di un lavoro?"
+     },
+     "opts": {
+      "DE": [
+       "1 Stunde vorher",
+       "1 Woche vorher",
+       "Nach der Arbeit",
+       "Nie"
+      ],
+      "ES": [
+       "1 hora antes",
+       "1 semana antes",
+       "Después del trabajo",
+       "Nunca"
+      ],
+      "EN": [
+       "1 hour before",
+       "1 week before",
+       "After the work",
+       "Never"
+      ],
+      "IT": [
+       "1 ora prima",
+       "1 settimana prima",
+       "Dopo il lavoro",
+       "Mai"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wie viel bezahlt die Firma pro Kilometer mit dem Auto von Kunde zu Kunde?",
+      "ES": "¿Cuánto paga la empresa por kilómetro en coche de un cliente a otro?",
+      "EN": "How much does the company pay per km by car from client to client?",
+      "IT": "Quanto paga l'azienda al km in auto da un cliente all'altro?"
+     },
+     "opts": {
+      "DE": [
+       "CHF 0.75",
+       "CHF 0.10",
+       "CHF 5.00",
+       "Nichts"
+      ],
+      "ES": [
+       "CHF 0.75",
+       "CHF 0.10",
+       "CHF 5.00",
+       "Nada"
+      ],
+      "EN": [
+       "CHF 0.75",
+       "CHF 0.10",
+       "CHF 5.00",
+       "Nothing"
+      ],
+      "IT": [
+       "CHF 0.75",
+       "CHF 0.10",
+       "CHF 5.00",
+       "Niente"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Ein Freund fragt nach Ihrem PIN. Was tun Sie?",
+      "ES": "Un amigo te pide tu PIN. ¿Qué haces?",
+      "EN": "A friend asks for your PIN. What do you do?",
+      "IT": "Un amico ti chiede il PIN. Cosa fai?"
+     },
+     "opts": {
+      "DE": [
+       "Ich gebe ihn niemandem",
+       "Ich gebe ihn nur Freunden",
+       "Ich schreibe ihn auf Facebook",
+       "Ich klebe ihn an die Tür"
+      ],
+      "ES": [
+       "No se lo doy a nadie",
+       "Solo se lo doy a amigos",
+       "Lo publico en Facebook",
+       "Lo pego en la puerta"
+      ],
+      "EN": [
+       "I give it to nobody",
+       "I only give it to friends",
+       "I post it on Facebook",
+       "I stick it on the door"
+      ],
+      "IT": [
+       "Non lo do a nessuno",
+       "Lo do solo agli amici",
+       "Lo scrivo su Facebook",
+       "Lo attacco alla porta"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wann wird der Chat automatisch gelöscht?",
+      "ES": "¿Cuándo se borra el chat automáticamente?",
+      "EN": "When is the chat deleted automatically?",
+      "IT": "Quando viene cancellata la chat automaticamente?"
+     },
+     "opts": {
+      "DE": [
+       "Jeden Sonntag um 12:00",
+       "Jeden Tag um 08:00",
+       "Nie",
+       "Einmal im Jahr"
+      ],
+      "ES": [
+       "Cada domingo a las 12:00",
+       "Cada día a las 08:00",
+       "Nunca",
+       "Una vez al año"
+      ],
+      "EN": [
+       "Every Sunday at 12:00",
+       "Every day at 08:00",
+       "Never",
+       "Once a year"
+      ],
+      "IT": [
+       "Ogni domenica alle 12:00",
+       "Ogni giorno alle 08:00",
+       "Mai",
+       "Una volta all'anno"
+      ]
+     },
+     "ans": 0
+    }
+   ]
+  },
+  // ── MANAGEMENT: PATJAC BUSINESS SUITE (admin only) ────
+  {
+   "id": "ac6",
+   "category": "management",
+   "badge": "new",
+   "emoji": "💼",
+   "color": "#7048E8",
+   "illustrationKey": "management_invoice",
+   "adminOnly": true,
+   "titleKey": {
+    "DE": "Patjac Business Suite — Administratorhandbuch v3",
+    "ES": "Patjac Business Suite — Manual del Administrador v3",
+    "EN": "Patjac Business Suite — Administrator Guide v3",
+    "IT": "Patjac Business Suite — Guida Amministratore v3"
+   },
+   "descKey": {
+    "DE": "Aktualisiert mit allen Neuheiten: wiederkehrende Aufträge, Teams mit Stundenaufteilung, Preis pro Stunde, Lohnabrechnung 2026 mit Quellensteuer-Liste, Monatsrapport mit Kilometern, Verträge mit Rechte-&-Pflichten-Seite, Rechnungen ohne MwSt., Lieferanten & Inventar, Standort beim Stempeln, Erinnerungen und automatischer Zugangsversand.",
+    "ES": "Actualizado con todas las novedades: trabajos recurrentes, equipos con horas repartidas, precio por hora, nómina 2026 con lista de impuesto en la fuente, hoja mensual con kilómetros, contratos con página de derechos y obligaciones, facturas sin IVA, proveedores e inventario, ubicación al fichar, avisos y envío automático del acceso.",
+    "EN": "Updated with all new features: recurring jobs, teams with split hours, price per hour, 2026 payroll with withholding-tax list, monthly sheet with kilometres, contracts with rights & obligations page, invoices without VAT, suppliers & inventory, clock-in location, reminders and automatic access sending.",
+    "IT": "Aggiornato con tutte le novità: lavori ricorrenti, squadre con ore divise, prezzo orario, stipendi 2026 con lista imposta alla fonte, rapporto mensile con chilometri, contratti con pagina diritti e obblighi, fatture senza IVA, fornitori e inventario, posizione alla timbratura, promemoria e invio automatico dell'accesso."
+   },
+   "duration": {
+    "DE": "2h 00min",
+    "ES": "2h 00min",
+    "EN": "2h 00min",
+    "IT": "2h 00min"
+   },
+   "level": "intermediate",
+   "progress": 0,
+   "lessons_list": [
+    {
+     "id": "ac6l1",
+     "titleKey": {
+      "DE": "Kunden & Aufträge",
+      "ES": "Clientes y trabajos",
+      "EN": "Clients & jobs",
+      "IT": "Clienti e lavori"
+     },
+     "done": false,
+     "illustrationKey": "management_customer",
+     "contentKey": {
+      "DE": "👥 KUNDEN\n🔹 «+ Hinzufügen»: Vorname, Nachname, Adresse, Telefon, E-Mail und PREIS PRO STUNDE (CHF).\n🔹 🔍 Suche: nach Name, Ort oder Telefon.\n🔹 ✏️ Bearbeiten: das Formular zeigt alle aktuellen Daten (inkl. Namen) – nur ändern, was nötig ist.\n🔹 ☑️ Mehrfachauswahl: mehrere Kunden anhaken → «Löschen» (wie bei E-Mails).\n\n📋 AUFTRÄGE\n🔹 NEUER AUFTRAG: Kunde, Datum, Beginn, Ende, Art (🧹/🌿).\n🔹 WIEDERKEHREND: mehrere Wochentage anhaken (z.B. Mo + Mi + Fr). Die App erstellt jeden Einsatz automatisch.\n🔹 TEAM: mehrere Mitarbeiter für einen Auftrag wählen.\n🔹 GESAMTSTUNDEN AUFTEILEN: Gesamtstunden eingeben – die App teilt sie durch die Anzahl Personen.\n   Beispiel: 5 h mit 2 Personen → je 2.5 h (08:00–10:30). Jeder wird für seinen Teil bezahlt.\n🔹 BERECHNUNG: Kunde = geplante Stunden × Preis pro Stunde. Mitarbeiter = vereinbarte Stunden × Stundenlohn.\n🔹 ☑️ Mehrere Aufträge auf einmal löschen.\n\n⏰ ERINNERUNG: 1 Stunde vor jedem Auftrag erhält der Mitarbeiter automatisch eine Nachricht in der App.",
+      "ES": "👥 CLIENTES\n🔹 «+ Añadir»: nombre, apellidos, dirección, teléfono, e-mail y PRECIO POR HORA (CHF).\n🔹 🔍 Buscar: por nombre, ciudad o teléfono.\n🔹 ✏️ Editar: el formulario muestra todos los datos actuales (también los nombres). Cambia solo lo necesario.\n🔹 ☑️ Selección múltiple: marca varios clientes → «Eliminar» (como en el correo).\n\n📋 TRABAJOS\n🔹 NUEVO TRABAJO: cliente, fecha, hora de inicio, hora de fin y tipo (🧹/🌿).\n🔹 RECURRENTE: marca varios días de la semana (por ejemplo lun + mié + vie). La app crea cada servicio sola.\n🔹 EQUIPO: elige varios empleados para un mismo trabajo.\n🔹 REPARTIR HORAS: escribe las horas totales y la app las divide entre las personas.\n   Ejemplo: 5 h con 2 personas → 2,5 h cada una (08:00–10:30). Cada una cobra su parte.\n🔹 CÁLCULO: cliente = horas planificadas × precio por hora. Empleado = horas pactadas × su precio por hora.\n🔹 ☑️ Borra varios trabajos a la vez.\n\n⏰ AVISO: 1 hora antes de cada trabajo, el empleado recibe automáticamente un mensaje en la app.",
+      "EN": "👥 CLIENTS\n🔹 «+ Add»: first name, last name, address, phone, email and PRICE PER HOUR (CHF).\n🔹 🔍 Search: by name, city or phone.\n🔹 ✏️ Edit: the form shows all current data (incl. names) – change only what you need.\n🔹 ☑️ Multi-select: tick several clients → «Delete» (like email).\n\n📋 JOBS\n🔹 NEW JOB: client, date, start, end, type (🧹/🌿).\n🔹 RECURRING: tick several weekdays (e.g. Mon + Wed + Fri). The app creates each visit automatically.\n🔹 TEAM: choose several employees for one job.\n🔹 SPLIT TOTAL HOURS: enter total hours – the app divides them by the number of people.\n   Example: 5 h with 2 people → 2.5 h each (08:00–10:30). Each is paid for their part.\n🔹 CALCULATION: client = planned hours × price per hour. Employee = agreed hours × hourly rate.\n🔹 ☑️ Delete several jobs at once.\n\n⏰ REMINDER: 1 hour before each job the employee automatically gets an in-app message.",
+      "IT": "👥 CLIENTI\n🔹 «+ Aggiungi»: nome, cognome, indirizzo, telefono, e-mail e PREZZO ORARIO (CHF).\n🔹 🔍 Cerca: per nome, città o telefono.\n🔹 ✏️ Modifica: il modulo mostra tutti i dati attuali (anche i nomi) – cambia solo il necessario.\n🔹 ☑️ Selezione multipla: spunta più clienti → «Elimina» (come nelle e-mail).\n\n📋 LAVORI\n🔹 NUOVO LAVORO: cliente, data, inizio, fine, tipo (🧹/🌿).\n🔹 RICORRENTE: spunta più giorni della settimana (es. lun + mer + ven). L'app crea ogni intervento da sola.\n🔹 SQUADRA: scegli più dipendenti per un lavoro.\n🔹 DIVIDERE LE ORE: inserisci le ore totali – l'app le divide per il numero di persone.\n   Esempio: 5 h con 2 persone → 2,5 h ciascuno (08:00–10:30). Ognuno è pagato per la sua parte.\n🔹 CALCOLO: cliente = ore pianificate × prezzo orario. Dipendente = ore concordate × paga oraria.\n🔹 ☑️ Elimina più lavori insieme.\n\n⏰ PROMEMORIA: 1 ora prima di ogni lavoro il dipendente riceve automaticamente un messaggio nell'app."
+     }
+    },
+    {
+     "id": "ac6l2",
+     "titleKey": {
+      "DE": "Mitarbeiter & Zugang",
+      "ES": "Empleados y acceso",
+      "EN": "Employees & access",
+      "IT": "Dipendenti e accesso"
+     },
+     "done": false,
+     "illustrationKey": "management_customer",
+     "contentKey": {
+      "DE": "👤 NEUER MITARBEITER\n🔹 Vorname, Nachname, Adresse, Telefon, E-Mail, AHV-Nr., Geburtsdatum, Bewilligung, Eintritt.\n🔹 GAV-KATEGORIE: Tätigkeit wählen → Mindestlohn wird eingesetzt.\n   Reinigung 2026: Unterhalt I 21.40 · Unterhalt II 22.90 · Spezial I 23.40 · Spezial II 24.90 · EBA 23.10 · EFZ 25.80 CHF/h.\n🔹 LOHN: Stundenlohn oder Monatslohn.\n🔹 FAMILIE: Zivilstand, Kinder (unter 12 / 12–16 / in Ausbildung) → Familienzulagen ZH automatisch.\n🔹 QUELLENSTEUER: Tarif einfach aus der Liste wählen (A/B/C/H + Kinder + Kirche). Kein Tippen nötig – der Satz kommt aus der offiziellen ZH-Tabelle.\n🔹 TRANSPORT: Auto (CHF 0.75/km) oder ÖV (Billettpreis).\n🔹 🔍 Suche nach Name, Ort, Telefon oder AHV.\n\n🔑 ZUGANG SENDEN\nNach dem Speichern öffnet sich «Zugang senden» automatisch. Link + PIN + Vertraulichkeitshinweis gehen per:\n• 💬 WhatsApp\n• 📧 Outlook, Gmail oder Mail-App (Nachricht ist vorbereitet – nur «Senden» klicken)\n• 📱 SMS (nur vom Handy)\n🔹 Später: Knopf «🔑 Zugang senden» auf der Mitarbeiterkarte.\n🔹 PIN verloren? Neuen PIN erzeugen – das Fenster öffnet sich wieder.\n🔹 Der Link lautet immer: patjac-app.vercel.app",
+      "ES": "👤 NUEVO EMPLEADO\n🔹 Nombre, apellidos, dirección, teléfono, e-mail, n.º AHV, fecha de nacimiento, permiso y fecha de entrada.\n🔹 CATEGORÍA GAV: elige la actividad y la app pone el salario mínimo.\n   Limpieza 2026 (CHF/h): mantenimiento I 21,40 · mantenimiento II 22,90 · especial I 23,40 · especial II 24,90 · EBA 23,10 · EFZ 25,80.\n🔹 SALARIO: por hora o mensual.\n🔹 FAMILIA: estado civil e hijos (menores de 12 / de 12 a 16 / estudiando). Las asignaciones familiares de ZH se calculan solas.\n🔹 IMPUESTO EN LA FUENTE: elige la tarifa de la lista (A/B/C/H + hijos + iglesia). No hay que escribir nada: el % sale de la tabla oficial de ZH.\n🔹 TRANSPORTE: coche (CHF 0,75/km) o transporte público (precio del billete).\n🔹 🔍 Busca por nombre, ciudad, teléfono o AHV.\n\n🔑 ENVIAR ACCESO\nAl guardar un empleado se abre sola la ventana «Enviar acceso». El enlace, el PIN y el aviso de confidencialidad se envían por:\n• 💬 WhatsApp\n• 📧 Outlook, Gmail o App de correo (el mensaje ya está escrito; solo pulsa «Enviar»)\n• 📱 SMS (solo desde el móvil)\n🔹 Más tarde: botón «🔑 Enviar acceso» en la tarjeta del empleado.\n🔹 ¿Perdió el PIN? Genera uno nuevo y la ventana se abre otra vez.\n🔹 El enlace siempre es: patjac-app.vercel.app",
+      "EN": "👤 NEW EMPLOYEE\n🔹 First name, last name, address, phone, email, AHV no., birth date, permit, start date.\n🔹 GAV CATEGORY: choose the activity → the minimum wage is filled in.\n   Cleaning 2026: maintenance I 21.40 · maintenance II 22.90 · special I 23.40 · special II 24.90 · EBA 23.10 · EFZ 25.80 CHF/h.\n🔹 WAGE: hourly or monthly.\n🔹 FAMILY: marital status, children (under 12 / 12–16 / in education) → ZH family allowances automatically.\n🔹 WITHHOLDING TAX: just pick the tariff from the list (A/B/C/H + children + church). No typing – the rate comes from the official ZH table.\n🔹 TRANSPORT: car (CHF 0.75/km) or public transport (ticket price).\n🔹 🔍 Search by name, city, phone or AHV.\n\n🔑 SEND ACCESS\nAfter saving, «Send access» opens automatically. Link + PIN + confidentiality notice go by:\n• 💬 WhatsApp\n• 📧 Outlook, Gmail or mail app (message is ready – just click «Send»)\n• 📱 SMS (from a phone only)\n🔹 Later: «🔑 Send access» button on the employee card.\n🔹 Lost PIN? Generate a new PIN – the window opens again.\n🔹 The link is always: patjac-app.vercel.app",
+      "IT": "👤 NUOVO DIPENDENTE\n🔹 Nome, cognome, indirizzo, telefono, e-mail, n. AVS, data di nascita, permesso, entrata.\n🔹 CATEGORIA GAV: scegli l'attività → il salario minimo viene inserito.\n   Pulizie 2026: manutenzione I 21.40 · manutenzione II 22.90 · speciale I 23.40 · speciale II 24.90 · EBA 23.10 · EFZ 25.80 CHF/h.\n🔹 SALARIO: orario o mensile.\n🔹 FAMIGLIA: stato civile, figli (sotto 12 / 12–16 / in formazione) → assegni familiari ZH automatici.\n🔹 IMPOSTA ALLA FONTE: scegli la tariffa dalla lista (A/B/C/H + figli + chiesa). Niente da digitare – l'aliquota viene dalla tabella ufficiale ZH.\n🔹 TRASPORTO: auto (CHF 0.75/km) o mezzi pubblici (prezzo del biglietto).\n🔹 🔍 Cerca per nome, città, telefono o AVS.\n\n🔑 INVIA ACCESSO\nDopo il salvataggio si apre da sola «Invia accesso». Link + PIN + avviso di riservatezza via:\n• 💬 WhatsApp\n• 📧 Outlook, Gmail o app mail (il messaggio è pronto – basta cliccare «Invia»)\n• 📱 SMS (solo dal telefono)\n🔹 In seguito: pulsante «🔑 Invia accesso» sulla scheda del dipendente.\n🔹 PIN perso? Genera un nuovo PIN – la finestra si riapre.\n🔹 Il link è sempre: patjac-app.vercel.app"
+     }
+    },
+    {
+     "id": "ac6l3",
+     "titleKey": {
+      "DE": "Lohn, Monatsrapport & Verträge",
+      "ES": "Nómina, hoja mensual y contratos",
+      "EN": "Payroll, monthly sheet & contracts",
+      "IT": "Stipendi, rapporto mensile e contratti"
+     },
+     "done": false,
+     "illustrationKey": "management_invoice",
+     "contentKey": {
+      "DE": "💵 LOHNABRECHNUNG 2026 (automatisch)\n🔹 Stundenlohn + GAV-Zuschläge: Ferien 8.33% (oder 10.64%), Feiertage, 13. Monatslohn 8.33%.\n🔹 Abzüge Mitarbeiter: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (ab 8 h/Woche) · KTG 0.5% · BVG (ab CHF 22'680/Jahr) · Quellensteuer (falls Tarif).\n🔹 Familienzulagen ZH: CHF 215 pro Kind, CHF 268 in Ausbildung.\n🔹 Arbeitgeberkosten werden nur Ihnen angezeigt.\n🔹 📄 Lohnabrechnung als PDF · 📧 per E-Mail senden.\n\n📋 MONATSRAPPORT\n🔹 Pro Tag: Datum, Kunde, Ort, Ein-/Ausstempelzeit, Kilometer.\n🔹 Weg Zuhause → 1. Kunde = privat. Kunde → Kunde = Arbeitszeit, wird bezahlt.\n🔹 Auto CHF 0.75/km oder ÖV-Billett.\n🔹 Kilometer werden über Karten berechnet. Fehlt ein Wert («?»), antippen und von Hand eintragen.\n\n📝 VERTRÄGE\n🔹 Mitarbeiter- oder Kundenvertrag wählen, GAV-Tätigkeit und Vertragsart.\n🔹 NEU: Jeder Vertrag hat eine Zusatzseite «Rechte & Pflichten» (Firma ↔ Mitarbeiter bzw. Firma ↔ Kunde) – für volle Transparenz.\n🔹 🔍 Suche nach Name.",
+      "ES": "💵 NÓMINA 2026 (automática)\n🔹 Precio por hora + suplementos GAV: vacaciones 8,33 % (o 10,64 %), festivos y 13.º salario 8,33 %.\n🔹 Deducciones del empleado: AHV/IV/EO 5,3 % · ALV 1,1 % · NBU 1,2 % (desde 8 h/semana) · KTG 0,5 % · BVG (desde CHF 22 680/año) · impuesto en la fuente (si tiene tarifa).\n🔹 Asignaciones familiares ZH: CHF 215 por hijo y CHF 268 si está estudiando.\n🔹 El coste de la empresa solo lo ves tú.\n🔹 📄 Nómina en PDF · 📧 envío por e-mail.\n\n📋 HOJA MENSUAL\n🔹 Por día: fecha, cliente, lugar, horas de entrada y salida y kilómetros.\n🔹 De casa al primer cliente = trayecto privado. De un cliente a otro = tiempo de trabajo, y se paga.\n🔹 Coche CHF 0,75/km o billete de transporte público.\n🔹 Los kilómetros se calculan con mapas. Si falta alguno («?»), tócalo y escríbelo a mano.\n\n📝 CONTRATOS\n🔹 Elige contrato de empleado o de cliente, la actividad GAV y el tipo de contrato.\n🔹 NUEVO: cada contrato lleva una página extra de «Derechos y obligaciones» (empresa ↔ empleado o empresa ↔ cliente), para que todo sea transparente.\n🔹 🔍 Busca por nombre.",
+      "EN": "💵 PAYROLL 2026 (automatic)\n🔹 Hourly wage + GAV supplements: holidays 8.33% (or 10.64%), public holidays, 13th salary 8.33%.\n🔹 Employee deductions: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (from 8 h/week) · KTG 0.5% · BVG (from CHF 22,680/year) · withholding tax (if tariff).\n🔹 ZH family allowances: CHF 215 per child, CHF 268 in education.\n🔹 Employer costs are shown only to you.\n🔹 📄 Payslip as PDF · 📧 send by email.\n\n📋 MONTHLY SHEET\n🔹 Per day: date, client, place, clock-in/out time, kilometres.\n🔹 Home → 1st client = private. Client → client = working time, paid.\n🔹 Car CHF 0.75/km or public transport ticket.\n🔹 Kilometres are calculated with maps. If a value is missing («?»), tap it and enter it by hand.\n\n📝 CONTRACTS\n🔹 Choose employee or client contract, GAV activity and contract type.\n🔹 NEW: every contract has an extra page «Rights & obligations» (company ↔ employee or company ↔ client) – for full transparency.\n🔹 🔍 Search by name.",
+      "IT": "💵 BUSTA PAGA 2026 (automatica)\n🔹 Paga oraria + supplementi GAV: vacanze 8.33% (o 10.64%), festivi, 13a mensilità 8.33%.\n🔹 Deduzioni dipendente: AVS/AI/IPG 5.3% · AD 1.1% · AINP 1.2% (da 8 h/settimana) · IGM 0.5% · LPP (da CHF 22'680/anno) · imposta alla fonte (se tariffa).\n🔹 Assegni familiari ZH: CHF 215 per figlio, CHF 268 in formazione.\n🔹 I costi del datore di lavoro sono visibili solo a te.\n🔹 📄 Busta paga in PDF · 📧 invio per e-mail.\n\n📋 RAPPORTO MENSILE\n🔹 Per giorno: data, cliente, luogo, ora di entrata/uscita, chilometri.\n🔹 Casa → 1° cliente = privato. Cliente → cliente = tempo di lavoro, pagato.\n🔹 Auto CHF 0.75/km o biglietto dei mezzi pubblici.\n🔹 I chilometri sono calcolati con le mappe. Se manca un valore («?»), toccalo e inseriscilo a mano.\n\n📝 CONTRATTI\n🔹 Scegli contratto dipendente o cliente, attività GAV e tipo di contratto.\n🔹 NUOVO: ogni contratto ha una pagina in più «Diritti e obblighi» (azienda ↔ dipendente o azienda ↔ cliente) – per piena trasparenza.\n🔹 🔍 Cerca per nome."
+     }
+    },
+    {
+     "id": "ac6l4",
+     "titleKey": {
+      "DE": "Rechnungen, Lager & Berichte",
+      "ES": "Facturas, almacén e informes",
+      "EN": "Invoices, warehouse & reports",
+      "IT": "Fatture, magazzino e rapporti"
+     },
+     "done": false,
+     "illustrationKey": "management_invoice",
+     "contentKey": {
+      "DE": "🧾 RECHNUNGEN\n🔹 Kunde wählen → Betrag = geplante Stunden × Preis pro Stunde.\n🔹 OHNE MwSt.: Rechnungen an Kunden werden ohne Mehrwertsteuer erstellt.\n🔹 Swiss-QR-Zahlungsteil mit Ihrer IBAN (in Einstellungen hinterlegen).\n🔹 Status: Offen → Bezahlt. ☑️ Mehrere auf einmal löschen.\n\n📦 LAGER & LIEFERANTEN\n🔹 Produkte mit Preis und Bestand. Mindestbestand → Warnung.\n🔹 Lieferanten nach Kategorie filtern: 🧹 Reinigung · 🌿 Garten · 🧱 Kleinbau · 🛠️ Maschinen (22 Lieferanten mit Webseite und Notizen bereits erfasst).\n🔹 Bestellungen erstellen und per E-Mail senden.\n\n📈 BERICHTE → INVENTAR\n🔹 Jederzeit eine Inventur machen: gezählte Menge eintragen → Differenz und Wert werden berechnet → «Inventar speichern».\n🔹 Empfehlung: einmal pro Monat.",
+      "ES": "🧾 FACTURAS\n🔹 Elige el cliente. El importe = horas planificadas × precio por hora.\n🔹 SIN IVA: las facturas a clientes se hacen sin IVA.\n🔹 La parte de pago Swiss QR lleva tu IBAN (guárdalo en Configuración).\n🔹 Estado: Pendiente → Pagada. ☑️ Puedes borrar varias a la vez.\n\n📦 ALMACÉN Y PROVEEDORES\n🔹 Productos con precio y existencias. Si bajan del mínimo, sale un aviso.\n🔹 Filtra los proveedores por categoría: 🧹 limpieza · 🌿 jardín · 🧱 obras pequeñas · 🛠️ maquinaria. Ya hay 22 proveedores guardados, con su web y notas.\n🔹 Crea pedidos y envíalos por e-mail.\n\n📈 INFORMES → INVENTARIO\n🔹 Haz inventario cuando quieras: escribe la cantidad contada. La app calcula la diferencia y el valor. Luego pulsa «Guardar inventario».\n🔹 Recomendación: una vez al mes.",
+      "EN": "🧾 INVOICES\n🔹 Choose client → amount = planned hours × price per hour.\n🔹 NO VAT: client invoices are created without VAT.\n🔹 Swiss QR payment part with your IBAN (store it in Settings).\n🔹 Status: Open → Paid. ☑️ Delete several at once.\n\n📦 WAREHOUSE & SUPPLIERS\n🔹 Products with price and stock. Minimum stock → warning.\n🔹 Filter suppliers by category: 🧹 cleaning · 🌿 garden · 🧱 small construction · 🛠️ machinery (22 suppliers with website and notes already saved).\n🔹 Create orders and send them by email.\n\n📈 REPORTS → INVENTORY\n🔹 Do a stock count any time: enter the counted quantity → difference and value are calculated → «Save inventory».\n🔹 Recommended: once a month.",
+      "IT": "🧾 FATTURE\n🔹 Scegli il cliente → importo = ore pianificate × prezzo orario.\n🔹 SENZA IVA: le fatture ai clienti sono create senza IVA.\n🔹 Sezione di pagamento Swiss QR con il tuo IBAN (da salvare in Impostazioni).\n🔹 Stato: Aperta → Pagata. ☑️ Elimina più fatture insieme.\n\n📦 MAGAZZINO E FORNITORI\n🔹 Prodotti con prezzo e giacenza. Sotto il minimo → avviso.\n🔹 Filtra i fornitori per categoria: 🧹 pulizie · 🌿 giardino · 🧱 piccole opere · 🛠️ macchinari (22 fornitori con sito web e note già salvati).\n🔹 Crea ordini e inviali per e-mail.\n\n📈 RAPPORTI → INVENTARIO\n🔹 Fai l'inventario quando vuoi: inserisci la quantità contata → differenza e valore calcolati → «Salva inventario».\n🔹 Consiglio: una volta al mese."
+     }
+    },
+    {
+     "id": "ac6l5",
+     "titleKey": {
+      "DE": "Zeiterfassung, Standorte & Nachrichten",
+      "ES": "Fichaje, ubicaciones y mensajes",
+      "EN": "Time clock, locations & messages",
+      "IT": "Timbrature, posizioni e messaggi"
+     },
+     "done": false,
+     "illustrationKey": "management_customer",
+     "contentKey": {
+      "DE": "⏱️ ZEITERFASSUNG\n🔹 Mitarbeiter stempeln pro Kunde ein und aus. Stunden werden automatisch berechnet.\n🔹 Als Admin: Mitarbeiter oben wählen, um seine Stempelungen zu sehen.\n\n📍 STANDORTE (Betrugsschutz)\n🔹 Registerkarte «📍 Standorte»: Adresse beim Einstempeln und beim Ausstempeln, mit Distanz zur Kundenadresse.\n🔹 Grün = beim Kunden · Gelb/Rot = weit entfernt → nachfragen.\n🔹 Filter nach Mitarbeiter.\n\n💬 NACHRICHTEN\n🔹 Chat mit jedem Mitarbeiter, mit Fotos (Galerie oder Kamera).\n🔹 🔔 Benachrichtigungen erlauben, damit neue Nachrichten sofort erscheinen.\n🔹 ⏰ Automatische Erinnerung an den Mitarbeiter 1 Stunde vor jedem Auftrag.\n🔹 🧹 Jeden Sonntag um 12:00 werden alle Nachrichten automatisch gelöscht.\n\n🛡️ TIPPS\n🔹 Mitarbeiter sehen nur ihre eigenen Daten (Aufträge, Stempelungen, Lohn).\n🔹 Schicken Sie jedem neuen Mitarbeiter den Kurs «App-Anleitung für Mitarbeiter» in der Academy.",
+      "ES": "⏱️ FICHAJE\n🔹 Los empleados fichan entrada y salida en cada cliente. Las horas se calculan solas.\n🔹 Como administrador: elige arriba el empleado para ver sus fichajes.\n\n📍 UBICACIONES (contra fraudes)\n🔹 Pestaña «📍 Ubicaciones»: dirección al fichar entrada y al fichar salida, con la distancia hasta la dirección del cliente.\n🔹 Verde = estaba en el cliente · Amarillo/rojo = estaba lejos. En ese caso, pregunta.\n🔹 Puedes filtrar por empleado.\n\n💬 MENSAJES\n🔹 Chat con cada empleado, con fotos (de la galería o de la cámara).\n🔹 🔔 Permite las notificaciones para que los mensajes nuevos salgan al momento.\n🔹 ⏰ Aviso automático al empleado 1 hora antes de cada trabajo.\n🔹 🧹 Cada domingo a las 12:00 se borran todos los mensajes automáticamente.\n\n🛡️ CONSEJOS\n🔹 Los empleados solo ven sus propios datos: trabajos, fichajes y nómina.\n🔹 A cada empleado nuevo, pídele que haga el curso «Guía de la app para empleados» de la Academy.",
+      "EN": "⏱️ TIME CLOCK\n🔹 Employees clock in and out per client. Hours are calculated automatically.\n🔹 As admin: choose the employee at the top to see their records.\n\n📍 LOCATIONS (anti-fraud)\n🔹 «📍 Locations» tab: address at clock-in and clock-out, with distance to the client address.\n🔹 Green = at the client · Yellow/red = far away → ask.\n🔹 Filter by employee.\n\n💬 MESSAGES\n🔹 Chat with each employee, with photos (gallery or camera).\n🔹 🔔 Allow notifications so new messages appear immediately.\n🔹 ⏰ Automatic reminder to the employee 1 hour before each job.\n🔹 🧹 Every Sunday at 12:00 all messages are deleted automatically.\n\n🛡️ TIPS\n🔹 Employees only see their own data (jobs, clock records, pay).\n🔹 Ask every new employee to take the «App guide for employees» course in the Academy.",
+      "IT": "⏱️ TIMBRATURE\n🔹 I dipendenti timbrano entrata e uscita per ogni cliente. Le ore sono calcolate automaticamente.\n🔹 Come admin: scegli il dipendente in alto per vedere le sue timbrature.\n\n📍 POSIZIONI (antifrode)\n🔹 Scheda «📍 Posizioni»: indirizzo all'entrata e all'uscita, con distanza dall'indirizzo del cliente.\n🔹 Verde = dal cliente · Giallo/rosso = lontano → chiedi.\n🔹 Filtro per dipendente.\n\n💬 MESSAGGI\n🔹 Chat con ogni dipendente, con foto (galleria o fotocamera).\n🔹 🔔 Consenti le notifiche per vedere subito i nuovi messaggi.\n🔹 ⏰ Promemoria automatico al dipendente 1 ora prima di ogni lavoro.\n🔹 🧹 Ogni domenica alle 12:00 tutti i messaggi vengono cancellati automaticamente.\n\n🛡️ CONSIGLI\n🔹 I dipendenti vedono solo i propri dati (lavori, timbrature, stipendio).\n🔹 Chiedi a ogni nuovo dipendente di seguire il corso «Guida all'app per dipendenti» nell'Academy."
+     }
+    }
+   ],
+   "quiz": [
+    {
+     "q": {
+      "DE": "Wie loggt sich ein Mitarbeiter ein?",
+      "ES": "¿Cómo entra un empleado en la app?",
+      "EN": "How does an employee log in?",
+      "IT": "Come accede un dipendente?"
+     },
+     "opts": {
+      "DE": [
+       "«Mitarbeiter» + PIN",
+       "E-Mail + Passwort",
+       "Fingerabdruck",
+       "QR-Code"
+      ],
+      "ES": [
+       "«Empleado» + PIN",
+       "E-mail + contraseña",
+       "Huella dactilar",
+       "Código QR"
+      ],
+      "EN": [
+       "«Employee» + PIN",
+       "Email + password",
+       "Fingerprint",
+       "QR code"
+      ],
+      "IT": [
+       "«Dipendente» + PIN",
+       "E-mail + password",
+       "Impronta digitale",
+       "Codice QR"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Ein Auftrag dauert 5 h mit 2 Personen. Wie viele Stunden arbeitet jede Person?",
+      "ES": "Un trabajo de 5 h con 2 personas. ¿Cuántas horas trabaja cada una?",
+      "EN": "A 5 h job with 2 people. How many hours does each person work?",
+      "IT": "Un lavoro di 5 h con 2 persone. Quante ore lavora ciascuno?"
+     },
+     "opts": {
+      "DE": [
+       "2.5 h",
+       "5 h",
+       "10 h",
+       "1 h"
+      ],
+      "ES": [
+       "2,5 h",
+       "5 h",
+       "10 h",
+       "1 h"
+      ],
+      "EN": [
+       "2.5 h",
+       "5 h",
+       "10 h",
+       "1 h"
+      ],
+      "IT": [
+       "2,5 h",
+       "5 h",
+       "10 h",
+       "1 h"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wann erhält ein Mitarbeiter die Auftragserinnerung?",
+      "ES": "¿Cuándo recibe el empleado el aviso del trabajo?",
+      "EN": "When does an employee get the job reminder?",
+      "IT": "Quando riceve il dipendente il promemoria?"
+     },
+     "opts": {
+      "DE": [
+       "1 Stunde vorher",
+       "1 Tag vorher",
+       "Nach dem Auftrag",
+       "Nie"
+      ],
+      "ES": [
+       "1 hora antes",
+       "1 día antes",
+       "Después del trabajo",
+       "Nunca"
+      ],
+      "EN": [
+       "1 hour before",
+       "1 day before",
+       "After the job",
+       "Never"
+      ],
+      "IT": [
+       "1 ora prima",
+       "1 giorno prima",
+       "Dopo il lavoro",
+       "Mai"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wann werden die Chat-Nachrichten gelöscht?",
+      "ES": "¿Cuándo se borran los mensajes del chat?",
+      "EN": "When are chat messages deleted?",
+      "IT": "Quando vengono cancellati i messaggi?"
+     },
+     "opts": {
+      "DE": [
+       "Sonntag 12:00",
+       "Nach 30 Tagen",
+       "Nie",
+       "Jeden Tag"
+      ],
+      "ES": [
+       "Domingo 12:00",
+       "A los 30 días",
+       "Nunca",
+       "Cada día"
+      ],
+      "EN": [
+       "Sunday 12:00",
+       "After 30 days",
+       "Never",
+       "Every day"
+      ],
+      "IT": [
+       "Domenica 12:00",
+       "Dopo 30 giorni",
+       "Mai",
+       "Ogni giorno"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wie viel wird pro km mit dem Auto zwischen Kunden vergütet?",
+      "ES": "¿Cuánto se paga por km en coche entre clientes?",
+      "EN": "How much is paid per km by car between clients?",
+      "IT": "Quanto si rimborsa al km in auto tra clienti?"
+     },
+     "opts": {
+      "DE": [
+       "CHF 0.75",
+       "CHF 0.50",
+       "CHF 1.00",
+       "Nichts"
+      ],
+      "ES": [
+       "CHF 0,75",
+       "CHF 0,50",
+       "CHF 1,00",
+       "Nada"
+      ],
+      "EN": [
+       "CHF 0.75",
+       "CHF 0.50",
+       "CHF 1.00",
+       "Nothing"
+      ],
+      "IT": [
+       "CHF 0.75",
+       "CHF 0.50",
+       "CHF 1.00",
+       "Niente"
+      ]
+     },
+     "ans": 0
+    },
+    {
+     "q": {
+      "DE": "Wie wählen Sie die Quellensteuer?",
+      "ES": "¿Cómo se pone el impuesto en la fuente?",
+      "EN": "How do you set withholding tax?",
+      "IT": "Come si imposta l'imposta alla fonte?"
+     },
+     "opts": {
+      "DE": [
+       "Tarif aus der Liste wählen",
+       "Prozent von Hand tippen",
+       "Gar nicht",
+       "Per Telefon"
+      ],
+      "ES": [
+       "Elijo la tarifa de la lista",
+       "Escribo el % a mano",
+       "No se pone",
+       "Por teléfono"
+      ],
+      "EN": [
+       "Pick the tariff from the list",
+       "Type the % by hand",
+       "Not at all",
+       "By phone"
+      ],
+      "IT": [
+       "Scelgo la tariffa dalla lista",
+       "Scrivo la % a mano",
+       "Per niente",
+       "Per telefono"
+      ]
+     },
+     "ans": 0
+    }
+   ]
   },
 ];
 
@@ -6750,17 +7359,23 @@ function CourseIllustration({illustrationKey, height=160}){
   );
 }
 
-function AcademyApp({t, lang, setLang, notify, onBack}){
+function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
   const [view,setView] = useState("home");
   const [selCourse,setSelCourse] = useState(null);
   const [selLesson,setSelLesson] = useState(null);
   const [filter,setFilter] = useState("all");
   const [search,setSearch] = useState("");
   const [quizState,setQuizState] = useState({step:0,answers:[],done:false});
-  const [courses,setCourses] = useState(ACADEMY_COURSES_V2);
+  // Employees don't see the administrator manual; their app guide is shown first
+  const isEmployee = currentUser?.role==="employee";
+  const [courses,setCourses] = useState(()=>{
+    const list = ACADEMY_COURSES_V2.filter(c=>!(isEmployee&&c.adminOnly));
+    return isEmployee ? [...list.filter(c=>c.category==="app"), ...list.filter(c=>c.category!=="app")] : list;
+  });
 
   const cats=[
     {id:"all",  emoji:"📚", labelKey:{DE:"Alle",ES:"Todos",EN:"All",IT:"Tutti"}},
+    {id:"app",        emoji:"📱", labelKey:{DE:"App-Anleitung",ES:"Guía de la app",EN:"App guide",IT:"Guida app"}},
     {id:"cleaning",   emoji:"🧹", labelKey:{DE:"Reinigung",ES:"Limpieza",EN:"Cleaning",IT:"Pulizie"}},
     {id:"gardening",  emoji:"🌿", labelKey:{DE:"Garten",ES:"Jardín",EN:"Gardening",IT:"Giardino"}},
     {id:"management", emoji:"📋", labelKey:{DE:"Management",ES:"Gestión",EN:"Management",IT:"Gestione"}},
@@ -7246,7 +7861,16 @@ function AcademyApp({t, lang, setLang, notify, onBack}){
                   ))}
                 </div>
               ):(
-                <p style={{color:i===0?CP.textPrimary:CP.textSecondary,fontSize:i===0?15:14,lineHeight:1.7,margin:0}}>{p}</p>
+                p.includes("\n") ? (
+                  // Multi-line paragraph: first line is a heading, the rest are steps/points
+                  <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"10px 14px"}}>
+                    {p.split("\n").map((line,j)=>(
+                      <div key={j} style={{color:j===0?CP.textPrimary:CP.textSecondary,fontSize:j===0?15:14,fontWeight:j===0?700:400,lineHeight:1.7,marginBottom:j===0?4:0,whiteSpace:"pre-wrap"}}>{line}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{color:i===0?CP.textPrimary:CP.textSecondary,fontSize:i===0?15:14,lineHeight:1.7,margin:0}}>{p}</p>
+                )
               )}
             </div>
           ))}
