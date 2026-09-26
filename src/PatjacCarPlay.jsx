@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
 const T = {
@@ -140,7 +140,7 @@ const T = {
     notClockedIn:"Nicht eingecheckt",
     swissLegalNotes:"Schweizer Rechtshinweise",
     securityActive:"Sicherheitsstatus: Aktiv",
-    contracts:"Verträge", newContract:"Neuer Vertrag", contractType:"Vertragsart",
+    contracts:"Verträge", documents:"Dokumente", newContract:"Neuer Vertrag", contractType:"Vertragsart",
     clientContract:"Kundenvertrag", employeeContract:"Arbeitsvertrag",
     contractDate:"Vertragsdatum", contractStart:"Beginn", contractEnd:"Ende",
     contractSalary:"Lohn/Tarif", contractHours:"Arbeitsstunden/Woche",
@@ -292,7 +292,7 @@ const T = {
     notClockedIn:"Sin fichar",
     swissLegalNotes:"Notas legales suizas",
     securityActive:"Estado seguridad: Activo",
-    contracts:"Contratos", newContract:"Nuevo contrato", contractType:"Tipo de contrato",
+    contracts:"Contratos", documents:"Documentos", newContract:"Nuevo contrato", contractType:"Tipo de contrato",
     clientContract:"Contrato cliente", employeeContract:"Contrato laboral",
     contractDate:"Fecha contrato", contractStart:"Inicio", contractEnd:"Fin",
     contractSalary:"Salario/Tarifa", contractHours:"Horas semanales",
@@ -443,7 +443,7 @@ const T = {
     notClockedIn:"Not clocked in",
     swissLegalNotes:"Swiss Legal Notes",
     securityActive:"Security status: Active",
-    contracts:"Contracts", newContract:"New Contract", contractType:"Contract type",
+    contracts:"Contracts", documents:"Documents", newContract:"New Contract", contractType:"Contract type",
     clientContract:"Client contract", employeeContract:"Employment contract",
     contractDate:"Contract date", contractStart:"Start", contractEnd:"End",
     contractSalary:"Salary/Rate", contractHours:"Weekly hours",
@@ -594,7 +594,7 @@ const T = {
     notClockedIn:"Non timbrato",
     swissLegalNotes:"Note legali svizzere",
     securityActive:"Stato sicurezza: Attivo",
-    contracts:"Contratti", newContract:"Nuovo contratto", contractType:"Tipo contratto",
+    contracts:"Contratti", documents:"Documenti", newContract:"Nuovo contratto", contractType:"Tipo contratto",
     clientContract:"Contratto cliente", employeeContract:"Contratto di lavoro",
     contractDate:"Data contratto", contractStart:"Inizio", contractEnd:"Fine",
     contractSalary:"Salario/Tariffa", contractHours:"Ore settimanali",
@@ -793,6 +793,7 @@ const APPS = [
   {id:"payroll",   icon:"💵", color:"#0CA678"},
   {id:"inventory", icon:"📦", color:"#6741D9"},
   {id:"contracts", icon:"📝", color:"#0B7285"},
+  {id:"documents", icon:"📁", color:"#1098AD"},
 ];
 
 // ─── CSS CONSTANTS ───────────────────────────────────────────
@@ -1442,7 +1443,8 @@ export default function PatjacCarPlay(){
 
   const openApp = (id) => {
     if(currentUser?.role==="employee"){
-      const allowed=["dashboard","timeclock","messaging","jobs","employees","payroll","academy","routes"];
+      // Payslips are no longer a separate icon for employees: they are in "Documents"
+      const allowed=["dashboard","timeclock","messaging","jobs","documents","academy","routes"];
       if(!allowed.includes(id)){ notify(t.security_blocked,"error"); return; }
     }
     setActiveApp(id);
@@ -1485,6 +1487,7 @@ export default function PatjacCarPlay(){
       case "academy":    return <AcademyApp {...props} lang={lang} setLang={setLang}/>;
       case "payroll":    return <PayrollApp {...props} lang={lang}/>;
       case "inventory":  return <InventoryApp {...props} lang={lang}/>;
+      case "documents":  return <DocumentsApp {...props} lang={lang} currentUser={currentUser} contracts={contracts} companySettings={companySettings}/>;
       case "contracts":  return <ContractsApp {...props} lang={lang} currentUser={currentUser} contracts={contracts} setContracts={dbSetContracts}/>;
       default: return null;
     }
@@ -1849,7 +1852,7 @@ const EMPLOYEE_APPS = [
   {id:"timeclock", icon:"⏱️", color:"#1098AD"},
   {id:"jobs",      icon:"📋", color:"#F08C00"},
   {id:"academy",   icon:"🎓", color:"#E67700"},
-  {id:"payroll",   icon:"💵", color:"#0CA678"},
+  {id:"documents", icon:"📁", color:"#0CA678"},
   {id:"messaging", icon:"💬", color:"#D6336C"},
   {id:"routes",    icon:"🗺️", color:"#F76707"},
 ];
@@ -1881,7 +1884,6 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
   const todayClock = timeclock.find(tc=>tc.employeeId===currentUser?.id&&tc.date===todayStr);
   const isClockedIn = !!(todayClock?.clockIn&&!todayClock?.clockOut);
   const unread = messages.filter(m=>m.to===currentUser?.id&&!m.read).length;
-  const pay = emp ? calcSwissPayroll(emp,timeclock,now.getMonth()+1,now.getFullYear(),jobs,{spesen:getSavedSpesen(emp.id,now.getFullYear(),now.getMonth()+1)}) : null;
   const pendingCount = todayJobs.filter(j=>j.status==="pending").length;
   const completedCount = todayJobs.filter(j=>j.status==="completed").length;
   const [ticker,setTicker] = useState(0);
@@ -1956,7 +1958,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
             let badge=null, sublabel=null;
             if(app.id==="timeclock") sublabel=isClockedIn?(t.active||"Active"):(t.notClockedIn||"Not clocked in");
             if(app.id==="jobs"){ badge=pendingCount>0?pendingCount:null; sublabel=`${todayJobs.length} ${t.today2||"today"}`; }
-            if(app.id==="payroll"&&pay) sublabel=`CHF ${pay.net}`;
+            if(app.id==="documents") sublabel=L("Lohn · Verträge","Nóminas · contratos","Pay · contracts","Paga · contratti");
             if(app.id==="messaging"){ badge=unread>0?unread:null; sublabel=unread>0?`${unread} ${lang==="DE"?"neu":lang==="ES"?"nuevo":lang==="IT"?"nuovo":"new"}`:null; }
             if(app.id==="routes"){ const r=jobs.filter(j=>j.employeeId===currentUser?.id&&j.date===todayStr); sublabel=`${r.length} stops`; }
             return (
@@ -1990,18 +1992,17 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
           </CPCard>
         )}
 
-        {/* Payroll quick view */}
-        {pay&&emp&&(
-          <CPCard style={{marginBottom:12,cursor:"pointer"}} onClick={()=>openApp("payroll")}>
-            <div style={{color:CP.textSecondary,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>💵 {t.payrollTitle||"Lohnabrechnung"} — {monthNames[now.getMonth()]} {now.getFullYear()}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-              <div style={{textAlign:"center"}}><div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.grossSalary||"Brutto"}</div><div style={{color:"#74C0FC",fontWeight:700,fontSize:16}}>CHF {pay.grossTotal}</div></div>
-              <div style={{textAlign:"center"}}><div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.deductions||"Abzüge"}</div><div style={{color:"#FF8787",fontWeight:700,fontSize:16}}>−CHF {pay.totalDeductEmp}</div></div>
-              <div style={{background:"rgba(12,166,120,0.15)",border:"1px solid rgba(12,166,120,0.35)",borderRadius:10,padding:"6px",textAlign:"center"}}><div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.netSalary||"Netto"}</div><div style={{color:"#69DB7C",fontWeight:700,fontSize:20}}>CHF {pay.net}</div></div>
+        {/* Documents shortcut (payslips, contracts, files) */}
+        <CPCard style={{marginBottom:12,cursor:"pointer"}} onClick={()=>openApp("documents")}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{fontSize:30}}>📁</div>
+            <div style={{flex:1}}>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{L("Meine Dokumente","Mis documentos","My documents","I miei documenti")}</div>
+              <div style={{color:CP.textSecondary,fontSize:12}}>{L("Lohnabrechnung jeden Monat, Verträge und weitere Dokumente zum Herunterladen und Drucken","Nómina de cada mes, contratos y otros documentos para descargar e imprimir","Monthly payslips, contracts and other documents to download and print","Buste paga mensili, contratti e altri documenti da scaricare e stampare")}</div>
             </div>
-            <div style={{color:"rgba(116,192,252,0.5)",fontSize:11,textAlign:"center",marginTop:10}}>{lang==="DE"?"Tippen für vollständige Nómina →":lang==="ES"?"Toca para ver nómina completa →":lang==="IT"?"Tocca per busta paga completa →":"Tap to open full payslip →"}</div>
-          </CPCard>
-        )}
+            <div style={{color:CP.textTertiary,fontSize:18}}>›</div>
+          </div>
+        </CPCard>
 
         {/* Access code */}
         <CPCard style={{background:"rgba(0,0,0,0.2)",border:`1px solid rgba(255,255,255,0.05)`}}>
@@ -6584,7 +6585,7 @@ const ACADEMY_COURSES_V2 = [
 
   // ── MANAGEMENT ────────────────────────────────────────
   {
-    id:"ac3", category:"management", badge:"new",
+    id:"ac3", category:"management", badge:"new", adminOnly:true,
     emoji:"📋", color:"#7048E8", illustrationKey:"management_customer",
     titleKey:{
       DE:"Betriebsmanagement & Kundenservice Schweiz",
@@ -6772,18 +6773,18 @@ const ACADEMY_COURSES_V2 = [
     {
      "id": "ac7l5",
      "titleKey": {
-      "DE": "5. Mein Lohn & Monatsrapport",
-      "ES": "5. Mi nómina y hoja mensual",
-      "EN": "5. My payslip & monthly sheet",
-      "IT": "5. La mia busta paga e rapporto mensile"
+      "DE": "5. Meine Dokumente: Lohn & Verträge",
+      "ES": "5. Mis documentos: nómina y contratos",
+      "EN": "5. My documents: payslip & contracts",
+      "IT": "5. I miei documenti: busta paga e contratti"
      },
      "done": false,
      "illustrationKey": "management_invoice",
      "contentKey": {
-      "DE": "💵 WO?\nTippen Sie auf das Symbol 👤 «Mitarbeiter». Dort sehen Sie nur Ihre eigene Lohnabrechnung. Wählen Sie oben Monat und Jahr.\n\n📄 LOHNABRECHNUNG – EINFACH ERKLÄRT\n• BRUTTOLOHN: alles, was Sie verdient haben (Stunden × Stundenlohn + Zuschläge wie Ferien und Feiertage).\n• ABZÜGE: Beiträge, die das Gesetz verlangt – AHV (Rente), ALV (Arbeitslosigkeit), Unfallversicherung, Pensionskasse (BVG, ab einem bestimmten Lohn) und evtl. Quellensteuer.\n• NETTOLOHN: das Geld, das auf Ihr Konto kommt.\n• FAMILIENZULAGEN: Haben Sie Kinder, kommt Geld für die Kinder dazu.\n\n📋 MONATSRAPPORT\nTippen Sie auf «📋 Arbeitsrapport». Sie sehen für jeden Tag:\n• Datum, Kunde und Ort\n• Ein- und Ausstempelzeit\n• Gefahrene Kilometer\n• Fahrtkosten\n\n🚗 FAHRTKOSTEN\n• Der Weg von zu Hause zum ERSTEN Kunden ist Ihr privater Arbeitsweg.\n• Die Fahrten VON Kunde ZU Kunde bezahlt die Firma:\n  – mit dem Auto: CHF 0.75 pro Kilometer\n  – mit dem ÖV (Bus, Tram, Zug): das Billett.\n\n✅ BITTE KONTROLLIEREN\nSchauen Sie jeden Monat Ihren Rapport an. Stimmt etwas nicht? Schreiben Sie der Firma im Chat 💬.",
-      "ES": "💵 ¿DÓNDE?\nToca el icono 👤 «Empleados». Ahí ves solo tu propia nómina. Arriba eliges el mes y el año.\n\n📄 LA NÓMINA, FÁCIL\n• SALARIO BRUTO: todo lo que ganaste (horas × precio por hora + suplementos como vacaciones y festivos).\n• DEDUCCIONES: lo que pide la ley. AHV (jubilación), ALV (paro), seguro de accidentes, caja de pensiones (BVG, a partir de cierto sueldo) y, si te toca, impuesto en la fuente.\n• SALARIO NETO: el dinero que llega a tu cuenta.\n• ASIGNACIONES FAMILIARES: si tienes hijos, recibes además un dinero por cada hijo.\n\n📋 HOJA MENSUAL\nToca «📋 Hoja mensual». Para cada día ves:\n• Fecha, cliente y lugar\n• Hora de entrada y de salida\n• Kilómetros recorridos\n• Gastos de transporte\n\n🚗 TRANSPORTE\n• El camino de tu casa al PRIMER cliente es tu trayecto privado.\n• Los viajes DE un cliente A otro los paga la empresa:\n  – en coche: CHF 0.75 por kilómetro\n  – en transporte público (bus, tranvía, tren): el billete.\n\n✅ REVÍSALO\nMira tu hoja cada mes. ¿Algo no cuadra? Escribe a la empresa en el chat 💬.",
-      "EN": "💵 WHERE?\nTap the 👤 «Employees» icon. There you only see your own payslip. Choose month and year at the top.\n\n📄 PAYSLIP – MADE EASY\n• GROSS PAY: everything you earned (hours × hourly rate + supplements like holidays and public holidays).\n• DEDUCTIONS: what the law requires – AHV (pension), ALV (unemployment), accident insurance, pension fund (BVG, from a certain salary) and maybe withholding tax.\n• NET PAY: the money that arrives in your account.\n• FAMILY ALLOWANCES: if you have children, you get extra money for each child.\n\n📋 MONTHLY SHEET\nTap «📋 Work sheet». For each day you see:\n• Date, client and place\n• Clock-in and clock-out time\n• Kilometres travelled\n• Travel costs\n\n🚗 TRAVEL\n• The way from home to your FIRST client is your private commute.\n• Trips FROM one client TO another are paid by the company:\n  – by car: CHF 0.75 per kilometre\n  – by public transport (bus, tram, train): the ticket.\n\n✅ PLEASE CHECK\nLook at your sheet every month. Something wrong? Write to the company in the chat 💬.",
-      "IT": "💵 DOVE?\nTocca l'icona 👤 «Dipendenti». Lì vedi solo la tua busta paga. In alto scegli mese e anno.\n\n📄 BUSTA PAGA – SEMPLICE\n• SALARIO LORDO: tutto ciò che hai guadagnato (ore × paga oraria + supplementi come vacanze e festivi).\n• DEDUZIONI: ciò che chiede la legge – AVS (pensione), AD (disoccupazione), assicurazione infortuni, cassa pensione (LPP, da un certo salario) ed eventualmente imposta alla fonte.\n• SALARIO NETTO: i soldi che arrivano sul tuo conto.\n• ASSEGNI FAMILIARI: se hai figli, ricevi in più dei soldi per ogni figlio.\n\n📋 RAPPORTO MENSILE\nTocca «📋 Rapporto». Per ogni giorno vedi:\n• Data, cliente e luogo\n• Ora di entrata e di uscita\n• Chilometri percorsi\n• Spese di trasporto\n\n🚗 TRASPORTO\n• La strada da casa al PRIMO cliente è il tuo tragitto privato.\n• I viaggi DA un cliente A un altro li paga l'azienda:\n  – in auto: CHF 0.75 al chilometro\n  – con i mezzi pubblici (bus, tram, treno): il biglietto.\n\n✅ CONTROLLA\nGuarda il tuo rapporto ogni mese. Qualcosa non va? Scrivi all'azienda nella chat 💬."
+      "DE": "📁 WO?\nTippen Sie auf das Symbol 📁 «Dokumente». Dort finden Sie:\n• 💵 Lohnabrechnungen – am Ende jedes Monats erscheint die neue.\n• 📝 Verträge – Ihr Arbeitsvertrag.\n• 📂 Andere Dokumente – z.B. Bescheinigungen oder Reglemente.\nAlles können Sie öffnen, herunterladen und drucken (oder als PDF speichern).\n\n📄 LOHNABRECHNUNG – EINFACH ERKLÄRT\n• BRUTTOLOHN: alles, was Sie verdient haben (Stunden × Stundenlohn + Zuschläge wie Ferien und Feiertage).\n• ABZÜGE: Beiträge, die das Gesetz verlangt – AHV (Rente), ALV (Arbeitslosigkeit), Unfallversicherung, Pensionskasse (BVG, ab einem bestimmten Lohn) und evtl. Quellensteuer.\n• NETTOLOHN: das Geld, das auf Ihr Konto kommt.\n• FAMILIENZULAGEN: Haben Sie Kinder, kommt Geld für die Kinder dazu.\n\n📋 MONATSRAPPORT\nTippen Sie auf «📋 Arbeitsrapport». Sie sehen für jeden Tag:\n• Datum, Kunde und Ort\n• Ein- und Ausstempelzeit\n• Gefahrene Kilometer\n• Fahrtkosten\n\n🚗 FAHRTKOSTEN\n• Der Weg von zu Hause zum ERSTEN Kunden ist Ihr privater Arbeitsweg.\n• Die Fahrten VON Kunde ZU Kunde bezahlt die Firma:\n  – mit dem Auto: CHF 0.75 pro Kilometer\n  – mit dem ÖV (Bus, Tram, Zug): das Billett.\n\n✅ BITTE KONTROLLIEREN\nSchauen Sie jeden Monat Ihren Rapport an. Stimmt etwas nicht? Schreiben Sie der Firma im Chat 💬.",
+      "ES": "📁 ¿DÓNDE?\nToca el icono 📁 «Documentos». Ahí encuentras:\n• 💵 Nóminas: al final de cada mes aparece la nueva.\n• 📝 Contratos: tu contrato de trabajo.\n• 📂 Otros documentos: por ejemplo certificados o reglamentos.\nTodo lo puedes abrir, descargar e imprimir (o guardar como PDF).\n\n📄 LA NÓMINA, FÁCIL\n• SALARIO BRUTO: todo lo que ganaste (horas × precio por hora + suplementos como vacaciones y festivos).\n• DEDUCCIONES: lo que pide la ley. AHV (jubilación), ALV (paro), seguro de accidentes, caja de pensiones (BVG, a partir de cierto sueldo) y, si te toca, impuesto en la fuente.\n• SALARIO NETO: el dinero que llega a tu cuenta.\n• ASIGNACIONES FAMILIARES: si tienes hijos, recibes además un dinero por cada hijo.\n\n📋 HOJA MENSUAL\nToca «📋 Hoja mensual». Para cada día ves:\n• Fecha, cliente y lugar\n• Hora de entrada y de salida\n• Kilómetros recorridos\n• Gastos de transporte\n\n🚗 TRANSPORTE\n• El camino de tu casa al PRIMER cliente es tu trayecto privado.\n• Los viajes DE un cliente A otro los paga la empresa:\n  – en coche: CHF 0.75 por kilómetro\n  – en transporte público (bus, tranvía, tren): el billete.\n\n✅ REVÍSALO\nMira tu hoja cada mes. ¿Algo no cuadra? Escribe a la empresa en el chat 💬.",
+      "EN": "📁 WHERE?\nTap the 📁 «Documents» icon. There you find:\n• 💵 Payslips – a new one appears at the end of each month.\n• 📝 Contracts – your employment contract.\n• 📂 Other documents – e.g. certificates or rules.\nYou can open, download and print everything (or save it as PDF).\n\n📄 PAYSLIP – MADE EASY\n• GROSS PAY: everything you earned (hours × hourly rate + supplements like holidays and public holidays).\n• DEDUCTIONS: what the law requires – AHV (pension), ALV (unemployment), accident insurance, pension fund (BVG, from a certain salary) and maybe withholding tax.\n• NET PAY: the money that arrives in your account.\n• FAMILY ALLOWANCES: if you have children, you get extra money for each child.\n\n📋 MONTHLY SHEET\nTap «📋 Work sheet». For each day you see:\n• Date, client and place\n• Clock-in and clock-out time\n• Kilometres travelled\n• Travel costs\n\n🚗 TRAVEL\n• The way from home to your FIRST client is your private commute.\n• Trips FROM one client TO another are paid by the company:\n  – by car: CHF 0.75 per kilometre\n  – by public transport (bus, tram, train): the ticket.\n\n✅ PLEASE CHECK\nLook at your sheet every month. Something wrong? Write to the company in the chat 💬.",
+      "IT": "📁 DOVE?\nTocca l'icona 📁 «Documenti». Lì trovi:\n• 💵 Buste paga – alla fine di ogni mese compare la nuova.\n• 📝 Contratti – il tuo contratto di lavoro.\n• 📂 Altri documenti – ad es. certificati o regolamenti.\nPuoi aprire, scaricare e stampare tutto (o salvarlo in PDF).\n\n📄 BUSTA PAGA – SEMPLICE\n• SALARIO LORDO: tutto ciò che hai guadagnato (ore × paga oraria + supplementi come vacanze e festivi).\n• DEDUZIONI: ciò che chiede la legge – AVS (pensione), AD (disoccupazione), assicurazione infortuni, cassa pensione (LPP, da un certo salario) ed eventualmente imposta alla fonte.\n• SALARIO NETTO: i soldi che arrivano sul tuo conto.\n• ASSEGNI FAMILIARI: se hai figli, ricevi in più dei soldi per ogni figlio.\n\n📋 RAPPORTO MENSILE\nTocca «📋 Rapporto». Per ogni giorno vedi:\n• Data, cliente e luogo\n• Ora di entrata e di uscita\n• Chilometri percorsi\n• Spese di trasporto\n\n🚗 TRASPORTO\n• La strada da casa al PRIMO cliente è il tuo tragitto privato.\n• I viaggi DA un cliente A un altro li paga l'azienda:\n  – in auto: CHF 0.75 al chilometro\n  – con i mezzi pubblici (bus, tram, treno): il biglietto.\n\n✅ CONTROLLA\nGuarda il tuo rapporto ogni mese. Qualcosa non va? Scrivi all'azienda nella chat 💬."
      }
     },
     {
@@ -7092,10 +7093,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "management_invoice",
      "contentKey": {
-      "DE": "💵 LOHNABRECHNUNG 2026 (automatisch)\n🔹 Stundenlohn + GAV-Zuschläge: Ferien 8.33% (oder 10.64%), Feiertage, 13. Monatslohn 8.33%.\n🔹 Abzüge Mitarbeiter: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (ab 8 h/Woche) · KTG 0.5% · BVG (ab CHF 22'680/Jahr) · Quellensteuer (falls Tarif).\n🔹 Familienzulagen ZH: CHF 215 pro Kind, CHF 268 in Ausbildung.\n🔹 Arbeitgeberkosten werden nur Ihnen angezeigt.\n🔹 📄 Lohnabrechnung als PDF · 📧 per E-Mail senden.\n\n📋 MONATSRAPPORT\n🔹 Pro Tag: Datum, Kunde, Ort, Ein-/Ausstempelzeit, Kilometer.\n🔹 Weg Zuhause → 1. Kunde = privat. Kunde → Kunde = Arbeitszeit, wird bezahlt.\n🔹 Auto CHF 0.75/km oder ÖV-Billett.\n🔹 Kilometer werden über Karten berechnet. Fehlt ein Wert («?»), antippen und von Hand eintragen.\n\n📝 VERTRÄGE\n🔹 Mitarbeiter- oder Kundenvertrag wählen, GAV-Tätigkeit und Vertragsart.\n🔹 NEU: Jeder Vertrag hat eine Zusatzseite «Rechte & Pflichten» (Firma ↔ Mitarbeiter bzw. Firma ↔ Kunde) – für volle Transparenz.\n🔹 🔍 Suche nach Name.",
-      "ES": "💵 NÓMINA 2026 (automática)\n🔹 Precio por hora + suplementos GAV: vacaciones 8,33 % (o 10,64 %), festivos y 13.º salario 8,33 %.\n🔹 Deducciones del empleado: AHV/IV/EO 5,3 % · ALV 1,1 % · NBU 1,2 % (desde 8 h/semana) · KTG 0,5 % · BVG (desde CHF 22 680/año) · impuesto en la fuente (si tiene tarifa).\n🔹 Asignaciones familiares ZH: CHF 215 por hijo y CHF 268 si está estudiando.\n🔹 El coste de la empresa solo lo ves tú.\n🔹 📄 Nómina en PDF · 📧 envío por e-mail.\n\n📋 HOJA MENSUAL\n🔹 Por día: fecha, cliente, lugar, horas de entrada y salida y kilómetros.\n🔹 De casa al primer cliente = trayecto privado. De un cliente a otro = tiempo de trabajo, y se paga.\n🔹 Coche CHF 0,75/km o billete de transporte público.\n🔹 Los kilómetros se calculan con mapas. Si falta alguno («?»), tócalo y escríbelo a mano.\n\n📝 CONTRATOS\n🔹 Elige contrato de empleado o de cliente, la actividad GAV y el tipo de contrato.\n🔹 NUEVO: cada contrato lleva una página extra de «Derechos y obligaciones» (empresa ↔ empleado o empresa ↔ cliente), para que todo sea transparente.\n🔹 🔍 Busca por nombre.",
-      "EN": "💵 PAYROLL 2026 (automatic)\n🔹 Hourly wage + GAV supplements: holidays 8.33% (or 10.64%), public holidays, 13th salary 8.33%.\n🔹 Employee deductions: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (from 8 h/week) · KTG 0.5% · BVG (from CHF 22,680/year) · withholding tax (if tariff).\n🔹 ZH family allowances: CHF 215 per child, CHF 268 in education.\n🔹 Employer costs are shown only to you.\n🔹 📄 Payslip as PDF · 📧 send by email.\n\n📋 MONTHLY SHEET\n🔹 Per day: date, client, place, clock-in/out time, kilometres.\n🔹 Home → 1st client = private. Client → client = working time, paid.\n🔹 Car CHF 0.75/km or public transport ticket.\n🔹 Kilometres are calculated with maps. If a value is missing («?»), tap it and enter it by hand.\n\n📝 CONTRACTS\n🔹 Choose employee or client contract, GAV activity and contract type.\n🔹 NEW: every contract has an extra page «Rights & obligations» (company ↔ employee or company ↔ client) – for full transparency.\n🔹 🔍 Search by name.",
-      "IT": "💵 BUSTA PAGA 2026 (automatica)\n🔹 Paga oraria + supplementi GAV: vacanze 8.33% (o 10.64%), festivi, 13a mensilità 8.33%.\n🔹 Deduzioni dipendente: AVS/AI/IPG 5.3% · AD 1.1% · AINP 1.2% (da 8 h/settimana) · IGM 0.5% · LPP (da CHF 22'680/anno) · imposta alla fonte (se tariffa).\n🔹 Assegni familiari ZH: CHF 215 per figlio, CHF 268 in formazione.\n🔹 I costi del datore di lavoro sono visibili solo a te.\n🔹 📄 Busta paga in PDF · 📧 invio per e-mail.\n\n📋 RAPPORTO MENSILE\n🔹 Per giorno: data, cliente, luogo, ora di entrata/uscita, chilometri.\n🔹 Casa → 1° cliente = privato. Cliente → cliente = tempo di lavoro, pagato.\n🔹 Auto CHF 0.75/km o biglietto dei mezzi pubblici.\n🔹 I chilometri sono calcolati con le mappe. Se manca un valore («?»), toccalo e inseriscilo a mano.\n\n📝 CONTRATTI\n🔹 Scegli contratto dipendente o cliente, attività GAV e tipo di contratto.\n🔹 NUOVO: ogni contratto ha una pagina in più «Diritti e obblighi» (azienda ↔ dipendente o azienda ↔ cliente) – per piena trasparenza.\n🔹 🔍 Cerca per nome."
+      "DE": "💵 LOHNABRECHNUNG 2026 (automatisch)\n🔹 Stundenlohn + GAV-Zuschläge: Ferien 8.33% (oder 10.64%), Feiertage, 13. Monatslohn 8.33%.\n🔹 Abzüge Mitarbeiter: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (ab 8 h/Woche) · KTG 0.5% · BVG (ab CHF 22'680/Jahr) · Quellensteuer (falls Tarif).\n🔹 Familienzulagen ZH: CHF 215 pro Kind, CHF 268 in Ausbildung.\n🔹 Arbeitgeberkosten werden nur Ihnen angezeigt.\n🔹 📄 Lohnabrechnung als PDF · 📧 per E-Mail senden.\n\n📋 MONATSRAPPORT\n🔹 Pro Tag: Datum, Kunde, Ort, Ein-/Ausstempelzeit, Kilometer.\n🔹 Weg Zuhause → 1. Kunde = privat. Kunde → Kunde = Arbeitszeit, wird bezahlt.\n🔹 Auto CHF 0.75/km oder ÖV-Billett.\n🔹 Kilometer werden über Karten berechnet. Fehlt ein Wert («?»), antippen und von Hand eintragen.\n\n📝 VERTRÄGE\n🔹 Mitarbeiter- oder Kundenvertrag wählen, GAV-Tätigkeit und Vertragsart.\n🔹 NEU: Jeder Vertrag hat eine Zusatzseite «Rechte & Pflichten» (Firma ↔ Mitarbeiter bzw. Firma ↔ Kunde) – für volle Transparenz.\n🔹 🔍 Suche nach Name.\n\n📁 DOKUMENTE (NEU)\n🔹 Mitarbeiter sehen die Lohnabrechnung nicht mehr als eigenes Symbol, sondern im Symbol «📁 Dokumente»: Lohnabrechnungen (jeden Monat automatisch nach Monatsende), Arbeitsrapport, Verträge und andere Dokumente.\n🔹 Als Admin: Mitarbeiter wählen → «📂 Andere Dokumente» → «⬆️ Dokument hochladen» (PDF, Bild, Word, max. 5 MB), für eine Person oder für alle.",
+      "ES": "💵 NÓMINA 2026 (automática)\n🔹 Precio por hora + suplementos GAV: vacaciones 8,33 % (o 10,64 %), festivos y 13.º salario 8,33 %.\n🔹 Deducciones del empleado: AHV/IV/EO 5,3 % · ALV 1,1 % · NBU 1,2 % (desde 8 h/semana) · KTG 0,5 % · BVG (desde CHF 22 680/año) · impuesto en la fuente (si tiene tarifa).\n🔹 Asignaciones familiares ZH: CHF 215 por hijo y CHF 268 si está estudiando.\n🔹 El coste de la empresa solo lo ves tú.\n🔹 📄 Nómina en PDF · 📧 envío por e-mail.\n\n📋 HOJA MENSUAL\n🔹 Por día: fecha, cliente, lugar, horas de entrada y salida y kilómetros.\n🔹 De casa al primer cliente = trayecto privado. De un cliente a otro = tiempo de trabajo, y se paga.\n🔹 Coche CHF 0,75/km o billete de transporte público.\n🔹 Los kilómetros se calculan con mapas. Si falta alguno («?»), tócalo y escríbelo a mano.\n\n📝 CONTRATOS\n🔹 Elige contrato de empleado o de cliente, la actividad GAV y el tipo de contrato.\n🔹 NUEVO: cada contrato lleva una página extra de «Derechos y obligaciones» (empresa ↔ empleado o empresa ↔ cliente), para que todo sea transparente.\n🔹 🔍 Busca por nombre.\n\n📁 DOCUMENTOS (NUEVO)\n🔹 Los empleados ya no ven la nómina como icono aparte. Ahora está en el icono «📁 Documentos», junto con la hoja mensual, los contratos y otros documentos. La nómina de cada mes aparece sola al terminar el mes.\n🔹 Como administrador: elige el empleado → «📂 Otros documentos» → «⬆️ Subir documento» (PDF, imagen o Word, máx. 5 MB), para una persona o para todos.",
+      "EN": "💵 PAYROLL 2026 (automatic)\n🔹 Hourly wage + GAV supplements: holidays 8.33% (or 10.64%), public holidays, 13th salary 8.33%.\n🔹 Employee deductions: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (from 8 h/week) · KTG 0.5% · BVG (from CHF 22,680/year) · withholding tax (if tariff).\n🔹 ZH family allowances: CHF 215 per child, CHF 268 in education.\n🔹 Employer costs are shown only to you.\n🔹 📄 Payslip as PDF · 📧 send by email.\n\n📋 MONTHLY SHEET\n🔹 Per day: date, client, place, clock-in/out time, kilometres.\n🔹 Home → 1st client = private. Client → client = working time, paid.\n🔹 Car CHF 0.75/km or public transport ticket.\n🔹 Kilometres are calculated with maps. If a value is missing («?»), tap it and enter it by hand.\n\n📝 CONTRACTS\n🔹 Choose employee or client contract, GAV activity and contract type.\n🔹 NEW: every contract has an extra page «Rights & obligations» (company ↔ employee or company ↔ client) – for full transparency.\n🔹 🔍 Search by name.\n\n📁 DOCUMENTS (NEW)\n🔹 Employees no longer see payroll as a separate icon but inside «📁 Documents»: payslips (automatically after each month-end), work sheet, contracts and other documents.\n🔹 As admin: choose the employee → «📂 Other documents» → «⬆️ Upload document» (PDF, image, Word, max 5 MB), for one person or for everyone.",
+      "IT": "💵 BUSTA PAGA 2026 (automatica)\n🔹 Paga oraria + supplementi GAV: vacanze 8.33% (o 10.64%), festivi, 13a mensilità 8.33%.\n🔹 Deduzioni dipendente: AVS/AI/IPG 5.3% · AD 1.1% · AINP 1.2% (da 8 h/settimana) · IGM 0.5% · LPP (da CHF 22'680/anno) · imposta alla fonte (se tariffa).\n🔹 Assegni familiari ZH: CHF 215 per figlio, CHF 268 in formazione.\n🔹 I costi del datore di lavoro sono visibili solo a te.\n🔹 📄 Busta paga in PDF · 📧 invio per e-mail.\n\n📋 RAPPORTO MENSILE\n🔹 Per giorno: data, cliente, luogo, ora di entrata/uscita, chilometri.\n🔹 Casa → 1° cliente = privato. Cliente → cliente = tempo di lavoro, pagato.\n🔹 Auto CHF 0.75/km o biglietto dei mezzi pubblici.\n🔹 I chilometri sono calcolati con le mappe. Se manca un valore («?»), toccalo e inseriscilo a mano.\n\n📝 CONTRATTI\n🔹 Scegli contratto dipendente o cliente, attività GAV e tipo di contratto.\n🔹 NUOVO: ogni contratto ha una pagina in più «Diritti e obblighi» (azienda ↔ dipendente o azienda ↔ cliente) – per piena trasparenza.\n🔹 🔍 Cerca per nome.\n\n📁 DOCUMENTI (NUOVO)\n🔹 I dipendenti non vedono più gli stipendi come icona separata ma dentro «📁 Documenti»: buste paga (automaticamente a fine mese), rapporto, contratti e altri documenti.\n🔹 Come admin: scegli il dipendente → «📂 Altri documenti» → «⬆️ Carica documento» (PDF, immagine, Word, max 5 MB), per una persona o per tutti."
      }
     },
     {
@@ -9149,7 +9150,249 @@ function buildRightsAnnexHTML(annex, lang, signLeft, signRight){
 </div>`;
 }
 
-function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,currentUser,contracts,setContracts}){
+// ─── DOCUMENTS (payslips each month-end, contracts, other files) ──────────
+// Employees see only their own documents; the administrator picks an employee and can upload files.
+const DOCS_REST = "https://rtviublrukagwxaypmit.supabase.co/rest/v1/";
+const DOCS_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0dml1YmxydWthZ3d4YXlwbWl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MjkwMjEsImV4cCI6MjEwNTUwNTAyMX0.Ykj1dz8elWC12GP-m88IBiDc_Hscrw1AjPY9Tw7p-G8";
+const docsFetch = async (path, method="GET", body=null) => {
+  const res = await fetch(DOCS_REST+path, { method, headers:{ "Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, Prefer:"return=representation" }, body: body?JSON.stringify(body):undefined });
+  if(!res.ok) throw new Error(await res.text());
+  const tx = await res.text(); return tx ? JSON.parse(tx) : null;
+};
+const DOC_MAX_BYTES = 5*1024*1024;
+const DOC_CATS = [
+  {id:"contract",    icon:"📝", L:["Unterschriebener Vertrag","Contrato firmado","Signed contract","Contratto firmato"]},
+  {id:"certificate", icon:"🏅", L:["Zeugnis / Bescheinigung","Certificado","Certificate","Certificato"]},
+  {id:"salary",      icon:"💵", L:["Lohnausweis / Lohn","Certificado de salario","Salary certificate","Certificato di salario"]},
+  {id:"rules",       icon:"📘", L:["Reglement / Info","Reglamento / información","Rules / info","Regolamento / info"]},
+  {id:"other",       icon:"📄", L:["Anderes","Otro","Other","Altro"]},
+];
+
+// Same travel-cost logic as the monthly work sheet, so the payslip includes transport on any device
+const computeSpesen = async (emp, month, year, jobs, clients) => {
+  const monthStr = `${year}-${String(month).padStart(2,"0")}`;
+  const mine = (jobs||[]).filter(j=>j.employeeId===emp.id && j.date && j.date.startsWith(monthStr))
+    .sort((a,b)=>`${a.date}${a.timeStart||""}`.localeCompare(`${b.date}${b.timeStart||""}`));
+  if(!mine.length) return 0;
+  const mode = emp.transportMode||"public", ticket = Number(emp.ticketPrice)||0, withMeals = lsGet("patjac_meals_on",true);
+  const rows=[]; let prevDate=null, prevAddr=null;
+  for(const j of mine){
+    const c=(clients||[]).find(x=>x.id===j.clientId); const addr=fmtAddr(c); const first=j.date!==prevDate;
+    const r = first ? null : await routeKm(prevAddr, addr);
+    rows.push({date:j.date, first, km:r?r.km:0, planStart:j.timeStart||"", planEnd:j.timeEnd||""});
+    prevDate=j.date; prevAddr=addr;
+  }
+  const transport = rows.reduce((s,r)=>s+(r.first?0:(mode==="car"?(r.km||0)*KM_RATE_CAR:(r.km>0?ticket:0))),0);
+  const days=[...new Set(rows.map(r=>r.date))];
+  const meals = withMeals ? days.reduce((s,d)=>{ const rs=rows.filter(r=>r.date===d); const st=rs.map(r=>r.planStart).sort()[0], en=rs.map(r=>r.planEnd).sort().slice(-1)[0]; return s+(hoursBetween(st,en)>=6?MEAL_ALLOWANCE:0); },0) : 0;
+  const total = Math.round((transport+meals)*100)/100;
+  saveSpesen(emp.id,year,month,total);
+  return total;
+};
+
+function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,companySettings,currentUser,notify,onBack}){
+  const L = makeL(lang);
+  useQstTariffs(employees);
+  const isAdmin = currentUser?.role==="admin";
+  const activeEmps = (employees||[]).filter(e=>e.role!=="admin");
+  const [empId,setEmpId] = useState(isAdmin ? (activeEmps[0]?.id||"") : currentUser?.id);
+  const emp = (employees||[]).find(e=>e.id===empId);
+  const [tab,setTab] = useState("payslips");
+  const [payslipData,setPayslipData] = useState(null);
+  const [worksheet,setWorksheet] = useState(null);
+  const [busy,setBusy] = useState("");
+  const [docs,setDocs] = useState(null);
+  const [upload,setUpload] = useState(null); // admin upload form
+  const monthNames = MONTHS[lang]||MONTHS.EN;
+
+  // Months available: a month appears once it is over (on its last day it is already shown). Admin also sees the current month.
+  const months = useMemo(()=>{
+    if(!emp) return [];
+    const now=new Date(); const lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    let end = new Date(now.getFullYear(), now.getMonth(), 1);
+    if(!(isAdmin || now.getDate()===lastDay)) end = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const start0 = emp.startDate ? new Date(emp.startDate+"T00:00:00") : new Date(now.getFullYear()-1, now.getMonth(), 1);
+    const limit = new Date(now.getFullYear()-2, now.getMonth(), 1);
+    let d = new Date(Math.max(new Date(start0.getFullYear(),start0.getMonth(),1), limit));
+    const out=[];
+    while(d<=end){
+      const m=d.getMonth()+1, y=d.getFullYear(), ms=`${y}-${String(m).padStart(2,"0")}`;
+      const active = (jobs||[]).some(j=>j.employeeId===emp.id&&j.date?.startsWith(ms)) || (timeclock||[]).some(x=>x.employeeId===emp.id&&x.date?.startsWith(ms));
+      if(active || emp.type!=="hourly") out.push({m,y,current: m===now.getMonth()+1&&y===now.getFullYear()});
+      d = new Date(y, m, 1);
+    }
+    return out.reverse();
+  },[emp?.id, jobs, timeclock, isAdmin]);
+
+  const loadDocs = async () => {
+    if(!emp){ setDocs([]); return; }
+    try{
+      const rows = await docsFetch(`employee_documents?select=id,employee_id,title,category,file_name,mime,size_bytes,created_at&or=(employee_id.eq.${emp.id},employee_id.is.null)&order=created_at.desc`);
+      setDocs(rows||[]);
+    }catch(e){ setDocs([]); notify(L("Dokumente konnten nicht geladen werden","No se pudieron cargar los documentos","Could not load documents","Impossibile caricare i documenti"),"error"); }
+  };
+  useEffect(()=>{ setDocs(null); if(tab==="other") loadDocs(); },[empId, tab]);
+
+  const openPayslip = async (m,y) => {
+    setBusy(`p${y}${m}`);
+    try{
+      let sp = getSavedSpesen(emp.id,y,m);
+      if(!sp) sp = await computeSpesen(emp,m,y,jobs,clients);
+      const pay = calcSwissPayroll(emp,timeclock,m,y,jobs,{spesen:sp});
+      setPayslipData({emp,pay,month:m,year:y});
+    } finally { setBusy(""); }
+  };
+
+  const openFile = async (d, mode) => {
+    setBusy(d.id);
+    try{
+      const rows = await docsFetch(`employee_documents?select=data,mime,file_name&id=eq.${d.id}`);
+      const r = rows?.[0]; if(!r?.data) throw new Error("empty");
+      const bin = atob(r.data); const arr = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([arr],{type:r.mime||"application/octet-stream"}));
+      if(mode==="open"){ const w=window.open(url,"_blank"); if(!w){ const a=document.createElement("a"); a.href=url; a.target="_blank"; document.body.appendChild(a); a.click(); a.remove(); } }
+      else { const a=document.createElement("a"); a.href=url; a.download=r.file_name||d.title; document.body.appendChild(a); a.click(); a.remove(); }
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(e){ notify(L("Fehler beim Öffnen","Error al abrir el documento","Could not open","Errore di apertura"),"error"); }
+    finally{ setBusy(""); }
+  };
+
+  const doUpload = async () => {
+    const f = upload?.file;
+    if(!f){ notify(L("Bitte Datei wählen","Elija un archivo","Choose a file","Scegli un file"),"error"); return; }
+    if(f.size>DOC_MAX_BYTES){ notify(L("Datei zu gross (max. 5 MB)","Archivo demasiado grande (máx. 5 MB)","File too large (max 5 MB)","File troppo grande (max 5 MB)"),"error"); return; }
+    setBusy("upload");
+    try{
+      const b64 = await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result).split(",")[1]||""); fr.onerror=rej; fr.readAsDataURL(f); });
+      await docsFetch("employee_documents","POST",{ employee_id: upload.forAll?null:emp.id, title:(upload.title||f.name).trim(), category:upload.category||"other", file_name:f.name, mime:f.type||"application/octet-stream", size_bytes:f.size, data:b64 });
+      notify(L("Dokument hochgeladen","Documento subido","Document uploaded","Documento caricato"),"success");
+      setUpload(null); loadDocs();
+    }catch(e){ notify(L("Fehler beim Hochladen","Error al subir","Upload failed","Errore di caricamento"),"error"); }
+    finally{ setBusy(""); }
+  };
+  const delDoc = async (d) => {
+    if(!window.confirm(L("Dokument löschen?","¿Eliminar este documento?","Delete this document?","Eliminare il documento?"))) return;
+    try{ await docsFetch(`employee_documents?id=eq.${d.id}`,"DELETE"); setDocs(p=>(p||[]).filter(x=>x.id!==d.id)); }
+    catch(e){ notify(L("Fehler","Error","Error","Errore"),"error"); }
+  };
+
+  const tabs = [
+    ["payslips","💵",L("Lohnabrechnungen","Nóminas","Payslips","Buste paga")],
+    ["contracts","📝",L("Verträge","Contratos","Contracts","Contratti")],
+    ["other","📂",L("Andere Dokumente","Otros documentos","Other documents","Altri documenti")],
+  ];
+  const catOf = id => DOC_CATS.find(c=>c.id===id)||DOC_CATS[DOC_CATS.length-1];
+  const langIdx = {DE:0,ES:1,EN:2,IT:3}[lang]??1;
+  const fmtSize = n => n>1048576?`${(n/1048576).toFixed(1)} MB`:`${Math.max(1,Math.round((n||0)/1024))} KB`;
+
+  return (
+    <CPScreen title={L("Dokumente","Documentos","Documents","Documenti")} icon="📁" onBack={onBack} t={t}>
+      {isAdmin&&(
+        <div style={{marginBottom:12}}>
+          <CPField label={L("Mitarbeiter","Empleado","Employee","Dipendente")}>
+            <CPSelect value={empId} onChange={e=>setEmpId(e.target.value)}>
+              {activeEmps.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+            </CPSelect>
+          </CPField>
+        </div>
+      )}
+      {!emp ? <CPCard><div style={{color:CP.textSecondary}}>{L("Kein Mitarbeiter","Sin empleado","No employee","Nessun dipendente")}</div></CPCard> : (<>
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        {tabs.map(([k,ic,lbl])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:CP.font,background:tab===k?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{ic} {lbl}</button>
+        ))}
+      </div>
+
+      {tab==="payslips"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{color:CP.textSecondary,fontSize:12}}>ℹ️ {L("Am Ende jedes Monats erscheint hier die neue Lohnabrechnung mit dem Arbeitsrapport. Öffnen → «Herunterladen» → drucken oder als PDF speichern.","Al final de cada mes aparece aquí tu nueva nómina con la hoja mensual. Ábrela → «Descargar» → imprime o guarda como PDF.","At the end of each month your new payslip and work sheet appear here. Open → «Download» → print or save as PDF.","Alla fine di ogni mese qui compare la nuova busta paga con il rapporto. Apri → «Scarica» → stampa o salva in PDF.")}</div>
+          {months.length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>🗓️</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine abgeschlossenen Monate.","Todavía no hay meses cerrados.","No completed months yet.","Ancora nessun mese chiuso.")}</div></CPCard>}
+          {months.map(({m,y,current})=>(
+            <CPCard key={`${y}-${m}`} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{fontSize:28}}>💵</div>
+                <div>
+                  <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{monthNames[m-1]} {y}</div>
+                  <div style={{color:CP.textTertiary,fontSize:12}}>{current?L("Laufender Monat (nur Admin)","Mes en curso (solo administrador)","Current month (admin only)","Mese in corso (solo admin)"):L("Abgeschlossen","Mes cerrado","Closed","Chiuso")}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <CPBtn size="sm" variant="success" onClick={()=>openPayslip(m,y)}>{busy===`p${y}${m}`?"⏳":"📄"} {L("Lohnabrechnung","Nómina","Payslip","Busta paga")}</CPBtn>
+                <CPBtn size="sm" variant="secondary" onClick={()=>setWorksheet({m,y})}>📋 {L("Arbeitsrapport","Hoja mensual","Work sheet","Rapporto")}</CPBtn>
+              </div>
+            </CPCard>
+          ))}
+        </div>
+      )}
+
+      {tab==="contracts"&&(
+        <ContractsApp t={t} lang={lang} clients={clients||[]} employees={employees} companySettings={companySettings} notify={notify}
+          onBack={onBack} currentUser={currentUser} contracts={contracts||[]} setContracts={()=>{}} embedded viewAsId={emp.id}/>
+      )}
+
+      {tab==="other"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {isAdmin&&!upload&&<CPBtn onClick={()=>setUpload({category:"other",title:"",forAll:false,file:null})}>⬆️ {L("Dokument hochladen","Subir documento","Upload document","Carica documento")}</CPBtn>}
+          {isAdmin&&upload&&(
+            <CPCard>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <CPField label={L("Datei (PDF, Bild, Word – max. 5 MB)","Archivo (PDF, imagen, Word – máx. 5 MB)","File (PDF, image, Word – max 5 MB)","File (PDF, immagine, Word – max 5 MB)")}>
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt" onChange={e=>{const f=e.target.files?.[0]||null; setUpload(u=>({...u,file:f,title:u.title||(f?f.name.replace(/\.[^.]+$/,""):"")}));}} style={{color:CP.textPrimary}}/>
+                </CPField>
+                <CPField label={L("Titel","Título","Title","Titolo")}><CPInput value={upload.title} onChange={e=>setUpload(u=>({...u,title:e.target.value}))}/></CPField>
+                <CPField label={L("Art","Tipo","Type","Tipo")}>
+                  <CPSelect value={upload.category} onChange={e=>setUpload(u=>({...u,category:e.target.value}))}>
+                    {DOC_CATS.map(c=><option key={c.id} value={c.id}>{c.icon} {c.L[langIdx]}</option>)}
+                  </CPSelect>
+                </CPField>
+                <label style={{color:CP.textSecondary,fontSize:13,display:"flex",gap:8,alignItems:"center"}}>
+                  <input type="checkbox" checked={upload.forAll} onChange={e=>setUpload(u=>({...u,forAll:e.target.checked}))}/>
+                  {L("Für alle Mitarbeiter","Para todos los empleados","For all employees","Per tutti i dipendenti")} {upload.forAll?"":`(${L("nur","solo","only","solo")} ${emp.name})`}
+                </label>
+                <div style={{display:"flex",gap:8}}>
+                  <CPBtn variant="success" onClick={doUpload}>{busy==="upload"?"⏳":"✅"} {L("Hochladen","Subir","Upload","Carica")}</CPBtn>
+                  <CPBtn variant="secondary" onClick={()=>setUpload(null)}>{t.cancel||L("Abbrechen","Cancelar","Cancel","Annulla")}</CPBtn>
+                </div>
+              </div>
+            </CPCard>
+          )}
+          {docs===null&&<div style={{color:CP.textSecondary}}>⏳ {L("Laden…","Cargando…","Loading…","Caricamento…")}</div>}
+          {docs&&docs.length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>📂</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine Dokumente.","Todavía no hay documentos.","No documents yet.","Ancora nessun documento.")}</div></CPCard>}
+          {(docs||[]).map(d=>{ const c=catOf(d.category); return (
+            <CPCard key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
+                <div style={{fontSize:28}}>{c.icon}</div>
+                <div style={{minWidth:0}}>
+                  <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15,wordBreak:"break-word"}}>{d.title}</div>
+                  <div style={{color:CP.textTertiary,fontSize:12}}>{c.L[langIdx]} · {String(d.created_at||"").slice(0,10)} · {fmtSize(d.size_bytes)}{!d.employee_id?` · ${L("Für alle","Para todos","For all","Per tutti")}`:""}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <CPBtn size="sm" variant="success" onClick={()=>openFile(d,"open")}>{busy===d.id?"⏳":"👁️"} {L("Öffnen / Drucken","Abrir / Imprimir","Open / Print","Apri / Stampa")}</CPBtn>
+                <CPBtn size="sm" variant="secondary" onClick={()=>openFile(d,"download")}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</CPBtn>
+                {isAdmin&&<CPBtn size="sm" variant="danger" onClick={()=>delDoc(d)}>🗑️</CPBtn>}
+              </div>
+            </CPCard>
+          );})}
+        </div>
+      )}
+      </>)}
+
+      {payslipData&&(
+        <PayslipModal emp={payslipData.emp} pay={payslipData.pay} month={payslipData.month} year={payslipData.year}
+          lang={lang} t={t} onClose={()=>setPayslipData(null)} companySettings={companySettings}/>
+      )}
+      {worksheet&&emp&&(
+        <WorkSheetModal emp={emp} month={worksheet.m} year={worksheet.y} jobs={jobs} clients={clients||[]}
+          lang={lang} companySettings={companySettings} onClose={()=>setWorksheet(null)}/>
+      )}
+    </CPScreen>
+  );
+}
+
+function EmbedOrScreen({embedded,children,...rest}){ return embedded ? <>{children}</> : <CPScreen {...rest}>{children}</CPScreen>; }
+
+function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,currentUser,contracts,setContracts,embedded,viewAsId}){
   const L = makeL(lang);
   const cs = companySettings||{name:"Patjac Reinigung Garten & Services",street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich",phone:"+41 44 123 4567",email:"patjacservices@outlook.com",uid:"CHE-123.456.789",iban:"CH56 0483 5012 3456 7800 9"};
   const [modal,setModal] = useState(null); // null | "form" | "preview" | "sign"
@@ -9407,12 +9650,13 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
   };
 
   // ── EMPLOYEE VIEW — only their own contract ──────────────────
-  if(!isAdmin){
-    const emp = employees.find(e=>e.id===currentUser?.id);
-    const myContracts = contracts.filter(c=>c.type==="employee"&&c.employeeId===currentUser?.id);
+  if(!isAdmin || embedded){
+    const viewId = viewAsId || currentUser?.id;
+    const emp = employees.find(e=>e.id===viewId);
+    const myContracts = contracts.filter(c=>c.type==="employee"&&c.employeeId===viewId);
 
     return (
-      <CPScreen title={L("Mein Vertrag","Mi contrato","My Contract","Il mio contratto")} icon="📝" onBack={onBack} t={t}>
+      <EmbedOrScreen embedded={embedded} title={L("Mein Vertrag","Mi contrato","My Contract","Il mio contratto")} icon="📝" onBack={onBack} t={t}>
         {myContracts.length===0 ? (
           <CPCard style={{textAlign:"center",padding:"40px 20px"}}>
             <div style={{fontSize:48,marginBottom:12}}>📄</div>
@@ -9490,6 +9734,9 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                   <div style={{color:"#4ECDC4",fontWeight:700,fontSize:13}}>
                     👁️ {L("Vertragsvorschau","Vista previa del contrato","Contract preview","Anteprima contratto")}
                   </div>
+                  <button onClick={()=>{ const w=window.open("","_blank"); if(w){ w.document.write(html); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400);} }} style={{
+                    background:"rgba(47,158,68,0.3)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:8,color:"#fff",padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:CP.font,marginLeft:"auto",marginRight:8,
+                  }}>🖨️ {L("Drucken","Imprimir","Print","Stampa")}</button>
                   <button onClick={()=>downloadContract(c)} style={{
                     background:"rgba(11,114,133,0.3)",border:"1px solid rgba(11,114,133,0.4)",
                     borderRadius:8,color:"#fff",padding:"5px 12px",cursor:"pointer",
@@ -9507,7 +9754,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
             </div>
           );
         })}
-      </CPScreen>
+      </EmbedOrScreen>
     );
   }
 
