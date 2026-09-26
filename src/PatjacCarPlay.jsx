@@ -2258,7 +2258,7 @@ const spesenKey = (empId,y,m)=>`${empId}_${y}-${String(m).padStart(2,"0")}`;
 const getSavedSpesen = (empId,y,m)=> (lsGet("patjac_spesen",{})[spesenKey(empId,y,m)]||0);
 const saveSpesen = (empId,y,m,val)=>{ const all=lsGet("patjac_spesen",{}); all[spesenKey(empId,y,m)]=val; lsSet("patjac_spesen",all); };
 
-function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, companySettings, onSpesen}){
+function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, companySettings, onSpesen, canSend}){
   const L = makeL(lang);
   const cs = companySettings||{name:"Patjac Reinigung Garten & Services",street:"",number:"",postalCode:"",city:"Zürich",uid:""};
   const monthName = (MONTHS[lang]||MONTHS.EN)[month-1];
@@ -2321,7 +2321,7 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
   const th = {padding:"5px 6px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #000",fontSize:10.5};
   const td = {padding:"4px 6px",borderBottom:"1px solid #eee",fontSize:10.5,verticalAlign:"top"};
 
-  const download = ()=>{
+  const download = (returnHtml)=>{
     const el=document.getElementById("patjac-worksheet"); if(!el) return;
     const title=L("Arbeitsrapport","Hoja de trabajo","Work sheet","Rapporto di lavoro");
     const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} ${emp.name} ${monthName} ${year}</title>
@@ -2329,6 +2329,7 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
 .hint{background:#1C7ED6;color:#fff;padding:10px;border-radius:6px;text-align:center;margin-bottom:14px;font-size:12px}
 @media print{.hint{display:none}@page{size:A4 landscape;margin:1.2cm}}</style></head><body>
 <div class="hint">${L("💡 Drucken → Als PDF speichern","💡 Imprimir → Guardar como PDF","💡 Print → Save as PDF","💡 Stampa → Salva come PDF")}</div>${el.innerHTML}</body></html>`;
+    if(returnHtml===true) return html;
     try{ const b=new Blob([html],{type:"text/html;charset=utf-8"}); const u=URL.createObjectURL(b); const a=document.createElement("a");
       a.href=u; a.download=`${title}_${emp.name.replace(/\s+/g,"_")}_${monthName}_${year}.html`; document.body.appendChild(a); a.click();
       setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(u);},3000);
@@ -2345,7 +2346,9 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
               <input type="checkbox" checked={withMeals} onChange={e=>{setWithMeals(e.target.checked);lsSet("patjac_meals_on",e.target.checked);}}/>
               {L("Verpflegung CHF 16 (GAV)","Comida CHF 16 (GAV)","Meals CHF 16 (GAV)","Pasto CHF 16 (CCL)")}
             </label>
-            <button onClick={download} disabled={!rows} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontWeight:700}}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</button>
+            {canSend&&rows&&<SendToDocsButton lang={lang} employeeId={emp.id} category="worksheet" period={monthStr} style={{padding:"7px 14px"}}
+              title={`${L("Arbeitsrapport","Hoja mensual","Work sheet","Rapporto")} ${monthName} ${year}`} getHtml={()=>download(true)}/>}
+            <button onClick={()=>download()} disabled={!rows} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontWeight:700}}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</button>
             <button onClick={onClose} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer"}}>✕</button>
           </div>
         </div>
@@ -2444,7 +2447,7 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
 }
 
 // ─── PAYSLIP MODAL – On-Screen Preview + PDF Download ────────
-function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings}){
+function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings, canSend}){
   const cs = companySettings || {
     name:"Patjac Reinigung Garten & Services",logo:"🌿",
     street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich",
@@ -2459,7 +2462,7 @@ function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings}
   );
   const L = makeL(lang);
 
-  const generatePDF = () => {
+  const generatePDF = (returnHtml) => {
     const content = document.getElementById("patjac-payslip-preview");
     if(!content) { alert("Preview not found"); return; }
 
@@ -2525,6 +2528,8 @@ td:last-child{text-align:right;font-weight:600}
   ${content.innerHTML}
 </body>
 </html>`;
+
+    if(returnHtml===true) return html;
 
     // Method 1: Blob URL download (preferred - works in most browsers)
     try {
@@ -2597,7 +2602,9 @@ td:last-child{text-align:right;font-weight:600}
             </div>
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={generatePDF} style={{
+            {canSend&&<SendToDocsButton lang={lang} employeeId={emp.id} category="payslip" period={`${year}-${String(month).padStart(2,"0")}`}
+              title={`${L("Lohnabrechnung","Nómina","Payslip","Busta paga")} ${monthName} ${year}`} getHtml={()=>generatePDF(true)}/>}
+            <button onClick={()=>generatePDF()} style={{
               background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",
               borderRadius:10,color:"#fff",padding:"8px 16px",cursor:"pointer",
               fontSize:13,fontWeight:700,fontFamily:CP.font,
@@ -3360,7 +3367,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
       })()}
 
       {payslipData&&(
-        <PayslipModal
+        <PayslipModal canSend={isAdmin}
           emp={payslipData.emp} pay={payslipData.pay}
           month={payslipData.month} year={payslipData.year}
           lang={lang} t={t} onClose={()=>setPayslipData(null)}
@@ -3368,7 +3375,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
         />
       )}
       {worksheetEmp&&(
-        <WorkSheetModal emp={worksheetEmp} month={selMonth} year={selYear} jobs={jobs} clients={clients||[]}
+        <WorkSheetModal canSend={isAdmin} emp={worksheetEmp} month={selMonth} year={selYear} jobs={jobs} clients={clients||[]}
           lang={lang} companySettings={companySettings} onClose={()=>setWorksheetEmp(null)}
           onSpesen={()=>setSpesenTick(x=>x+1)}/>
       )}
@@ -3491,7 +3498,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
       </div>
 
       {payslipData&&(
-        <PayslipModal
+        <PayslipModal canSend={isAdmin}
           emp={payslipData.emp} pay={payslipData.pay}
           month={payslipData.month} year={payslipData.year}
           lang={lang} t={t} onClose={()=>setPayslipData(null)}
@@ -3499,7 +3506,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
         />
       )}
       {worksheetEmp&&(
-        <WorkSheetModal emp={worksheetEmp} month={selMonth} year={selYear} jobs={jobs} clients={clients||[]}
+        <WorkSheetModal canSend={isAdmin} emp={worksheetEmp} month={selMonth} year={selYear} jobs={jobs} clients={clients||[]}
           lang={lang} companySettings={companySettings} onClose={()=>setWorksheetEmp(null)}
           onSpesen={()=>setSpesenTick(x=>x+1)}/>
       )}
@@ -7093,10 +7100,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "management_invoice",
      "contentKey": {
-      "DE": "💵 LOHNABRECHNUNG 2026 (automatisch)\n🔹 Stundenlohn + GAV-Zuschläge: Ferien 8.33% (oder 10.64%), Feiertage, 13. Monatslohn 8.33%.\n🔹 Abzüge Mitarbeiter: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (ab 8 h/Woche) · KTG 0.5% · BVG (ab CHF 22'680/Jahr) · Quellensteuer (falls Tarif).\n🔹 Familienzulagen ZH: CHF 215 pro Kind, CHF 268 in Ausbildung.\n🔹 Arbeitgeberkosten werden nur Ihnen angezeigt.\n🔹 📄 Lohnabrechnung als PDF · 📧 per E-Mail senden.\n\n📋 MONATSRAPPORT\n🔹 Pro Tag: Datum, Kunde, Ort, Ein-/Ausstempelzeit, Kilometer.\n🔹 Weg Zuhause → 1. Kunde = privat. Kunde → Kunde = Arbeitszeit, wird bezahlt.\n🔹 Auto CHF 0.75/km oder ÖV-Billett.\n🔹 Kilometer werden über Karten berechnet. Fehlt ein Wert («?»), antippen und von Hand eintragen.\n\n📝 VERTRÄGE\n🔹 Mitarbeiter- oder Kundenvertrag wählen, GAV-Tätigkeit und Vertragsart.\n🔹 NEU: Jeder Vertrag hat eine Zusatzseite «Rechte & Pflichten» (Firma ↔ Mitarbeiter bzw. Firma ↔ Kunde) – für volle Transparenz.\n🔹 🔍 Suche nach Name.\n\n📁 DOKUMENTE (NEU)\n🔹 Mitarbeiter sehen die Lohnabrechnung nicht mehr als eigenes Symbol, sondern im Symbol «📁 Dokumente»: Lohnabrechnungen (jeden Monat automatisch nach Monatsende), Arbeitsrapport, Verträge und andere Dokumente.\n🔹 Als Admin: Mitarbeiter wählen → «📂 Andere Dokumente» → «⬆️ Dokument hochladen» (PDF, Bild, Word, max. 5 MB), für eine Person oder für alle.",
-      "ES": "💵 NÓMINA 2026 (automática)\n🔹 Precio por hora + suplementos GAV: vacaciones 8,33 % (o 10,64 %), festivos y 13.º salario 8,33 %.\n🔹 Deducciones del empleado: AHV/IV/EO 5,3 % · ALV 1,1 % · NBU 1,2 % (desde 8 h/semana) · KTG 0,5 % · BVG (desde CHF 22 680/año) · impuesto en la fuente (si tiene tarifa).\n🔹 Asignaciones familiares ZH: CHF 215 por hijo y CHF 268 si está estudiando.\n🔹 El coste de la empresa solo lo ves tú.\n🔹 📄 Nómina en PDF · 📧 envío por e-mail.\n\n📋 HOJA MENSUAL\n🔹 Por día: fecha, cliente, lugar, horas de entrada y salida y kilómetros.\n🔹 De casa al primer cliente = trayecto privado. De un cliente a otro = tiempo de trabajo, y se paga.\n🔹 Coche CHF 0,75/km o billete de transporte público.\n🔹 Los kilómetros se calculan con mapas. Si falta alguno («?»), tócalo y escríbelo a mano.\n\n📝 CONTRATOS\n🔹 Elige contrato de empleado o de cliente, la actividad GAV y el tipo de contrato.\n🔹 NUEVO: cada contrato lleva una página extra de «Derechos y obligaciones» (empresa ↔ empleado o empresa ↔ cliente), para que todo sea transparente.\n🔹 🔍 Busca por nombre.\n\n📁 DOCUMENTOS (NUEVO)\n🔹 Los empleados ya no ven la nómina como icono aparte. Ahora está en el icono «📁 Documentos», junto con la hoja mensual, los contratos y otros documentos. La nómina de cada mes aparece sola al terminar el mes.\n🔹 Como administrador: elige el empleado → «📂 Otros documentos» → «⬆️ Subir documento» (PDF, imagen o Word, máx. 5 MB), para una persona o para todos.",
-      "EN": "💵 PAYROLL 2026 (automatic)\n🔹 Hourly wage + GAV supplements: holidays 8.33% (or 10.64%), public holidays, 13th salary 8.33%.\n🔹 Employee deductions: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (from 8 h/week) · KTG 0.5% · BVG (from CHF 22,680/year) · withholding tax (if tariff).\n🔹 ZH family allowances: CHF 215 per child, CHF 268 in education.\n🔹 Employer costs are shown only to you.\n🔹 📄 Payslip as PDF · 📧 send by email.\n\n📋 MONTHLY SHEET\n🔹 Per day: date, client, place, clock-in/out time, kilometres.\n🔹 Home → 1st client = private. Client → client = working time, paid.\n🔹 Car CHF 0.75/km or public transport ticket.\n🔹 Kilometres are calculated with maps. If a value is missing («?»), tap it and enter it by hand.\n\n📝 CONTRACTS\n🔹 Choose employee or client contract, GAV activity and contract type.\n🔹 NEW: every contract has an extra page «Rights & obligations» (company ↔ employee or company ↔ client) – for full transparency.\n🔹 🔍 Search by name.\n\n📁 DOCUMENTS (NEW)\n🔹 Employees no longer see payroll as a separate icon but inside «📁 Documents»: payslips (automatically after each month-end), work sheet, contracts and other documents.\n🔹 As admin: choose the employee → «📂 Other documents» → «⬆️ Upload document» (PDF, image, Word, max 5 MB), for one person or for everyone.",
-      "IT": "💵 BUSTA PAGA 2026 (automatica)\n🔹 Paga oraria + supplementi GAV: vacanze 8.33% (o 10.64%), festivi, 13a mensilità 8.33%.\n🔹 Deduzioni dipendente: AVS/AI/IPG 5.3% · AD 1.1% · AINP 1.2% (da 8 h/settimana) · IGM 0.5% · LPP (da CHF 22'680/anno) · imposta alla fonte (se tariffa).\n🔹 Assegni familiari ZH: CHF 215 per figlio, CHF 268 in formazione.\n🔹 I costi del datore di lavoro sono visibili solo a te.\n🔹 📄 Busta paga in PDF · 📧 invio per e-mail.\n\n📋 RAPPORTO MENSILE\n🔹 Per giorno: data, cliente, luogo, ora di entrata/uscita, chilometri.\n🔹 Casa → 1° cliente = privato. Cliente → cliente = tempo di lavoro, pagato.\n🔹 Auto CHF 0.75/km o biglietto dei mezzi pubblici.\n🔹 I chilometri sono calcolati con le mappe. Se manca un valore («?»), toccalo e inseriscilo a mano.\n\n📝 CONTRATTI\n🔹 Scegli contratto dipendente o cliente, attività GAV e tipo di contratto.\n🔹 NUOVO: ogni contratto ha una pagina in più «Diritti e obblighi» (azienda ↔ dipendente o azienda ↔ cliente) – per piena trasparenza.\n🔹 🔍 Cerca per nome.\n\n📁 DOCUMENTI (NUOVO)\n🔹 I dipendenti non vedono più gli stipendi come icona separata ma dentro «📁 Documenti»: buste paga (automaticamente a fine mese), rapporto, contratti e altri documenti.\n🔹 Come admin: scegli il dipendente → «📂 Altri documenti» → «⬆️ Carica documento» (PDF, immagine, Word, max 5 MB), per una persona o per tutti."
+      "DE": "💵 LOHNABRECHNUNG 2026 (automatisch)\n🔹 Stundenlohn + GAV-Zuschläge: Ferien 8.33% (oder 10.64%), Feiertage, 13. Monatslohn 8.33%.\n🔹 Abzüge Mitarbeiter: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (ab 8 h/Woche) · KTG 0.5% · BVG (ab CHF 22'680/Jahr) · Quellensteuer (falls Tarif).\n🔹 Familienzulagen ZH: CHF 215 pro Kind, CHF 268 in Ausbildung.\n🔹 Arbeitgeberkosten werden nur Ihnen angezeigt.\n🔹 📄 Lohnabrechnung als PDF · 📧 per E-Mail senden.\n\n📋 MONATSRAPPORT\n🔹 Pro Tag: Datum, Kunde, Ort, Ein-/Ausstempelzeit, Kilometer.\n🔹 Weg Zuhause → 1. Kunde = privat. Kunde → Kunde = Arbeitszeit, wird bezahlt.\n🔹 Auto CHF 0.75/km oder ÖV-Billett.\n🔹 Kilometer werden über Karten berechnet. Fehlt ein Wert («?»), antippen und von Hand eintragen.\n\n📝 VERTRÄGE\n🔹 Mitarbeiter- oder Kundenvertrag wählen, GAV-Tätigkeit und Vertragsart.\n🔹 NEU: Jeder Vertrag hat eine Zusatzseite «Rechte & Pflichten» (Firma ↔ Mitarbeiter bzw. Firma ↔ Kunde) – für volle Transparenz.\n🔹 🔍 Suche nach Name.\n\n📁 DOKUMENTE (NEU)\n🔹 Mitarbeiter sehen die Lohnabrechnung nicht mehr als eigenes Symbol, sondern im Symbol «📁 Dokumente»: Lohnabrechnungen (jeden Monat automatisch nach Monatsende), Arbeitsrapport, Verträge und andere Dokumente.\n🔹 Als Admin: Mitarbeiter wählen → «📂 Andere Dokumente» → «⬆️ Dokument hochladen» (PDF, Bild, Word, max. 5 MB), für eine Person oder für alle.\n🔹 📤 In jeder Lohnabrechnung, jedem Arbeitsrapport und jedem Arbeitsvertrag gibt es den Knopf «An Mitarbeiter-Dokumente senden». Danach sieht der Mitarbeiter genau dieses Dokument in «📁 Dokumente» und kann es drucken.",
+      "ES": "💵 NÓMINA 2026 (automática)\n🔹 Precio por hora + suplementos GAV: vacaciones 8,33 % (o 10,64 %), festivos y 13.º salario 8,33 %.\n🔹 Deducciones del empleado: AHV/IV/EO 5,3 % · ALV 1,1 % · NBU 1,2 % (desde 8 h/semana) · KTG 0,5 % · BVG (desde CHF 22 680/año) · impuesto en la fuente (si tiene tarifa).\n🔹 Asignaciones familiares ZH: CHF 215 por hijo y CHF 268 si está estudiando.\n🔹 El coste de la empresa solo lo ves tú.\n🔹 📄 Nómina en PDF · 📧 envío por e-mail.\n\n📋 HOJA MENSUAL\n🔹 Por día: fecha, cliente, lugar, horas de entrada y salida y kilómetros.\n🔹 De casa al primer cliente = trayecto privado. De un cliente a otro = tiempo de trabajo, y se paga.\n🔹 Coche CHF 0,75/km o billete de transporte público.\n🔹 Los kilómetros se calculan con mapas. Si falta alguno («?»), tócalo y escríbelo a mano.\n\n📝 CONTRATOS\n🔹 Elige contrato de empleado o de cliente, la actividad GAV y el tipo de contrato.\n🔹 NUEVO: cada contrato lleva una página extra de «Derechos y obligaciones» (empresa ↔ empleado o empresa ↔ cliente), para que todo sea transparente.\n🔹 🔍 Busca por nombre.\n\n📁 DOCUMENTOS (NUEVO)\n🔹 Los empleados ya no ven la nómina como icono aparte. Ahora está en el icono «📁 Documentos», junto con la hoja mensual, los contratos y otros documentos. La nómina de cada mes aparece sola al terminar el mes.\n🔹 Como administrador: elige el empleado → «📂 Otros documentos» → «⬆️ Subir documento» (PDF, imagen o Word, máx. 5 MB), para una persona o para todos.\n🔹 📤 Cada nómina, hoja mensual y contrato laboral tiene el botón «Enviar a Documentos del empleado». Al pulsarlo, el empleado ve ese documento en «📁 Documentos» y puede imprimirlo.",
+      "EN": "💵 PAYROLL 2026 (automatic)\n🔹 Hourly wage + GAV supplements: holidays 8.33% (or 10.64%), public holidays, 13th salary 8.33%.\n🔹 Employee deductions: AHV/IV/EO 5.3% · ALV 1.1% · NBU 1.2% (from 8 h/week) · KTG 0.5% · BVG (from CHF 22,680/year) · withholding tax (if tariff).\n🔹 ZH family allowances: CHF 215 per child, CHF 268 in education.\n🔹 Employer costs are shown only to you.\n🔹 📄 Payslip as PDF · 📧 send by email.\n\n📋 MONTHLY SHEET\n🔹 Per day: date, client, place, clock-in/out time, kilometres.\n🔹 Home → 1st client = private. Client → client = working time, paid.\n🔹 Car CHF 0.75/km or public transport ticket.\n🔹 Kilometres are calculated with maps. If a value is missing («?»), tap it and enter it by hand.\n\n📝 CONTRACTS\n🔹 Choose employee or client contract, GAV activity and contract type.\n🔹 NEW: every contract has an extra page «Rights & obligations» (company ↔ employee or company ↔ client) – for full transparency.\n🔹 🔍 Search by name.\n\n📁 DOCUMENTS (NEW)\n🔹 Employees no longer see payroll as a separate icon but inside «📁 Documents»: payslips (automatically after each month-end), work sheet, contracts and other documents.\n🔹 As admin: choose the employee → «📂 Other documents» → «⬆️ Upload document» (PDF, image, Word, max 5 MB), for one person or for everyone.\n🔹 📤 Every payslip, work sheet and employment contract has the button «Send to employee documents». The employee then sees exactly that document in «📁 Documents» and can print it.",
+      "IT": "💵 BUSTA PAGA 2026 (automatica)\n🔹 Paga oraria + supplementi GAV: vacanze 8.33% (o 10.64%), festivi, 13a mensilità 8.33%.\n🔹 Deduzioni dipendente: AVS/AI/IPG 5.3% · AD 1.1% · AINP 1.2% (da 8 h/settimana) · IGM 0.5% · LPP (da CHF 22'680/anno) · imposta alla fonte (se tariffa).\n🔹 Assegni familiari ZH: CHF 215 per figlio, CHF 268 in formazione.\n🔹 I costi del datore di lavoro sono visibili solo a te.\n🔹 📄 Busta paga in PDF · 📧 invio per e-mail.\n\n📋 RAPPORTO MENSILE\n🔹 Per giorno: data, cliente, luogo, ora di entrata/uscita, chilometri.\n🔹 Casa → 1° cliente = privato. Cliente → cliente = tempo di lavoro, pagato.\n🔹 Auto CHF 0.75/km o biglietto dei mezzi pubblici.\n🔹 I chilometri sono calcolati con le mappe. Se manca un valore («?»), toccalo e inseriscilo a mano.\n\n📝 CONTRATTI\n🔹 Scegli contratto dipendente o cliente, attività GAV e tipo di contratto.\n🔹 NUOVO: ogni contratto ha una pagina in più «Diritti e obblighi» (azienda ↔ dipendente o azienda ↔ cliente) – per piena trasparenza.\n🔹 🔍 Cerca per nome.\n\n📁 DOCUMENTI (NUOVO)\n🔹 I dipendenti non vedono più gli stipendi come icona separata ma dentro «📁 Documenti»: buste paga (automaticamente a fine mese), rapporto, contratti e altri documenti.\n🔹 Come admin: scegli il dipendente → «📂 Altri documenti» → «⬆️ Carica documento» (PDF, immagine, Word, max 5 MB), per una persona o per tutti.\n🔹 📤 Ogni busta paga, rapporto e contratto di lavoro ha il pulsante «Invia ai documenti del dipendente». Il dipendente vede poi quel documento in «📁 Documenti» e può stamparlo."
      }
     },
     {
@@ -9160,6 +9167,32 @@ const docsFetch = async (path, method="GET", body=null) => {
   const tx = await res.text(); return tx ? JSON.parse(tx) : null;
 };
 const DOC_MAX_BYTES = 5*1024*1024;
+// Documents the administrator "sends" from the app (payslip, work sheet, contract) are stored as printable HTML
+const SENT_CATS = ["payslip","worksheet","contract_sent"];
+const utf8ToB64 = str => { const bytes=new TextEncoder().encode(str); let bin=""; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000)); return btoa(bin); };
+const publishEmployeeDoc = async ({employeeId,title,category,period=null,refId=null,html}) => {
+  // Replace an earlier copy of the same document (same month / same contract)
+  const q=[`employee_id=eq.${employeeId}`,`category=eq.${category}`,period?`period=eq.${encodeURIComponent(period)}`:null,refId?`ref_id=eq.${encodeURIComponent(refId)}`:null].filter(Boolean).join("&");
+  if(period||refId) await docsFetch(`employee_documents?${q}`,"DELETE");
+  const data = utf8ToB64(html);
+  return docsFetch("employee_documents","POST",{employee_id:employeeId,title,category,period,ref_id:refId,
+    file_name:`${title.replace(/[^\w\-]+/g,"_")}.html`,mime:"text/html",size_bytes:Math.round(data.length*3/4),data});
+};
+function SendToDocsButton({lang,employeeId,title,category,period,refId,getHtml,style,compact}){
+  const L = makeL(lang);
+  const [st,setSt] = useState("idle");
+  if(!employeeId) return null;
+  const send = async () => {
+    const html = getHtml && getHtml(); if(!html){ setSt("error"); return; }
+    setSt("sending");
+    try{ await publishEmployeeDoc({employeeId,title,category,period,refId,html}); setSt("done"); }
+    catch(e){ console.error(e); setSt("error"); }
+  };
+  const label = st==="sending"?"⏳":st==="done"?`✅ ${L("Gesendet","Enviado","Sent","Inviato")}`:st==="error"?`⚠️ ${L("Fehler – nochmals","Error – reintentar","Error – retry","Errore – riprova")}`:
+    compact?"📤":`📤 ${L("An Mitarbeiter-Dokumente senden","Enviar a Documentos del empleado","Send to employee documents","Invia ai documenti del dipendente")}`;
+  return <button onClick={send} disabled={st==="sending"} title={L("An Mitarbeiter-Dokumente senden","Enviar a Documentos del empleado","Send to employee documents","Invia ai documenti del dipendente")}
+    style={{background:st==="done"?"rgba(47,158,68,0.85)":"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",borderRadius:10,color:"#fff",padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font,...(style||{})}}>{label}</button>;
+}
 const DOC_CATS = [
   {id:"contract",    icon:"📝", L:["Unterschriebener Vertrag","Contrato firmado","Signed contract","Contratto firmato"]},
   {id:"certificate", icon:"🏅", L:["Zeugnis / Bescheinigung","Certificado","Certificate","Certificato"]},
@@ -9218,20 +9251,22 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
     while(d<=end){
       const m=d.getMonth()+1, y=d.getFullYear(), ms=`${y}-${String(m).padStart(2,"0")}`;
       const active = (jobs||[]).some(j=>j.employeeId===emp.id&&j.date?.startsWith(ms)) || (timeclock||[]).some(x=>x.employeeId===emp.id&&x.date?.startsWith(ms));
-      if(active || emp.type!=="hourly") out.push({m,y,current: m===now.getMonth()+1&&y===now.getFullYear()});
+      const sent = (docs||[]).some(x=>(x.category==="payslip"||x.category==="worksheet")&&x.period===ms);
+      if(active || sent || emp.type!=="hourly") out.push({m,y,ms,current: m===now.getMonth()+1&&y===now.getFullYear()});
       d = new Date(y, m, 1);
     }
     return out.reverse();
-  },[emp?.id, jobs, timeclock, isAdmin]);
+  },[emp?.id, jobs, timeclock, isAdmin, docs]);
+  const sentDoc = (cat,period) => (docs||[]).find(x=>x.category===cat&&x.period===period&&x.employee_id===emp?.id);
 
   const loadDocs = async () => {
     if(!emp){ setDocs([]); return; }
     try{
-      const rows = await docsFetch(`employee_documents?select=id,employee_id,title,category,file_name,mime,size_bytes,created_at&or=(employee_id.eq.${emp.id},employee_id.is.null)&order=created_at.desc`);
+      const rows = await docsFetch(`employee_documents?select=id,employee_id,title,category,period,ref_id,file_name,mime,size_bytes,created_at&or=(employee_id.eq.${emp.id},employee_id.is.null)&order=created_at.desc`);
       setDocs(rows||[]);
     }catch(e){ setDocs([]); notify(L("Dokumente konnten nicht geladen werden","No se pudieron cargar los documentos","Could not load documents","Impossibile caricare i documenti"),"error"); }
   };
-  useEffect(()=>{ setDocs(null); if(tab==="other") loadDocs(); },[empId, tab]);
+  useEffect(()=>{ setDocs(null); loadDocs(); },[empId]);
 
   const openPayslip = async (m,y) => {
     setBusy(`p${y}${m}`);
@@ -9307,24 +9342,41 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div style={{color:CP.textSecondary,fontSize:12}}>ℹ️ {L("Am Ende jedes Monats erscheint hier die neue Lohnabrechnung mit dem Arbeitsrapport. Öffnen → «Herunterladen» → drucken oder als PDF speichern.","Al final de cada mes aparece aquí tu nueva nómina con la hoja mensual. Ábrela → «Descargar» → imprime o guarda como PDF.","At the end of each month your new payslip and work sheet appear here. Open → «Download» → print or save as PDF.","Alla fine di ogni mese qui compare la nuova busta paga con il rapporto. Apri → «Scarica» → stampa o salva in PDF.")}</div>
           {months.length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>🗓️</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine abgeschlossenen Monate.","Todavía no hay meses cerrados.","No completed months yet.","Ancora nessun mese chiuso.")}</div></CPCard>}
-          {months.map(({m,y,current})=>(
+          {months.map(({m,y,ms,current})=>{ const sp=sentDoc("payslip",ms), sw=sentDoc("worksheet",ms); return (
             <CPCard key={`${y}-${m}`} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <div style={{fontSize:28}}>💵</div>
                 <div>
                   <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{monthNames[m-1]} {y}</div>
                   <div style={{color:CP.textTertiary,fontSize:12}}>{current?L("Laufender Monat (nur Admin)","Mes en curso (solo administrador)","Current month (admin only)","Mese in corso (solo admin)"):L("Abgeschlossen","Mes cerrado","Closed","Chiuso")}</div>
+                  {(sp||sw)&&<div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {isAdmin?L("An Mitarbeiter gesendet","Enviado al empleado","Sent to employee","Inviato al dipendente"):L("Offizielles Dokument der Firma","Documento oficial de la empresa","Official company document","Documento ufficiale dell'azienda")} {String((sp||sw).created_at||"").slice(0,10)}</div>}
                 </div>
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <CPBtn size="sm" variant="success" onClick={()=>openPayslip(m,y)}>{busy===`p${y}${m}`?"⏳":"📄"} {L("Lohnabrechnung","Nómina","Payslip","Busta paga")}</CPBtn>
-                <CPBtn size="sm" variant="secondary" onClick={()=>setWorksheet({m,y})}>📋 {L("Arbeitsrapport","Hoja mensual","Work sheet","Rapporto")}</CPBtn>
+                <CPBtn size="sm" variant="success" onClick={()=>(!isAdmin&&sp)?openFile(sp,"open"):openPayslip(m,y)}>{busy===`p${y}${m}`||busy===sp?.id?"⏳":"📄"} {L("Lohnabrechnung","Nómina","Payslip","Busta paga")}</CPBtn>
+                <CPBtn size="sm" variant="secondary" onClick={()=>(!isAdmin&&sw)?openFile(sw,"open"):setWorksheet({m,y})}>📋 {L("Arbeitsrapport","Hoja mensual","Work sheet","Rapporto")}</CPBtn>
               </div>
             </CPCard>
-          ))}
+          );})}
         </div>
       )}
 
+      {tab==="contracts"&&(docs||[]).filter(d=>d.category==="contract_sent"&&d.employee_id===emp.id).map(d=>(
+        <CPCard key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",marginBottom:10,border:"1px solid rgba(47,158,68,0.35)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{fontSize:28}}>📝</div>
+            <div>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{d.title}</div>
+              <div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {L("Von der Firma gesendet","Enviado por la empresa","Sent by the company","Inviato dall'azienda")} {String(d.created_at||"").slice(0,10)}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <CPBtn size="sm" variant="success" onClick={()=>openFile(d,"open")}>{busy===d.id?"⏳":"👁️"} {L("Öffnen / Drucken","Abrir / Imprimir","Open / Print","Apri / Stampa")}</CPBtn>
+            <CPBtn size="sm" variant="secondary" onClick={()=>openFile(d,"download")}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</CPBtn>
+            {isAdmin&&<CPBtn size="sm" variant="danger" onClick={()=>delDoc(d)}>🗑️</CPBtn>}
+          </div>
+        </CPCard>
+      ))}
       {tab==="contracts"&&(
         <ContractsApp t={t} lang={lang} clients={clients||[]} employees={employees} companySettings={companySettings} notify={notify}
           onBack={onBack} currentUser={currentUser} contracts={contracts||[]} setContracts={()=>{}} embedded viewAsId={emp.id}/>
@@ -9357,8 +9409,8 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
             </CPCard>
           )}
           {docs===null&&<div style={{color:CP.textSecondary}}>⏳ {L("Laden…","Cargando…","Loading…","Caricamento…")}</div>}
-          {docs&&docs.length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>📂</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine Dokumente.","Todavía no hay documentos.","No documents yet.","Ancora nessun documento.")}</div></CPCard>}
-          {(docs||[]).map(d=>{ const c=catOf(d.category); return (
+          {docs&&docs.filter(d=>!SENT_CATS.includes(d.category)).length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>📂</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine Dokumente.","Todavía no hay documentos.","No documents yet.","Ancora nessun documento.")}</div></CPCard>}
+          {(docs||[]).filter(d=>!SENT_CATS.includes(d.category)).map(d=>{ const c=catOf(d.category); return (
             <CPCard key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
                 <div style={{fontSize:28}}>{c.icon}</div>
@@ -9379,11 +9431,11 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
       </>)}
 
       {payslipData&&(
-        <PayslipModal emp={payslipData.emp} pay={payslipData.pay} month={payslipData.month} year={payslipData.year}
+        <PayslipModal canSend={isAdmin} emp={payslipData.emp} pay={payslipData.pay} month={payslipData.month} year={payslipData.year}
           lang={lang} t={t} onClose={()=>setPayslipData(null)} companySettings={companySettings}/>
       )}
       {worksheet&&emp&&(
-        <WorkSheetModal emp={emp} month={worksheet.m} year={worksheet.y} jobs={jobs} clients={clients||[]}
+        <WorkSheetModal canSend={isAdmin} emp={emp} month={worksheet.m} year={worksheet.y} jobs={jobs} clients={clients||[]}
           lang={lang} companySettings={companySettings} onClose={()=>setWorksheet(null)}/>
       )}
     </CPScreen>
@@ -9826,6 +9878,9 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                     <div style={{display:"flex",gap:6}}>
                       <CPBtn onClick={()=>{setSelContract(c);setModal("preview");}} variant="secondary" size="sm">👁️</CPBtn>
                       <CPBtn onClick={()=>downloadContract(c)} variant="secondary" size="sm">⬇️</CPBtn>
+                      {c.type==="employee"&&c.employeeId&&<SendToDocsButton compact lang={lang} employeeId={c.employeeId} category="contract_sent" refId={c.id}
+                        title={`${L("Arbeitsvertrag","Contrato laboral","Employment contract","Contratto di lavoro")} ${c.startDate||c.contractDate||""}`} getHtml={()=>buildContractHTML(c)}
+                        style={{background:"rgba(47,158,68,0.35)",padding:"5px 10px",fontSize:12}}/>}
                       <CPBtn onClick={()=>{
                         const entity = c.type==="client"
                           ? clients.find(x=>x.id===c.clientId)
@@ -9986,6 +10041,8 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
               <div style={{background:"linear-gradient(90deg,#0B7285,#2F9E44)",borderRadius:"22px 22px 0 0",padding:"13px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{color:"#fff",fontWeight:700,fontSize:15}}>📝 {typeLabel(selContract.type)} — {entity?.name}</div>
                 <div style={{display:"flex",gap:8}}>
+                  {selContract.type==="employee"&&selContract.employeeId&&<SendToDocsButton lang={lang} employeeId={selContract.employeeId} category="contract_sent" refId={selContract.id}
+                    title={`${L("Arbeitsvertrag","Contrato laboral","Employment contract","Contratto di lavoro")} ${selContract.startDate||selContract.contractDate||""}`} getHtml={()=>buildContractHTML(selContract)} style={{padding:"7px 14px"}}/>}
                   <button onClick={()=>downloadContract(selContract)} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.35)",borderRadius:10,color:"#fff",padding:"7px 15px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>⬇️ {t.contractDownload}</button>
                   <button onClick={()=>setModal(null)} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer",fontSize:13}}>✕</button>
                 </div>
