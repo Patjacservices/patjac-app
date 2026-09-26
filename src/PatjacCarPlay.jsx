@@ -2811,6 +2811,83 @@ td:last-child{text-align:right;font-weight:600}
   );
 }
 
+// ── NEW-EMPLOYEE ACCESS MESSAGE: app link + PIN + confidentiality warning ──
+const swissWa = (phone) => { let d=String(phone||"").replace(/[^\d+]/g,""); if(d.startsWith("+")) d=d.slice(1); else if(d.startsWith("00")) d=d.slice(2); else if(d.startsWith("0")) d="41"+d.slice(1); return d; };
+const accessMessage = (emp, lang) => {
+  const L = makeL(lang);
+  const link = (typeof window!=="undefined" ? window.location.origin : "");
+  return {
+    subject: L("Ihr Zugang zur Patjac-App","Tu acceso a la app de Patjac","Your access to the Patjac app","Il tuo accesso all'app Patjac"),
+    body: L(
+`Hallo ${emp.name},
+
+willkommen bei Patjac Reinigung Garten & Services!
+
+📲 App: ${link}
+🔑 Ihr persönlicher PIN: ${emp.pin}
+
+So melden Sie sich an: Link öffnen → «Mitarbeiter» wählen → PIN eingeben.
+
+⚠️ WICHTIG: Ihr PIN ist persönlich und vertraulich. Geben Sie ihn an niemanden weiter. Die Zugangsdaten sind Eigentum der Firma; eine Weitergabe oder Nutzung durch Dritte ist verboten und kann arbeitsrechtliche Konsequenzen haben (Treue- und Schweigepflicht, Art. 321a OR). Bei Verlust sofort die Firma informieren.
+
+Patjac Reinigung Garten & Services`,
+`Hola ${emp.name}:
+
+¡Bienvenido/a a Patjac Reinigung Garten & Services!
+
+📲 App: ${link}
+🔑 Tu PIN personal: ${emp.pin}
+
+Cómo entrar: abre el enlace → elige «Empleado» → escribe tu PIN.
+
+⚠️ IMPORTANTE: tu PIN es personal y confidencial. No lo compartas con nadie. Las credenciales son propiedad de la empresa; está prohibido darlas a otra persona o que otra persona las use, y hacerlo puede tener consecuencias laborales (deber de lealtad y confidencialidad, Art. 321a del Código de Obligaciones). Si lo pierdes, avisa a la empresa de inmediato.
+
+Patjac Reinigung Garten & Services`,
+`Hello ${emp.name},
+
+welcome to Patjac Reinigung Garten & Services!
+
+📲 App: ${link}
+🔑 Your personal PIN: ${emp.pin}
+
+How to log in: open the link → choose «Employee» → enter your PIN.
+
+⚠️ IMPORTANT: your PIN is personal and confidential. Do not share it with anyone. The credentials are company property; passing them on or letting anyone else use them is forbidden and may have employment consequences (duty of loyalty and confidentiality, Art. 321a CO). If you lose it, inform the company immediately.
+
+Patjac Reinigung Garten & Services`,
+`Ciao ${emp.name},
+
+benvenuto/a in Patjac Reinigung Garten & Services!
+
+📲 App: ${link}
+🔑 Il tuo PIN personale: ${emp.pin}
+
+Come accedere: apri il link → scegli «Dipendente» → inserisci il PIN.
+
+⚠️ IMPORTANTE: il PIN è personale e riservato. Non condividerlo con nessuno. Le credenziali sono proprietà dell'azienda; cederle o farle usare ad altri è vietato e può avere conseguenze disciplinari (dovere di fedeltà e riservatezza, Art. 321a CO). In caso di smarrimento avvisa subito l'azienda.
+
+Patjac Reinigung Garten & Services`)
+  };
+};
+function AccessInviteModal({emp, lang, onClose}){
+  const L = makeL(lang);
+  const msg = accessMessage(emp, lang);
+  const btn = (bg)=>({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"12px 14px",cursor:"pointer",fontWeight:700,fontSize:14,textAlign:"left",width:"100%"});
+  const wa = swissWa(emp.phone);
+  return (
+    <CPModal title={`🔑 ${L("Zugang senden","Enviar acceso","Send access","Invia accesso")} – ${emp.name}`} onClose={onClose} width={520}>
+      <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10}}>{L("Wählen Sie, wie die Zugangsdaten gesendet werden sollen:","Elija cómo enviar los datos de acceso:","Choose how to send the access details:","Scegli come inviare i dati di accesso:")}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+        <button disabled={!emp.email} onClick={()=>sendByEmail({to:emp.email,subject:msg.subject,body:msg.body})} style={{...btn("#1C7ED6"),opacity:emp.email?1:.4}}>📧 E-mail {emp.email?`→ ${emp.email}`:`(${L("keine E-Mail erfasst","sin e-mail guardado","no email saved","nessuna e-mail")})`}</button>
+        <button disabled={!wa} onClick={()=>window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg.body)}`,"_blank")} style={{...btn("#25D366"),opacity:wa?1:.4}}>💬 WhatsApp {emp.phone?`→ ${emp.phone}`:`(${L("keine Nummer","sin teléfono","no number","nessun numero")})`}</button>
+        <button disabled={!emp.phone} onClick={()=>window.open(`sms:${String(emp.phone||"").replace(/\s/g,"")}?&body=${encodeURIComponent(msg.body)}`,"_self")} style={{...btn("#7048E8"),opacity:emp.phone?1:.4}}>📱 SMS {emp.phone?`→ ${emp.phone}`:""}</button>
+        <button onClick={()=>{ try{ navigator.clipboard.writeText(msg.body); }catch(e){} }} style={btn("rgba(255,255,255,.12)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
+      </div>
+      <pre style={{whiteSpace:"pre-wrap",background:"rgba(0,0,0,.3)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 12px",color:CP.textSecondary,fontSize:12,maxHeight:220,overflow:"auto",fontFamily:"inherit"}}>{msg.body}</pre>
+    </CPModal>
+  );
+}
+
 // ─── EMPLOYEES APP (payroll integrated) ──────────────────────
 function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,onBack,currentUser,lang,companySettings}){
   const L = makeL(lang);
@@ -2820,6 +2897,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
   const [deleteId,setDeleteId] = useState(null);
   const [payslipData,setPayslipData] = useState(null);
   const [worksheetEmp,setWorksheetEmp] = useState(null);
+  const [inviteEmp,setInviteEmp] = useState(null);
   const [,setSpesenTick] = useState(0);
   useQstTariffs(employees);
   const now = new Date();
@@ -2843,8 +2921,12 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
     if(selId) setEmployees(p=>p.map(e=>e.id===selId?{...e,...form,name:n}:e));
     else {
       const code=gCodeUnique(employees), pin=gPinUnique(employees);
-      setEmployees(p=>[...p,{...form,id:gid(),name:n,code,pin,role:"employee"}]);
+      const newEmp={...form,id:gid(),name:n,code,pin,role:"employee"};
+      setEmployees(p=>[...p,newEmp]);
       notify(`${t.userCode}: ${code} | ${t.pin}: ${pin}`,"info");
+      // Send the access message right away (opens the e-mail app pre-filled) and show all send options
+      if(newEmp.email){ const m=accessMessage(newEmp,lang); sendByEmail({to:newEmp.email,subject:m.subject,body:m.body}); }
+      setInviteEmp(newEmp);
     }
     setModal(null);
   };
@@ -2853,6 +2935,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
     const code=gCodeUnique(employees, id), pin=gPinUnique(employees, id);
     setEmployees(p=>p.map(e=>e.id===id?{...e,code,pin}:e));
     notify(`${t.userCode}: ${code} | ${t.pin}: ${pin}`,"info");
+    const e0=employees.find(e=>e.id===id); if(e0) setInviteEmp({...e0,code,pin}); // offer to send the new PIN
   };
 
   const deleteEmployee = (id) => {
@@ -3007,6 +3090,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                 </CPBtn>
                 {isAdmin&&(
                   <>
+                    <CPBtn onClick={()=>setInviteEmp(emp)} variant="secondary" size="sm">🔑 {L("Zugang senden","Enviar acceso","Send access","Invia accesso")}</CPBtn>
                     <CPBtn onClick={()=>{setForm(withNameParts({...emp}));setSelId(emp.id);setModal("form");}} variant="secondary" size="sm">
                       ✏️ {t.edit}
                     </CPBtn>
@@ -3191,7 +3275,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
           {!selId&&(
             <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#74C0FC"}}>
               ℹ️ {lang==="DE"?"Code & PIN werden automatisch generiert.":
-                   lang==="ES"?"Código y PIN se generan automáticamente.":
+                   lang==="ES"?"El código y el PIN se generan solos y se envían al empleado por e-mail, WhatsApp o SMS al guardar.":
                    lang==="IT"?"Codice e PIN vengono generati automaticamente.":
                    "Code & PIN are automatically generated."}
             </div>
@@ -3269,6 +3353,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
           lang={lang} companySettings={companySettings} onClose={()=>setWorksheetEmp(null)}
           onSpesen={()=>setSpesenTick(x=>x+1)}/>
       )}
+      {inviteEmp&&<AccessInviteModal emp={inviteEmp} lang={lang} onClose={()=>setInviteEmp(null)}/>}
     </CPScreen>
   );
 }
