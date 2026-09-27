@@ -855,9 +855,9 @@ function CPCard({children, style:xs, onClick}){
   );
 }
 
-function CPInput({value,onChange,placeholder,type="text",style:xs}){
+function CPInput({value,onChange,placeholder,type="text",style:xs,min,max}){
   return (
-    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder} min={min} max={max}
       style={{
         width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.07)",
         border:`1px solid ${CP.border}`, borderRadius: CP.radiusSm,
@@ -3959,11 +3959,15 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
               {bulk.selectMode&&<SelBox checked={bulk.selected.has(job.id)} onChange={()=>bulk.toggle(job.id)}/>}
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                  <span style={{fontSize:18}}>{job.serviceType==="cleaning"?"🧹":"🌿"}</span>
+                  <span style={{fontSize:18}}>{job.serviceType==="cleaning"?"🧹":job.serviceType==="repairs"?"🔧":"🌿"}</span>
                   <span style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{job.clientName}</span>
                   <CPBadge text={statusLabel(job.status)} color={statusColor(job.status)}/>
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {job.date} · {job.timeStart}–{job.timeEnd}</div>
+                {(()=>{const c=clients.find(x=>x.id===job.clientId); const addr=c?fmtAddr(c):(job.clientAddress||""); return addr?(
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
+                    style={{display:"inline-block",color:"#74C0FC",fontSize:12.5,marginTop:3,textDecoration:"none"}}>📍 {addr}</a>
+                ):<div style={{color:"#FF8787",fontSize:12,marginTop:3}}>📍 {L("Keine Adresse beim Kunden","El cliente no tiene dirección guardada","Client has no address","Cliente senza indirizzo")}</div>;})()}
                 {job.teamId&&(()=>{const team=teamOf(job);return team.length>1?(
                   <div style={{color:"#69DB7C",fontSize:12,marginTop:2}}>👥 {L("Team","Equipo","Team","Squadra")} ({team.length}): {team.map(m=>m.employeeName).join(", ")}</div>
                 ):null;})()}
@@ -4303,19 +4307,25 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
   // Recalculate automatically whenever client, mode, period or selected jobs change
   useEffect(()=>{
     if(modal!=="form"||!form.billingMode||form._manual) return;
-    const sel = form.billingMode==="job" ? (form._sel||[]) : jobGroups.filter(g=>!g.billed).map(g=>g.key);
+    const sel = form.billingMode==="job"
+      ? (form._selTouched ? (form._sel||[]).filter(k=>jobGroups.some(g=>g.key===k)) : jobGroups.filter(g=>!g.billed).map(g=>g.key))
+      : jobGroups.filter(g=>!g.billed).map(g=>g.key);
     const items = buildItems(form.billingMode, jobGroups, sel);
     const jobIds = jobGroups.filter(g=>sel.includes(g.key)).flatMap(g=>g.ids);
-    setForm(f=>({...f, items, jobIds}));
-  },[jobGroups, form.billingMode, JSON.stringify(form._sel||[]), rate, modal, form._manual]);
+    setForm(f=>({...f, items, jobIds, ...(f.billingMode==="job"&&!f._selTouched?{_sel:sel}:{})}));
+  },[jobGroups, form.billingMode, form._selTouched?JSON.stringify(form._sel||[]):"", rate, modal, form._manual]);
 
   const pickMode = (mode) => {
     const today = ymd(new Date());
     let from=form.periodFrom, to=form.periodTo;
     if(mode==="week"){ [from,to]=invWeekRange(today); }
     else if(mode==="month"){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); [from,to]=invMonthRange(ymd(d).slice(0,7)); }
-    else { const d=new Date(); d.setDate(d.getDate()-30); from=ymd(d); to=today; }
-    setForm(f=>({...f,billingMode:mode,periodFrom:from,periodTo:to,_sel:[],_manual:false}));
+    else {
+      // Per job: the day of the client's most recent job not yet invoiced (or today)
+      const cand=(jobs||[]).filter(j=>j.clientId===form.clientId&&j.date&&j.date<=today&&!billedJobIds.has(j.id)).map(j=>j.date).sort();
+      from=to=cand.length?cand[cand.length-1]:today;
+    }
+    setForm(f=>({...f,billingMode:mode,periodFrom:from,periodTo:to,_sel:[],_selTouched:false,_manual:false}));
   };
 
   const newInvoice = () => {
@@ -4333,7 +4343,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
     const c=clients.find(x=>x.id===form.clientId);
     const{s}=calc(form.items||[]);
     const items=(form.items||[]).map(({_k,...it})=>({...it,description:`${invSvcLabel(it.service||"cleaning",lang)}${it.detail?` – ${it.detail}`:""}`}));
-    const {_sel,_manual,...rest}=form;
+    const {_sel,_manual,_selTouched,...rest}=form;
     const inv={...rest,items,clientName:c?.name||"",amount:parseFloat(s),vatAmount:0,total:parseFloat(s),pdfUrl:"",
       periodFrom:form.periodFrom||null,periodTo:form.periodTo||null,billingMode:form.billingMode||"manual",jobIds:form.jobIds||[]};
     if(invoices.some(i=>i.id===inv.id)) setInvoices(p=>p.map(i=>i.id===inv.id?inv:i));
@@ -4432,12 +4442,32 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
           {/* 3. Period */}
           {form.clientId&&form.billingMode&&(<>
             <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"4px 0 8px",textTransform:"uppercase",letterSpacing:.5}}>3. {L("Zeitraum","Periodo","Period","Periodo")}</div>
-            <div style={{display:"grid",gridTemplateColumns:form.billingMode==="job"?"1fr 1fr":"1fr 1fr 1fr",gap:"0 10px"}}>
-              {form.billingMode==="week"&&<CPField label={L("Woche von","Semana del","Week of","Settimana del")}><CPInput type="date" value={form.periodFrom} onChange={e=>{const [a,b]=invWeekRange(e.target.value);setForm(f=>({...f,periodFrom:a,periodTo:b,_manual:false}));}}/></CPField>}
-              {form.billingMode==="month"&&<CPField label={L("Monat","Mes","Month","Mese")}><CPInput type="month" value={(form.periodFrom||"").slice(0,7)} onChange={e=>{const [a,b]=invMonthRange(e.target.value);setForm(f=>({...f,periodFrom:a,periodTo:b,_manual:false}));}}/></CPField>}
-              <CPField label={L("Von","Desde","From","Da")}><CPInput type="date" value={form.periodFrom} onChange={e=>setForm(f=>({...f,periodFrom:e.target.value,_manual:false}))}/></CPField>
-              <CPField label={L("Bis","Hasta","To","A")}><CPInput type="date" value={form.periodTo} onChange={e=>setForm(f=>({...f,periodTo:e.target.value,_manual:false}))}/></CPField>
-            </div>
+            {(()=>{
+              const [wF,wT]=invWeekRange(form.periodFrom); const [mF,mT]=invMonthRange((form.periodFrom||"").slice(0,7));
+              const clampTo = (v,min,max)=> v<min?min:v>max?max:v;
+              if(form.billingMode==="job") return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr",gap:"0 10px"}}>
+                  <CPField label={L("Datum des Einsatzes","Fecha del trabajo","Job date","Data dell'intervento")}>
+                    <CPInput type="date" value={form.periodFrom} onChange={e=>{const v=e.target.value; setForm(f=>({...f,periodFrom:v,periodTo:v,_sel:[],_selTouched:false,_manual:false}));}}/>
+                  </CPField>
+                  {(()=>{ const days=[...new Set((jobs||[]).filter(j=>j.clientId===form.clientId&&j.date).map(j=>j.date))].sort().reverse().slice(0,12); return days.length?(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",margin:"-4px 0 10px"}}>
+                      {days.map(d=><button key={d} onClick={()=>setForm(f=>({...f,periodFrom:d,periodTo:d,_sel:[],_selTouched:false,_manual:false}))} style={{padding:"4px 10px",borderRadius:14,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:CP.font,background:form.periodFrom===d?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{invFmtDate(d)}</button>)}
+                    </div>):null; })()}
+                </div>);
+              if(form.billingMode==="week") return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>
+                  <CPField label={L("Von","Desde","From","Da")}><CPInput type="date" value={form.periodFrom} onChange={e=>{const v=e.target.value; if(!v) return; const [a,b]=invWeekRange(v); setForm(f=>({...f,periodFrom:v,periodTo:clampTo(f.periodTo&&invWeekRange(f.periodTo)[0]===a?f.periodTo:b,v,b),_manual:false}));}}/></CPField>
+                  <CPField label={`${L("Bis","Hasta","To","A")} (${L("gleiche Woche","misma semana","same week","stessa settimana")})`}><CPInput type="date" min={form.periodFrom} max={wT} value={form.periodTo} onChange={e=>{const v=e.target.value; if(!v) return; setForm(f=>({...f,periodTo:clampTo(v,f.periodFrom,wT),_manual:false}));}}/></CPField>
+                  <div style={{gridColumn:"span 2",color:CP.textTertiary,fontSize:11.5,margin:"-8px 0 10px"}}>📅 {L("Woche","Semana","Week","Settimana")}: {invFmtDate(wF)} – {invFmtDate(wT)}</div>
+                </div>);
+              return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>
+                  <CPField label={L("Monat","Mes","Month","Mese")}><CPInput type="month" value={(form.periodFrom||"").slice(0,7)} onChange={e=>{if(!e.target.value) return; const [a,b]=invMonthRange(e.target.value);setForm(f=>({...f,periodFrom:a,periodTo:b,_manual:false}));}}/></CPField>
+                  <CPField label={L("Von","Desde","From","Da")}><CPInput type="date" min={mF} max={mT} value={form.periodFrom} onChange={e=>{const v=e.target.value; if(!v) return; const [a,b]=invMonthRange(v.slice(0,7)); setForm(f=>({...f,periodFrom:v,periodTo:(f.periodTo||"").slice(0,7)===v.slice(0,7)&&f.periodTo>=v?f.periodTo:b,_manual:false}));}}/></CPField>
+                  <CPField label={`${L("Bis","Hasta","To","A")} (${L("gleicher Monat","mismo mes","same month","stesso mese")})`}><CPInput type="date" min={form.periodFrom} max={mT} value={form.periodTo} onChange={e=>{const v=e.target.value; if(!v) return; setForm(f=>({...f,periodTo:clampTo(v,f.periodFrom,mT),_manual:false}));}}/></CPField>
+                </div>);
+            })()}
             {/* Job list */}
             <div style={{background:"rgba(0,0,0,.2)",borderRadius:12,padding:"8px 10px",marginBottom:12,maxHeight:220,overflowY:"auto"}}>
               {jobGroups.length===0&&<div style={{color:CP.textSecondary,fontSize:12,padding:6}}>ℹ️ {L("Keine Einsätze in diesem Zeitraum.","No hay trabajos de este cliente en ese periodo.","No jobs in this period.","Nessun intervento nel periodo.")}</div>}
@@ -4445,7 +4475,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
                 const checked = form.billingMode==="job" ? (form._sel||[]).includes(g.key) : !g.billed;
                 return (
                   <label key={g.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:"1px solid rgba(255,255,255,.05)",cursor:form.billingMode==="job"?"pointer":"default",fontSize:13,color:CP.textPrimary,opacity:g.billed&&!checked?.55:1}}>
-                    {form.billingMode==="job"&&<input type="checkbox" checked={checked} onChange={()=>setForm(f=>{const s=new Set(f._sel||[]); s.has(g.key)?s.delete(g.key):s.add(g.key); return {...f,_sel:[...s],_manual:false};})}/>}
+                    {form.billingMode==="job"&&<input type="checkbox" checked={checked} onChange={()=>setForm(f=>{const s=new Set(f._sel||[]); s.has(g.key)?s.delete(g.key):s.add(g.key); return {...f,_sel:[...s],_selTouched:true,_manual:false};})}/>}
                     <span>{INV_SERVICES.find(s=>s.id===g.service)?.icon}</span>
                     <span style={{flex:1}}>{invFmtDate(g.date)} · {g.start}–{g.end}{g.people>1?` · 👥 ${g.people}`:""}</span>
                     <span style={{color:"#74C0FC",fontWeight:700}}>{g.hours} h</span>
