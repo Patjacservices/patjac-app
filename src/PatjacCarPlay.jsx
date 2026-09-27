@@ -4136,13 +4136,132 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
 }
 
 // ─── INVOICES ────────────────────────────────────────────────
-function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
+// ─── INVOICES ────────────────────────────────────────────────
+// Billing modes: per job, per week, per month. Amounts = planned hours × client price per hour (no VAT).
+const INV_SERVICES = [
+  {id:"cleaning",  icon:"🧹", L:["Reinigung","Limpieza","Cleaning","Pulizia"]},
+  {id:"gardening", icon:"🌿", L:["Gartenpflege","Jardinería","Gardening","Giardinaggio"]},
+  {id:"repairs",   icon:"🔧", L:["Reparaturen","Reparaciones","Repairs","Riparazioni"]},
+];
+const invSvcId = st => st==="gardening"||st==="garden" ? "gardening" : st==="repairs" ? "repairs" : "cleaning";
+const invLangIdx = lang => ({DE:0,ES:1,EN:2,IT:3}[lang] ?? 1);
+const invSvcLabel = (id,lang) => { const s=INV_SERVICES.find(x=>x.id===id)||INV_SERVICES[0]; return s.L[invLangIdx(lang)]; };
+const invFmtDate = d => { if(!d) return ""; const [y,m,dd]=String(d).split("-"); return `${dd}.${m}.${y}`; };
+const invWeekRange = (dateStr) => { const d=new Date((dateStr||ymd(new Date()))+"T12:00:00"); const wd=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-wd); const sun=new Date(mon); sun.setDate(mon.getDate()+6); return [ymd(mon), ymd(sun)]; };
+const invMonthRange = (ym) => { const [y,m]=(ym||ymd(new Date()).slice(0,7)).split("-").map(Number); return [`${y}-${String(m).padStart(2,"0")}-01`, ymd(new Date(y,m,0))]; };
+const INV_BUCKET_URL = "https://rtviublrukagwxaypmit.supabase.co/storage/v1/object/";
+
+// PDF engine (loaded on demand from the CDN, only when a PDF is created)
+let _html2pdfPromise = null;
+const loadHtml2Pdf = () => {
+  if(window.html2pdf) return Promise.resolve(window.html2pdf);
+  if(_html2pdfPromise) return _html2pdfPromise;
+  const srcs = ["https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js","https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"];
+  _html2pdfPromise = new Promise((res,rej)=>{
+    const tryOne = (i) => { if(i>=srcs.length){ _html2pdfPromise=null; rej(new Error("pdf lib")); return; }
+      const s=document.createElement("script"); s.src=srcs[i]; s.async=true;
+      s.onload=()=> window.html2pdf ? res(window.html2pdf) : tryOne(i+1);
+      s.onerror=()=>{ s.remove(); tryOne(i+1); };
+      document.head.appendChild(s); };
+    tryOne(0);
+  });
+  return _html2pdfPromise;
+};
+const invoicePdfBlob = async (el) => {
+  const h2p = await loadHtml2Pdf();
+  return h2p().set({margin:[10,10,12,10], image:{type:"jpeg",quality:0.95}, html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"}, jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}, pagebreak:{mode:["avoid-all","css"]}}).from(el).outputPdf("blob");
+};
+const uploadInvoicePdf = async (blob, path) => {
+  const res = await fetch(INV_BUCKET_URL+"invoices/"+path, {method:"POST", headers:{apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, "Content-Type":"application/pdf", "x-upsert":"true"}, body:blob});
+  if(!res.ok) throw new Error(await res.text());
+  return INV_BUCKET_URL+"public/invoices/"+path;
+};
+
+// The printable invoice (used for preview, print and PDF)
+function InvoiceDocument({inv, client, cs, lang}){
   const L = makeL(lang);
+  const fm = n => Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const modeLabel = inv.billingMode==="job"?L("Pro Einsatz","Por trabajo","Per job","Per intervento"):inv.billingMode==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):inv.billingMode==="month"?L("Monatlich","Mensual","Monthly","Mensile"):"";
+  const addr = client ? [`${client.street||""} ${client.number||""}`.trim(), `${client.postalCode||""} ${client.city||""}`.trim()].filter(Boolean) : [];
+  const th = {padding:"7px 8px",textAlign:"left",fontWeight:700,fontSize:11};
+  const td = {padding:"7px 8px",fontSize:11,borderBottom:"1px solid #e5e7eb",verticalAlign:"top"};
+  return (
+    <div style={{background:"#fff",color:"#111",padding:"26px 28px",fontFamily:"Arial,Helvetica,sans-serif",width:"100%",boxSizing:"border-box"}}>
+      <div style={{display:"flex",justifyContent:"space-between",gap:16,marginBottom:22}}>
+        <div>
+          <img src={PATJAC_LOGO} alt="Patjac" style={{height:48,width:"auto",objectFit:"contain",display:"block",marginBottom:6}}/>
+          <div style={{fontSize:11,lineHeight:1.5,color:"#444"}}>
+            <div style={{fontWeight:700,color:"#111"}}>{cs.name}</div>
+            <div>{cs.street} {cs.number}, {cs.postalCode} {cs.city}</div>
+            <div>{cs.phone} · {cs.email}</div>
+            {cs.uid&&<div>UID: {cs.uid}</div>}
+          </div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:24,fontWeight:700,color:"#1C7ED6",letterSpacing:1}}>{L("RECHNUNG","FACTURA","INVOICE","FATTURA")}</div>
+          <div style={{fontSize:12,marginTop:6}}>Nr. <strong>{inv.invoiceNumber}</strong></div>
+          <div style={{fontSize:11,color:"#555"}}>{L("Datum","Fecha","Date","Data")}: {invFmtDate(inv.date)}</div>
+          <div style={{fontSize:11,color:"#555"}}>{L("Zahlbar bis","Vence","Due","Scadenza")}: {invFmtDate(inv.dueDate)}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",gap:16,marginBottom:16}}>
+        <div style={{background:"#f5f7fa",padding:"10px 14px",borderRadius:6,fontSize:12,lineHeight:1.5,minWidth:220}}>
+          <div style={{fontSize:10,color:"#777",textTransform:"uppercase",letterSpacing:.5}}>{L("Rechnung an","Facturar a","Bill to","Fatturare a")}</div>
+          <div style={{fontWeight:700}}>{inv.clientName}</div>
+          {addr.map((a,i)=><div key={i}>{a}</div>)}
+        </div>
+        {(inv.periodFrom||modeLabel)&&(
+          <div style={{fontSize:12,textAlign:"right",lineHeight:1.6,color:"#333"}}>
+            {modeLabel&&<div><strong>{L("Abrechnung","Facturación","Billing","Fatturazione")}:</strong> {modeLabel}</div>}
+            {inv.periodFrom&&<div><strong>{L("Zeitraum","Periodo","Period","Periodo")}:</strong> {invFmtDate(inv.periodFrom)} – {invFmtDate(inv.periodTo)}</div>}
+          </div>
+        )}
+      </div>
+      <table style={{width:"100%",borderCollapse:"collapse",marginBottom:14}}>
+        <thead><tr style={{background:"#1C7ED6",color:"#fff"}}>
+          <th style={th}>{L("Beschreibung","Descripción","Description","Descrizione")}</th>
+          <th style={{...th,textAlign:"right"}}>{L("Stunden","Horas","Hours","Ore")}</th>
+          <th style={{...th,textAlign:"right"}}>{L("CHF/Std.","CHF/hora","CHF/h","CHF/ora")}</th>
+          <th style={{...th,textAlign:"right"}}>Total CHF</th>
+        </tr></thead>
+        <tbody>{(inv.items||[]).map((it,i)=>(
+          <tr key={i}>
+            <td style={td}><div style={{fontWeight:700}}>{it.service?invSvcLabel(it.service,lang):it.description}</div>{it.service&&it.detail&&<div style={{color:"#555",fontSize:10.5,marginTop:2}}>{it.detail}</div>}</td>
+            <td style={{...td,textAlign:"right"}}>{Number(it.qty||0).toLocaleString("de-CH",{maximumFractionDigits:2})}</td>
+            <td style={{...td,textAlign:"right"}}>{fm(it.price)}</td>
+            <td style={{...td,textAlign:"right",fontWeight:700}}>{fm(it.total)}</td>
+          </tr>))}
+        </tbody>
+      </table>
+      <div style={{display:"flex",justifyContent:"flex-end"}}>
+        <div style={{width:250,fontSize:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",color:"#555",padding:"3px 0"}}><span>{L("Total Stunden","Total horas","Total hours","Totale ore")}</span><span>{(inv.items||[]).reduce((s,i)=>s+(Number(i.qty)||0),0).toLocaleString("de-CH",{maximumFractionDigits:2})} h</span></div>
+          <div style={{color:"#777",padding:"3px 0",fontSize:10}}>{L("Nicht MWST-pflichtig (Umsatz unter CHF 100'000)","No sujeto a IVA (facturación inferior a CHF 100'000)","Not subject to VAT (turnover below CHF 100,000)","Non assoggettato all'IVA (cifra d'affari inferiore a CHF 100'000)")}</div>
+          <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:16,borderTop:"2px solid #111",paddingTop:6,marginTop:4}}><span>Total CHF</span><span>{fm(inv.total)}</span></div>
+        </div>
+      </div>
+      <div style={{marginTop:18,padding:"10px 14px",background:"#e8f4fd",borderRadius:6,fontSize:11,lineHeight:1.6}}>
+        <strong>{L("Zahlungsangaben","Datos de pago","Payment details","Dati di pagamento")}</strong><br/>
+        {L("Empfänger","Beneficiario","Payee","Beneficiario")}: {cs.name}, {cs.postalCode} {cs.city}<br/>
+        IBAN: {cs.iban}{cs.bic?` · BIC: ${cs.bic}`:""}<br/>
+        {L("Zahlbar bis","Pagar antes del","Due by","Pagabile entro")}: {invFmtDate(inv.dueDate)} · {L("Vermerk","Referencia","Reference","Riferimento")}: {inv.invoiceNumber}
+      </div>
+      <div style={{marginTop:14,fontSize:10.5,color:"#666",textAlign:"center"}}>{L("Vielen Dank für Ihr Vertrauen!","¡Gracias por su confianza!","Thank you for your trust!","Grazie per la fiducia!")}</div>
+    </div>
+  );
+}
+
+function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify,onBack,lang}){
+  const L = makeL(lang);
+  const cs = {name:"Patjac Reinigung Garten & Services",street:"",number:"",postalCode:"",city:"Zürich",phone:"",email:"patjacservices@outlook.com",uid:"",iban:"",bic:"",...(companySettings||{})};
   const [modal,setModal]=useState(null);
-  const [selInv,setSelInv]=useState(null);
+  const [selInv,setSelInv]=useState(null);   // invoice object (preview) or id (edit)
   const [form,setForm]=useState({});
   const [deleteInvId,setDeleteInvId]=useState(null);
+  const [sendState,setSendState]=useState({status:"idle",url:"",blob:null});
   const bulk=useBulkSelect();
+  const previewRef = useRef(null);
+  const li = invLangIdx(lang);
 
   const deleteInvoice = (id) => {
     setInvoices(p=>p.filter(i=>i.id!==id));
@@ -4150,51 +4269,139 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
     notify(L("Rechnung gelöscht","Factura eliminada","Invoice deleted","Fattura eliminata"),"success");
   };
   // Patjac is not VAT-registered (turnover < CHF 100'000): invoices are issued without VAT.
-  const calc=(items)=>{const s=items.reduce((a,i)=>a+(i.total||0),0);return{s:s.toFixed(2),v:(0).toFixed(2),t:s.toFixed(2)};};
+  const calc=(items)=>{const s=items.reduce((a,i)=>a+(Number(i.total)||0),0);return{s:s.toFixed(2),v:(0).toFixed(2),t:s.toFixed(2)};};
   const sc=(s)=>s==="paid"?"green":s==="overdue"?"red":"yellow";
   const sl=(s)=>s==="paid"?t.paid:s==="overdue"?t.overdue:t.pending;
+  const r2 = n => Math.round(n*100)/100;
+
+  // ── Automatic calculation from the jobs ─────────────────────
+  const client = clients.find(c=>c.id===form.clientId);
+  const rate = parseFloat(client?.price)||0;
+  const billedJobIds = useMemo(()=>{ const s=new Set(); (invoices||[]).forEach(i=>{ if(i.id!==form.id) (i.jobIds||[]).forEach(x=>s.add(x)); }); return s; },[invoices, form.id]);
+  // One entry per job (team jobs = several rows with the same teamId → one job with the total hours)
+  const jobGroups = useMemo(()=>{
+    if(!form.clientId||!form.periodFrom||!form.periodTo) return [];
+    const rows=(jobs||[]).filter(j=>j.clientId===form.clientId&&j.date&&j.date>=form.periodFrom&&j.date<=form.periodTo&&j.status!=="cancelled");
+    const map=new Map();
+    rows.forEach(j=>{ const k=j.teamId||j.id; const g=map.get(k)||{key:k,ids:[],date:j.date,start:j.timeStart,end:j.timeEnd,service:invSvcId(j.serviceType),hours:0,people:0};
+      g.ids.push(j.id); g.hours+=hoursBetween(j.timeStart,j.timeEnd); g.people+=1;
+      if((j.timeStart||"")<(g.start||"99")) g.start=j.timeStart; if((j.timeEnd||"")>(g.end||"")) g.end=j.timeEnd; map.set(k,g); });
+    return [...map.values()].map(g=>({...g,hours:r2(g.hours),billed:g.ids.some(id=>billedJobIds.has(id))})).sort((a,b)=>`${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`));
+  },[jobs, form.clientId, form.periodFrom, form.periodTo, billedJobIds]);
+
+  const buildItems = (mode, groups, selected) => {
+    if(mode==="job"){
+      return groups.filter(g=>selected.includes(g.key)).map(g=>({_k:gid(),service:g.service,
+        detail:`${invFmtDate(g.date)} · ${g.start||""}–${g.end||""}${g.people>1?` · ${g.people} ${L("Personen","personas","people","persone")}`:""}`,
+        qty:g.hours,price:rate,total:r2(g.hours*rate)}));
+    }
+    const by={}; groups.filter(g=>!g.billed||selected.includes(g.key)).forEach(g=>{ (by[g.service]=by[g.service]||{h:0,n:0,dates:[]}); by[g.service].h+=g.hours; by[g.service].n+=1; by[g.service].dates.push(invFmtDate(g.date).slice(0,5)); });
+    return Object.entries(by).map(([svc,v])=>({_k:gid(),service:svc,
+      detail:`${v.n} ${v.n===1?L("Einsatz","servicio","visit","intervento"):L("Einsätze","servicios","visits","interventi")} (${v.dates.join(", ")}) · ${invFmtDate(form.periodFrom)}–${invFmtDate(form.periodTo)}`,
+      qty:r2(v.h),price:rate,total:r2(v.h*rate)}));
+  };
+  // Recalculate automatically whenever client, mode, period or selected jobs change
+  useEffect(()=>{
+    if(modal!=="form"||!form.billingMode||form._manual) return;
+    const sel = form.billingMode==="job" ? (form._sel||[]) : jobGroups.filter(g=>!g.billed).map(g=>g.key);
+    const items = buildItems(form.billingMode, jobGroups, sel);
+    const jobIds = jobGroups.filter(g=>sel.includes(g.key)).flatMap(g=>g.ids);
+    setForm(f=>({...f, items, jobIds}));
+  },[jobGroups, form.billingMode, JSON.stringify(form._sel||[]), rate, modal, form._manual]);
+
+  const pickMode = (mode) => {
+    const today = ymd(new Date());
+    let from=form.periodFrom, to=form.periodTo;
+    if(mode==="week"){ [from,to]=invWeekRange(today); }
+    else if(mode==="month"){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); [from,to]=invMonthRange(ymd(d).slice(0,7)); }
+    else { const d=new Date(); d.setDate(d.getDate()-30); from=ymd(d); to=today; }
+    setForm(f=>({...f,billingMode:mode,periodFrom:from,periodTo:to,_sel:[],_manual:false}));
+  };
+
+  const newInvoice = () => {
+    const yr=new Date().getFullYear();
+    const nums=invoices.filter(i=>(i.invoiceNumber||"").startsWith(`${yr}-`)).map(i=>parseInt((i.invoiceNumber||"").split("-")[1],10)).filter(x=>!isNaN(x));
+    const next=(nums.length?Math.max(...nums):0)+1;
+    const d=new Date(); d.setDate(d.getDate()+30);
+    setForm({id:gid(),clientId:"",invoiceNumber:`${yr}-${String(next).padStart(3,"0")}`,date:todayStr,dueDate:ymd(d),items:[],status:"pending",billingMode:"",periodFrom:"",periodTo:"",_sel:[]});
+    setSelInv(null); setModal("form");
+  };
 
   const save=()=>{
+    if(!form.clientId){ notify(L("Bitte Kunde wählen","Elija un cliente","Choose a client","Scegli un cliente"),"error"); return; }
+    if(!(form.items||[]).length){ notify(L("Keine Positionen","La factura no tiene líneas","No line items","Nessuna voce"),"error"); return; }
     const c=clients.find(x=>x.id===form.clientId);
-    const{s,v,tt}=calc(form.items||[]);
-    const inv={...form,id:selInv||gid(),clientName:c?.name||"",amount:parseFloat(s),vatAmount:parseFloat(v),total:parseFloat(tt||"0")};
-    if(selInv) setInvoices(p=>p.map(i=>i.id===selInv?inv:i));
+    const{s}=calc(form.items||[]);
+    const items=(form.items||[]).map(({_k,...it})=>({...it,description:`${invSvcLabel(it.service||"cleaning",lang)}${it.detail?` – ${it.detail}`:""}`}));
+    const {_sel,_manual,...rest}=form;
+    const inv={...rest,items,clientName:c?.name||"",amount:parseFloat(s),vatAmount:0,total:parseFloat(s),pdfUrl:"",
+      periodFrom:form.periodFrom||null,periodTo:form.periodTo||null,billingMode:form.billingMode||"manual",jobIds:form.jobIds||[]};
+    if(invoices.some(i=>i.id===inv.id)) setInvoices(p=>p.map(i=>i.id===inv.id?inv:i));
     else setInvoices(p=>[...p,inv]);
-    notify(t.success); setModal(null);
+    notify(t.success,"success"); setModal("preview"); setSelInv(inv); setSendState({status:"idle",url:"",blob:null});
   };
+
+  const setItem = (idx, patch) => setForm(f=>{ const it=[...(f.items||[])]; const n={...it[idx],...patch}; n.total=r2((Number(n.qty)||0)*(Number(n.price)||0)); it[idx]=n; return {...f,items:it,_manual:true}; });
+
+  // ── Send: build the PDF, store it and give WhatsApp / e-mail links ──
+  const clientOf = inv => clients.find(c=>c.id===inv?.clientId||c.name===inv?.clientName);
+  const pdfName = inv => `${L("Rechnung","Factura","Invoice","Fattura")}_${inv.invoiceNumber}_${(inv.clientName||"").replace(/[^\w]+/g,"_")}.pdf`;
+  const preparePdf = async (inv) => {
+    if(!previewRef.current) return;
+    setSendState(s=>({...s,status:"working"}));
+    try{
+      const blob = await invoicePdfBlob(previewRef.current);
+      let url = "";
+      try{ url = await uploadInvoicePdf(blob, `${inv.id}-${Math.random().toString(36).slice(2,10)}.pdf`);
+        setInvoices(p=>p.map(i=>i.id===inv.id?{...i,pdfUrl:url}:i)); setSelInv(v=>v&&v.id===inv.id?{...v,pdfUrl:url}:v);
+      }catch(e){ console.error("upload",e); }
+      setSendState({status:"ready",url,blob});
+      if(!url) notify(L("PDF erstellt, aber Link nicht verfügbar – PDF herunterladen und anhängen","PDF creado, pero no se pudo crear el enlace: descárguelo y adjúntelo","PDF created but no link – download and attach it","PDF creato ma senza link – scaricalo e allegalo"),"error");
+    }catch(e){ console.error(e); setSendState({status:"error",url:"",blob:null}); notify(L("PDF konnte nicht erstellt werden","No se pudo crear el PDF","Could not create the PDF","Impossibile creare il PDF"),"error"); }
+  };
+  const downloadBlob = (blob,name) => { const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),30000); };
+  const msgFor = (inv,url) => {
+    const fm = n => Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
+    return L(
+`Guten Tag ${inv.clientName}\n\nAnbei erhalten Sie unsere Rechnung Nr. ${inv.invoiceNumber}.\nBetrag: CHF ${fm(inv.total)}\nZahlbar bis: ${invFmtDate(inv.dueDate)}\n${url?`\n📄 Rechnung (PDF): ${url}\n`:""}\nIBAN: ${cs.iban}\n\nVielen Dank für Ihr Vertrauen!\n${cs.name}\n${cs.phone||""}`,
+`Buenos días ${inv.clientName}:\n\nLe enviamos nuestra factura n.º ${inv.invoiceNumber}.\nImporte: CHF ${fm(inv.total)}\nVence el: ${invFmtDate(inv.dueDate)}\n${url?`\n📄 Factura (PDF): ${url}\n`:""}\nIBAN: ${cs.iban}\n\n¡Gracias por su confianza!\n${cs.name}\n${cs.phone||""}`,
+`Hello ${inv.clientName},\n\nPlease find our invoice no. ${inv.invoiceNumber}.\nAmount: CHF ${fm(inv.total)}\nDue: ${invFmtDate(inv.dueDate)}\n${url?`\n📄 Invoice (PDF): ${url}\n`:""}\nIBAN: ${cs.iban}\n\nThank you for your trust!\n${cs.name}\n${cs.phone||""}`,
+`Buongiorno ${inv.clientName}\n\nLe inviamo la nostra fattura n. ${inv.invoiceNumber}.\nImporto: CHF ${fm(inv.total)}\nScadenza: ${invFmtDate(inv.dueDate)}\n${url?`\n📄 Fattura (PDF): ${url}\n`:""}\nIBAN: ${cs.iban}\n\nGrazie per la fiducia!\n${cs.name}\n${cs.phone||""}`);
+  };
+  const openPreview = (inv) => { setSelInv(inv); setSendState(inv.pdfUrl?{status:"ready",url:inv.pdfUrl,blob:null}:{status:"idle",url:"",blob:null}); setModal("preview"); };
+
+  const modeBtn = (id,icon,label,sub) => (
+    <button key={id} onClick={()=>pickMode(id)} style={{flex:1,minWidth:120,padding:"12px 10px",borderRadius:14,cursor:"pointer",fontFamily:CP.font,
+      border:`2px solid ${form.billingMode===id?"#1C7ED6":"rgba(255,255,255,.12)"}`,background:form.billingMode===id?"rgba(28,126,214,.25)":"rgba(255,255,255,.05)",color:"#fff",textAlign:"center"}}>
+      <div style={{fontSize:24}}>{icon}</div><div style={{fontWeight:700,fontSize:14}}>{label}</div><div style={{fontSize:11,color:CP.textSecondary}}>{sub}</div>
+    </button>);
 
   return (
     <CPScreen title={t.invoices} icon="🧾" onBack={onBack} t={t}
-      actions={<CPBtn onClick={()=>{const yr=new Date().getFullYear();const nums=invoices.filter(i=>(i.invoiceNumber||"").startsWith(`${yr}-`)).map(i=>parseInt((i.invoiceNumber||"").split("-")[1],10)).filter(x=>!isNaN(x));const next=(nums.length?Math.max(...nums):0)+1;const n=`${yr}-${String(next).padStart(3,"0")}`;const d=new Date();d.setDate(d.getDate()+14);setForm({clientId:clients[0]?.id||"",invoiceNumber:n,date:todayStr,dueDate:ymd(d),items:[{description:"",qty:1,price:0,total:0}],status:"pending"});setSelInv(null);setModal("form");}} size="sm">＋ {t.generateInvoice}</CPBtn>}
-    >
+      actions={<CPBtn onClick={newInvoice} size="sm">＋ {t.generateInvoice}</CPBtn>}>
       <BulkBar bulk={bulk} visibleIds={invoices.map(i=>i.id)} lang={lang}
         itemWord={{DE:"Rechnungen",ES:"facturas",EN:"invoices",IT:"fatture"}}
         onDelete={ids=>{setInvoices(p=>p.filter(i=>!ids.has(i.id)));notify(L("Rechnungen gelöscht","Facturas eliminadas","Invoices deleted","Fatture eliminate"),"success");}}/>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {invoices.map(inv=>(
+        {invoices.length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>🧾</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine Rechnungen.","Todavía no hay facturas.","No invoices yet.","Ancora nessuna fattura.")}</div></CPCard>}
+        {[...invoices].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(inv=>(
           <CPCard key={inv.id} onClick={bulk.selectMode?()=>bulk.toggle(inv.id):undefined} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,...(bulk.selected.has(inv.id)?{outline:"2px solid #4DABF7"}:{})}}>
             {bulk.selectMode&&<SelBox checked={bulk.selected.has(inv.id)} onChange={()=>bulk.toggle(inv.id)}/>}
-            <div style={{flex:1}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <div style={{flex:1,minWidth:180}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
                 <span style={{color:"#74C0FC",fontWeight:700,fontSize:15}}>{inv.invoiceNumber}</span>
                 <CPBadge text={sl(inv.status)} color={sc(inv.status)}/>
+                {inv.pdfUrl&&<span style={{fontSize:11,color:"#69DB7C"}}>📄 PDF</span>}
               </div>
               <div style={{color:CP.textPrimary,fontWeight:600,fontSize:14}}>{inv.clientName}</div>
-              <div style={{color:CP.textSecondary,fontSize:12}}>{inv.date} → {inv.dueDate}</div>
-              <div style={{color:"#FFD43B",fontWeight:700,fontSize:14,marginTop:4}}>CHF {(inv.total||0).toFixed(2)}</div>
+              <div style={{color:CP.textSecondary,fontSize:12}}>{invFmtDate(inv.date)} → {invFmtDate(inv.dueDate)}{inv.periodFrom?` · ${L("Zeitraum","Periodo","Period","Periodo")} ${invFmtDate(inv.periodFrom)}–${invFmtDate(inv.periodTo)}`:""}</div>
+              <div style={{color:"#FFD43B",fontWeight:700,fontSize:14,marginTop:4}}>CHF {(Number(inv.total)||0).toFixed(2)}</div>
             </div>
             {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              <CPBtn onClick={()=>{setSelInv(inv);setModal("preview");}} variant="secondary" size="sm">👁️</CPBtn>
-              {inv.status!=="paid"&&<CPBtn onClick={()=>{setInvoices(p=>p.map(i=>i.id===inv.id?{...i,status:"paid"}:i));notify(t.paid);}} variant="success" size="sm">✓ {t.paid}</CPBtn>}
-              <CPBtn onClick={()=>{setForm({...inv,items:inv.items||[]});setSelInv(inv.id);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
-              <CPBtn onClick={()=>{
-                const client = clients.find(c=>c.id===inv.clientId||c.name===inv.clientName);
-                sendByEmail({
-                  to: client?.email||"",
-                  subject: `${L("Rechnung","Factura","Invoice","Fattura")} ${inv.invoiceNumber} — Patjac Reinigung Garten & Services`,
-                  body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${inv.clientName},\n\n${L("Anbei Ihre Rechnung","Adjunto su factura","Please find your invoice","In allegato la sua fattura")} ${inv.invoiceNumber}.\n\n${L("Betrag","Importe","Amount","Importo")}: CHF ${(inv.total||0).toFixed(2)}\n${L("Fälligkeitsdatum","Fecha vencimiento","Due date","Scadenza")}: ${inv.dueDate||""}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
-                });
-              }} variant="primary" size="sm">📧</CPBtn>
+              <CPBtn onClick={()=>openPreview(inv)} variant="primary" size="sm">📤 {L("Senden","Enviar","Send","Invia")}</CPBtn>
+              <CPBtn onClick={()=>openPreview(inv)} variant="secondary" size="sm">👁️</CPBtn>
+              {inv.status!=="paid"&&<CPBtn onClick={()=>{setInvoices(p=>p.map(i=>i.id===inv.id?{...i,status:"paid"}:i));notify(t.paid,"success");}} variant="success" size="sm">✓ {t.paid}</CPBtn>}
+              <CPBtn onClick={()=>{setForm({...inv,items:(inv.items||[]).map(i=>({_k:gid(),service:i.service||"cleaning",detail:i.detail??i.description??"",...i})),_sel:[],_manual:true});setSelInv(inv.id);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
               <CPBtn onClick={()=>setDeleteInvId(inv.id)} variant="danger" size="sm">🗑️</CPBtn>
             </div>}
           </CPCard>
@@ -4202,109 +4409,147 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
       </div>
 
       {modal==="form"&&(
-        <CPModal title={t.generateInvoice} onClose={()=>setModal(null)} width={560}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 12px"}}>
-            <CPField label={t.clients}><CPSelect value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</CPSelect></CPField>
-            <CPField label={t.invoiceNumber}><CPInput value={form.invoiceNumber} onChange={e=>setForm(f=>({...f,invoiceNumber:e.target.value}))}/></CPField>
-            <CPField label={t.date}><CPInput type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
-          </div>
-          <CPField label={t.dueDate}><CPInput type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/></CPField>
-          <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{t.description}</div>
-          {(form.items||[]).map((item,idx)=>(
-            <div key={item._k||idx} style={{display:"grid",gridTemplateColumns:"3fr 1fr 1fr 1fr auto",gap:6,marginBottom:6,alignItems:"center"}}>
-              <CPInput value={item.description} onChange={e=>setForm(f=>{const it=[...f.items];it[idx]={...it[idx],description:e.target.value};return{...f,items:it};})} placeholder={t.description}/>
-              <CPInput type="number" value={item.qty} onChange={e=>{const q=parseFloat(e.target.value)||1;setForm(f=>{const it=[...f.items];it[idx]={...it[idx],qty:q,total:q*it[idx].price};return{...f,items:it};});}} placeholder="Qty"/>
-              <CPInput type="number" value={item.price} onChange={e=>{const p=parseFloat(e.target.value)||0;setForm(f=>{const it=[...f.items];it[idx]={...it[idx],price:p,total:it[idx].qty*p};return{...f,items:it};});}} placeholder="CHF"/>
-              <div style={{color:CP.textPrimary,fontSize:13,fontWeight:600,textAlign:"right"}}>CHF {(item.total||0).toFixed(2)}</div>
-              <CPBtn onClick={()=>setForm(f=>({...f,items:f.items.filter((_,i)=>i!==idx)}))} variant="danger" size="sm">✕</CPBtn>
+        <CPModal title={t.generateInvoice} onClose={()=>setModal(null)} width={640}>
+          {/* 1. Client */}
+          <CPField label={`1. ${L("Kunde","Cliente","Client","Cliente")}`}>
+            <CPSelect value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value,_sel:[],_manual:false}))}>
+              <option value="">— {L("Kunde wählen","Elija un cliente","Choose a client","Scegli un cliente")} —</option>
+              {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </CPSelect>
+          </CPField>
+          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"-4px 0 10px"}}>💶 {L("Preis pro Stunde","Precio por hora","Price per hour","Prezzo orario")}: <strong style={{color:rate?"#69DB7C":"#FF8787"}}>CHF {rate.toFixed(2)}</strong>{!rate&&` — ${L("im Kunden erfassen","añádalo en la ficha del cliente","set it on the client","impostalo nel cliente")}`}</div>}
+
+          {/* 2. Billing mode */}
+          {form.clientId&&(<>
+            <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"4px 0 8px",textTransform:"uppercase",letterSpacing:.5}}>2. {L("Abrechnungsart","Tipo de facturación","Billing type","Tipo di fatturazione")}</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+              {modeBtn("job","🧾",L("Pro Einsatz","Por trabajo","Per job","Per intervento"),L("Einsätze auswählen","Elegir trabajos","Pick jobs","Scegli interventi"))}
+              {modeBtn("week","📅",L("Woche","Semana","Week","Settimana"),L("Mo – So","Lun – Dom","Mon – Sun","Lun – Dom"))}
+              {modeBtn("month","🗓️",L("Monat","Mensual","Monthly","Mensile"),L("Ganzer Monat","Mes completo","Whole month","Mese intero"))}
             </div>
-          ))}
-          <CPBtn onClick={()=>setForm(f=>({...f,items:[...(f.items||[]),{_k:gid(),description:"",qty:1,price:0,total:0}]}))} variant="secondary" size="sm">＋ {L("Position","Posición","Line item","Voce")}</CPBtn>
-          {form.items?.length>0&&(()=>{const{s,v,t:tot}=calc(form.items);return(
-            <div style={{background:"rgba(0,0,0,.25)",borderRadius:12,padding:"12px 16px",marginTop:10}}>
-              <div style={{color:CP.textTertiary,fontSize:11,marginBottom:6}}>{L("Ohne MWST – nicht MWST-pflichtig","Sin IVA – empresa no sujeta a IVA","No VAT – not VAT-registered","Senza IVA – non assoggettato IVA")}</div>
-              {[[t.subtotal||"Subtotal",`CHF ${s}`]].map(([l,val])=>(
-                <div key={l} style={{display:"flex",justifyContent:"space-between",color:CP.textSecondary,fontSize:13,marginBottom:4}}><span>{l}</span><span>{val}</span></div>
-              ))}
-              <div style={{display:"flex",justifyContent:"space-between",color:"#FFD43B",fontSize:17,fontWeight:700,borderTop:`1px solid ${CP.border}`,paddingTop:8,marginTop:4}}><span>Total</span><span>CHF {tot}</span></div>
+          </>)}
+
+          {/* 3. Period */}
+          {form.clientId&&form.billingMode&&(<>
+            <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"4px 0 8px",textTransform:"uppercase",letterSpacing:.5}}>3. {L("Zeitraum","Periodo","Period","Periodo")}</div>
+            <div style={{display:"grid",gridTemplateColumns:form.billingMode==="job"?"1fr 1fr":"1fr 1fr 1fr",gap:"0 10px"}}>
+              {form.billingMode==="week"&&<CPField label={L("Woche von","Semana del","Week of","Settimana del")}><CPInput type="date" value={form.periodFrom} onChange={e=>{const [a,b]=invWeekRange(e.target.value);setForm(f=>({...f,periodFrom:a,periodTo:b,_manual:false}));}}/></CPField>}
+              {form.billingMode==="month"&&<CPField label={L("Monat","Mes","Month","Mese")}><CPInput type="month" value={(form.periodFrom||"").slice(0,7)} onChange={e=>{const [a,b]=invMonthRange(e.target.value);setForm(f=>({...f,periodFrom:a,periodTo:b,_manual:false}));}}/></CPField>}
+              <CPField label={L("Von","Desde","From","Da")}><CPInput type="date" value={form.periodFrom} onChange={e=>setForm(f=>({...f,periodFrom:e.target.value,_manual:false}))}/></CPField>
+              <CPField label={L("Bis","Hasta","To","A")}><CPInput type="date" value={form.periodTo} onChange={e=>setForm(f=>({...f,periodTo:e.target.value,_manual:false}))}/></CPField>
             </div>
-          );})()}
+            {/* Job list */}
+            <div style={{background:"rgba(0,0,0,.2)",borderRadius:12,padding:"8px 10px",marginBottom:12,maxHeight:220,overflowY:"auto"}}>
+              {jobGroups.length===0&&<div style={{color:CP.textSecondary,fontSize:12,padding:6}}>ℹ️ {L("Keine Einsätze in diesem Zeitraum.","No hay trabajos de este cliente en ese periodo.","No jobs in this period.","Nessun intervento nel periodo.")}</div>}
+              {jobGroups.map(g=>{
+                const checked = form.billingMode==="job" ? (form._sel||[]).includes(g.key) : !g.billed;
+                return (
+                  <label key={g.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:"1px solid rgba(255,255,255,.05)",cursor:form.billingMode==="job"?"pointer":"default",fontSize:13,color:CP.textPrimary,opacity:g.billed&&!checked?.55:1}}>
+                    {form.billingMode==="job"&&<input type="checkbox" checked={checked} onChange={()=>setForm(f=>{const s=new Set(f._sel||[]); s.has(g.key)?s.delete(g.key):s.add(g.key); return {...f,_sel:[...s],_manual:false};})}/>}
+                    <span>{INV_SERVICES.find(s=>s.id===g.service)?.icon}</span>
+                    <span style={{flex:1}}>{invFmtDate(g.date)} · {g.start}–{g.end}{g.people>1?` · 👥 ${g.people}`:""}</span>
+                    <span style={{color:"#74C0FC",fontWeight:700}}>{g.hours} h</span>
+                    <span style={{color:"#FFD43B",minWidth:80,textAlign:"right"}}>CHF {(g.hours*rate).toFixed(2)}</span>
+                    {g.billed&&<span style={{fontSize:10,color:"#FAB005"}}>{L("bereits verrechnet","ya facturado","already billed","già fatturato")}</span>}
+                  </label>);
+              })}
+            </div>
+          </>)}
+
+          {/* 4. Lines */}
+          {form.clientId&&(<>
+            <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"4px 0 8px",textTransform:"uppercase",letterSpacing:.5}}>4. {L("Beschreibung","Descripción","Description","Descrizione")}</div>
+            {(form.items||[]).map((item,idx)=>(
+              <div key={item._k||idx} style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:10,padding:8,marginBottom:6}}>
+                <div style={{display:"grid",gridTemplateColumns:"1.3fr 2fr auto",gap:6,marginBottom:6}}>
+                  <CPSelect value={item.service||"cleaning"} onChange={e=>setItem(idx,{service:e.target.value})}>
+                    {INV_SERVICES.map(s=><option key={s.id} value={s.id}>{s.icon} {s.L[li]}</option>)}
+                  </CPSelect>
+                  <CPInput value={item.detail||""} onChange={e=>setItem(idx,{detail:e.target.value})} placeholder={L("Details (optional)","Detalle (opcional)","Details (optional)","Dettagli (opzionale)")}/>
+                  <CPBtn onClick={()=>setForm(f=>({...f,items:f.items.filter((_,i)=>i!==idx),_manual:true}))} variant="danger" size="sm">✕</CPBtn>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center"}}>
+                  <div><div style={{color:CP.textTertiary,fontSize:10}}>{L("Stunden","Horas","Hours","Ore")}</div><CPInput type="number" value={item.qty} onChange={e=>setItem(idx,{qty:parseFloat(e.target.value)||0})}/></div>
+                  <div><div style={{color:CP.textTertiary,fontSize:10}}>CHF / {L("Std.","hora","h","ora")}</div><CPInput type="number" value={item.price} onChange={e=>setItem(idx,{price:parseFloat(e.target.value)||0})}/></div>
+                  <div style={{color:"#FFD43B",fontSize:15,fontWeight:700,textAlign:"right"}}>CHF {(Number(item.total)||0).toFixed(2)}</div>
+                </div>
+              </div>
+            ))}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <CPBtn onClick={()=>setForm(f=>({...f,items:[...(f.items||[]),{_k:gid(),service:"cleaning",detail:"",qty:1,price:rate,total:rate}],_manual:true}))} variant="secondary" size="sm">＋ {L("Position","Línea","Line item","Voce")}</CPBtn>
+              {form._manual&&form.billingMode&&<CPBtn onClick={()=>setForm(f=>({...f,_manual:false}))} variant="secondary" size="sm">🔄 {L("Neu berechnen","Recalcular","Recalculate","Ricalcola")}</CPBtn>}
+            </div>
+          </>)}
+
+          {/* 5. Dates + total */}
+          {form.clientId&&(<>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px",marginTop:12}}>
+              <CPField label={t.invoiceNumber}><CPInput value={form.invoiceNumber} onChange={e=>setForm(f=>({...f,invoiceNumber:e.target.value}))}/></CPField>
+              <CPField label={t.date}><CPInput type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
+              <CPField label={t.dueDate}><CPInput type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/></CPField>
+            </div>
+            {(()=>{const{t:tot}=calc(form.items||[]); const hrs=(form.items||[]).reduce((a,i)=>a+(Number(i.qty)||0),0); return(
+              <div style={{background:"rgba(0,0,0,.25)",borderRadius:12,padding:"12px 16px",marginTop:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",color:CP.textSecondary,fontSize:13,marginBottom:4}}><span>{L("Total Stunden","Total horas","Total hours","Totale ore")}</span><span>{r2(hrs)} h</span></div>
+                <div style={{color:CP.textTertiary,fontSize:11,marginBottom:6}}>{L("Ohne MWST – nicht MWST-pflichtig","Sin IVA – empresa no sujeta a IVA","No VAT – not VAT-registered","Senza IVA – non assoggettato IVA")}</div>
+                <div style={{display:"flex",justifyContent:"space-between",color:"#FFD43B",fontSize:18,fontWeight:700,borderTop:`1px solid ${CP.border}`,paddingTop:8}}><span>Total</span><span>CHF {tot}</span></div>
+              </div>);})()}
+          </>)}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:12}}>
             <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.cancel}</CPBtn>
-            <CPBtn onClick={save}>💾 {t.save}</CPBtn>
+            <CPBtn onClick={save}>💾 {L("Speichern & Vorschau","Guardar y ver","Save & preview","Salva e anteprima")}</CPBtn>
           </div>
         </CPModal>
       )}
 
-      {modal==="preview"&&selInv&&(
-        <CPModal title={`${t.invoiceNumber}: ${selInv.invoiceNumber}`} onClose={()=>setModal(null)} width={600}>
-          <div className="invoice-preview-content" style={{background:"#fff",color:"#000",padding:"24px",borderRadius:14,fontFamily:"Arial,sans-serif"}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}>
-              <div>
-                <img src={PATJAC_LOGO} alt="Patjac" style={{height:44,width:"auto",objectFit:"contain",display:"block",marginBottom:4}}/>
-                <div style={{fontSize:11,color:"#666",marginTop:2}}>Reinigung Garten & Services</div>
-                <div style={{fontSize:11,marginTop:6}}><div>Industriestrasse 14, 8004 Zürich</div><div>+41 44 123 4567</div><div>UID: CHE-123.456.789</div></div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:22,fontWeight:700,color:"#1C7ED6"}}>{L("RECHNUNG","FACTURA","INVOICE","FATTURA")}</div>
-                <div style={{fontSize:13,marginTop:4}}>Nr. {selInv.invoiceNumber}</div>
-                <div style={{fontSize:12,color:"#666"}}>{L("Datum","Fecha","Date","Data")}: {selInv.date}</div>
-                <div style={{fontSize:12,color:"#666"}}>{L("Fällig","Vence","Due","Scade")}: {selInv.dueDate}</div>
-              </div>
+      {modal==="preview"&&selInv&&typeof selInv==="object"&&(()=>{
+        const inv = invoices.find(i=>i.id===selInv.id)||selInv;
+        const c = clientOf(inv);
+        const wa = swissWa(c?.phone);
+        const ready = sendState.status==="ready";
+        const msg = msgFor(inv, sendState.url);
+        const subj = `${L("Rechnung","Factura","Invoice","Fattura")} ${inv.invoiceNumber} — ${cs.name}`;
+        const canShareFile = ready && sendState.blob && typeof navigator!=="undefined" && navigator.canShare && (()=>{ try{ return navigator.canShare({files:[new File([sendState.blob],pdfName(inv),{type:"application/pdf"})]}); }catch(e){ return false; } })();
+        const aBtn = (bg)=>({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"11px 12px",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
+        return (
+          <CPModal title={`🧾 ${inv.invoiceNumber} · ${inv.clientName}`} onClose={()=>setModal(null)} width={720}>
+            {/* SEND PANEL */}
+            <div style={{background:"rgba(28,126,214,.1)",border:"1px solid rgba(28,126,214,.3)",borderRadius:14,padding:12,marginBottom:12}}>
+              <div style={{color:"#74C0FC",fontWeight:700,fontSize:14,marginBottom:8}}>📤 {L("Rechnung als PDF an den Kunden senden","Enviar la factura en PDF al cliente","Send the invoice PDF to the client","Invia la fattura in PDF al cliente")}</div>
+              {!ready&&(
+                <CPBtn onClick={()=>preparePdf(inv)} full>{sendState.status==="working"?`⏳ ${L("PDF wird erstellt…","Creando PDF…","Creating PDF…","Creazione PDF…")}`:`📄 ${L("PDF erstellen","Crear PDF para enviar","Create PDF to send","Crea PDF da inviare")}`}</CPBtn>
+              )}
+              {ready&&(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
+                  <a href={wa?`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`:undefined} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!wa){e.preventDefault();notify(L("Kunde hat keine Telefonnummer","El cliente no tiene teléfono","Client has no phone","Il cliente non ha telefono"),"error");}}} style={{...aBtn("#25D366"),opacity:wa?1:.45}}>💬 WhatsApp</a>
+                  <a href={outlookWebUrl({to:c?.email||"",subject:subj,body:msg})} target="_blank" rel="noopener noreferrer" style={aBtn("#0F6CBD")}>📧 Outlook</a>
+                  <a href={gmailWebUrl({to:c?.email||"",subject:subj,body:msg})} target="_blank" rel="noopener noreferrer" style={aBtn("#D93025")}>📧 Gmail</a>
+                  <a href={`mailto:${c?.email||""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`} style={aBtn("#1C7ED6")}>📧 {L("Mail-App","App de correo","Mail app","App mail")}</a>
+                  {canShareFile&&<button onClick={async()=>{ try{ await navigator.share({files:[new File([sendState.blob],pdfName(inv),{type:"application/pdf"})],title:subj,text:msg}); }catch(e){} }} style={aBtn("#7048E8")}>📱 {L("PDF teilen","Compartir PDF","Share PDF","Condividi PDF")}</button>}
+                  <button onClick={async()=>{ if(sendState.blob) downloadBlob(sendState.blob,pdfName(inv)); else if(sendState.url) window.open(sendState.url,"_blank"); }} style={aBtn("rgba(255,255,255,.15)")}>⬇️ {L("PDF herunterladen","Descargar PDF","Download PDF","Scarica PDF")}</button>
+                </div>
+              )}
+              {ready&&<div style={{color:CP.textSecondary,fontSize:11.5,marginTop:8,lineHeight:1.5}}>
+                ℹ️ {sendState.url
+                  ? L("Die Nachricht enthält einen Link zum PDF. Der Kunde öffnet ihn mit einem Tipp.","El mensaje lleva un enlace al PDF: el cliente lo abre con un toque.","The message contains a link to the PDF – the client opens it with one tap.","Il messaggio contiene un link al PDF: il cliente lo apre con un tocco.")
+                  : L("Kein Link verfügbar: PDF herunterladen und im WhatsApp/E-Mail anhängen.","Sin enlace: descargue el PDF y adjúntelo en WhatsApp o en el e-mail.","No link: download the PDF and attach it in WhatsApp/email.","Nessun link: scarica il PDF e allegalo in WhatsApp/e-mail.")}
+                {!c?.email&&` ${L("(Kunde ohne E-Mail)","(el cliente no tiene e-mail guardado)","(client has no email)","(cliente senza e-mail)")}`}
+                {ready&&<button onClick={()=>setSendState({status:"idle",url:"",blob:null})} style={{background:"none",border:"none",color:"#74C0FC",cursor:"pointer",fontSize:11.5,textDecoration:"underline",marginLeft:6}}>{L("PDF neu erstellen","Volver a crear PDF","Recreate PDF","Ricrea PDF")}</button>}
+              </div>}
             </div>
-            <div style={{background:"#f5f5f5",padding:"10px 14px",borderRadius:6,marginBottom:14,fontSize:12}}><strong>{selInv.clientName}</strong></div>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:14}}>
-              <thead><tr style={{background:"#1C7ED6",color:"#fff"}}>
-                <th style={{padding:"6px 10px",textAlign:"left"}}>{t.description}</th>
-                <th style={{padding:"6px 10px",textAlign:"right"}}>{L("Menge","Cant.","Qty","Qtà")}</th>
-                <th style={{padding:"6px 10px",textAlign:"right"}}>{L("Preis","Precio","Price","Prezzo")}</th>
-                <th style={{padding:"6px 10px",textAlign:"right"}}>Total</th>
-              </tr></thead>
-              <tbody>{(selInv.items||[]).map((item,i)=><tr key={i} style={{borderBottom:"1px solid #eee"}}><td style={{padding:"6px 10px"}}>{item.description}</td><td style={{padding:"6px 10px",textAlign:"right"}}>{item.qty}</td><td style={{padding:"6px 10px",textAlign:"right"}}>CHF {item.price?.toFixed(2)}</td><td style={{padding:"6px 10px",textAlign:"right"}}>CHF {item.total?.toFixed(2)}</td></tr>)}</tbody>
-            </table>
-            <div style={{display:"flex",justifyContent:"flex-end"}}>
-              <div style={{width:220,fontSize:12}}>
-                <div style={{display:"flex",justifyContent:"space-between",color:"#666",padding:"3px 0"}}><span>{t.subtotal||"Subtotal"}</span><span>CHF {selInv.amount?.toFixed(2)}</span></div>
-                {selInv.vatAmount>0
-                  ? <div style={{display:"flex",justifyContent:"space-between",color:"#666",padding:"3px 0"}}><span>{L("MWST 8.1%","IVA 8.1%","VAT 8.1%","IVA 8.1%")}</span><span>CHF {selInv.vatAmount?.toFixed(2)}</span></div>
-                  : <div style={{color:"#666",padding:"3px 0",fontSize:10.5}}>{L("Nicht MWST-pflichtig (Umsatz unter CHF 100'000)","No sujeto a IVA (facturación inferior a CHF 100'000)","Not subject to VAT (turnover below CHF 100,000)","Non assoggettato all'IVA (cifra d'affari < CHF 100'000)")}</div>}
-                <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,fontSize:16,borderTop:"2px solid #000",paddingTop:6,marginTop:4}}><span>Total CHF</span><span>{selInv.total?.toFixed(2)}</span></div>
-              </div>
+
+            {/* INVOICE */}
+            <div style={{borderRadius:14,overflow:"hidden",border:"1px solid rgba(255,255,255,.1)"}}>
+              <div ref={previewRef}><InvoiceDocument inv={inv} client={c} cs={cs} lang={lang}/></div>
             </div>
-            <div style={{marginTop:14,padding:"10px 14px",background:"#e8f4fd",borderRadius:6,fontSize:11}}>
-              <strong>{L("Zahlungsdetails · Swiss QR","Detalles pago · QR suizo","Payment details · Swiss QR","Dettagli pagamento · QR svizzero")}</strong><br/>
-              IBAN: CH56 0483 5012 3456 7800 9 · BIC: CRESCHZZ80A<br/>
-              {L("Zahlbar bis","Vence el","Due by","Scadenza")}: {selInv.dueDate} · Ref: {selInv.invoiceNumber}
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14,flexWrap:"wrap"}}>
+              <CPBtn onClick={()=>{ const el=previewRef.current; const w=window.open("","_blank"); if(w&&el){ w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${subj}</title><style>body{margin:0}@page{size:A4;margin:10mm}</style></head><body>${el.innerHTML}</body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},500);} }} variant="secondary">🖨️ {L("Drucken","Imprimir","Print","Stampa")}</CPBtn>
+              <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.close}</CPBtn>
             </div>
-          </div>
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
-            <CPBtn onClick={()=>{
-              const inv = invoices.find(i=>i.id===selInv)||{};
-              const client = clients.find(c=>c.id===inv.clientId||c.name===inv.clientName);
-              sendByEmail({
-                to: client?.email||"",
-                subject: `${L("Rechnung","Factura","Invoice","Fattura")} ${inv.invoiceNumber} — Patjac Reinigung Garten & Services`,
-                body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${inv.clientName},\n\n${L("Anbei Ihre Rechnung","Adjunto su factura","Please find your invoice","In allegato la sua fattura")} ${inv.invoiceNumber}.\n\n${L("Betrag","Importe","Amount","Importo")}: CHF ${(inv.total||0).toFixed(2)}\n${L("Fälligkeitsdatum","Fecha vencimiento","Due date","Scadenza")}: ${inv.dueDate||""}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
-              });
-            }} variant="primary">📧 {t.sendInvoice}</CPBtn>
-            <CPBtn onClick={()=>{
-              const el = document.querySelector(".invoice-preview-content");
-              const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${L("Rechnung","Factura","Invoice","Fattura")} ${selInv?.invoiceNumber||""}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}body{padding:28px;background:#fff;color:#000;font-size:12px}table{width:100%;border-collapse:collapse}td,th{padding:6px 10px;border-bottom:1px solid #eee}@media print{@page{margin:1.5cm;size:A4}}</style>
-</head><body>${el?el.innerHTML:""}</body></html>`;
-              try{
-                const blob=new Blob([html],{type:"text/html;charset=utf-8"});
-                const url=URL.createObjectURL(blob);
-                const a=document.createElement("a");
-                a.href=url;a.download=`${L("Rechnung","Factura","Invoice","Fattura")}_${selInv?.invoiceNumber||""}.html`;
-                document.body.appendChild(a);a.click();
-                setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},3000);
-              }catch(e){window.print();}
-            }} variant="secondary">🖨️ {L("Drucken","Imprimir","Print","Stampa")}</CPBtn>
-            <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.close}</CPBtn>
-          </div>
-        </CPModal>
-      )}
+          </CPModal>
+        );
+      })()}
+
       {/* ── DELETE INVOICE MODAL ── */}
       {deleteInvId&&(()=>{
         const inv = invoices.find(i=>i.id===deleteInvId);
@@ -4314,7 +4559,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,notify,onBack,lang}){
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
                 <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>🧾 {inv?.invoiceNumber} — {inv?.clientName}</div>
-                <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>CHF {(inv?.total||0).toFixed(2)} · {inv?.date}</div>
+                <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>CHF {(Number(inv?.total)||0).toFixed(2)} · {invFmtDate(inv?.date)}</div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
                 {L("Diese Rechnung wird permanent gelöscht.","Esta factura será eliminada permanentemente.","This invoice will be permanently deleted.","Questa fattura verrà eliminata definitivamente.")}
