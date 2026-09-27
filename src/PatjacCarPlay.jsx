@@ -1089,6 +1089,7 @@ export default function PatjacCarPlay(){
   const [showHelp,setShowHelp] = useState(false);
   const [clock,setClock] = useState(new Date());
   const [dbReady,setDbReady] = useState(false);
+  const [invoicePrefill,setInvoicePrefill] = useState(null); // reminder → open a pre-filled invoice
   const [dbError,setDbError] = useState(null);
 
   // ─── SUPABASE REST API ───────────────────────────────────
@@ -1477,7 +1478,7 @@ export default function PatjacCarPlay(){
       case "clients":    return <ClientsApp {...props} lang={lang}/>;
       case "jobs":       return <JobsApp {...props} lang={lang}/>;
       case "employees":  return <EmployeesApp {...props} lang={lang}/>;
-      case "invoices":   return <InvoicesApp {...props} lang={lang}/>;
+      case "invoices":   return <InvoicesApp {...props} lang={lang} invoicePrefill={invoicePrefill} clearInvoicePrefill={()=>setInvoicePrefill(null)}/>;
       case "finance":    return <FinanceApp {...props} lang={lang}/>;
       case "timeclock":  return <TimeclockApp {...props} lang={lang}/>;
       case "messaging":  return <MessagingApp {...props} lang={lang}/>;
@@ -1688,7 +1689,7 @@ export default function PatjacCarPlay(){
         ) : (
           <HomeScreen t={t} openApp={openApp} clock={clock} lang={lang} currentUser={currentUser}
             jobs={jobs} invoices={invoices} clients={clients} employees={employees}
-            notify={notify} messages={messages}/>
+            notify={notify} messages={messages} onIssueInvoice={g=>{setInvoicePrefill(g); openApp("invoices");}}/>
         )}
       </div>
 
@@ -1774,8 +1775,19 @@ function DockIcon({app,label,onOpen}){
 }
 
 // ─── HOME SCREEN (Admin) ─────────────────────────────────────
-function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,employees,notify,messages}){
+function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,employees,notify,messages,onIssueInvoice}){
   const L = makeL(lang);
+  const billingDue = useMemo(()=>computeBillingDue(clients,jobs,invoices),[clients,jobs,invoices]);
+  // Alarm: a phone/browser notification once per reminder
+  useEffect(()=>{
+    if(!billingDue.length) return;
+    let seen={}; try{ seen=JSON.parse(localStorage.getItem("patjac_billing_notified")||"{}"); }catch(e){}
+    const fresh = billingDue.filter(g=>!seen[g.key]);
+    if(!fresh.length) return;
+    notify(`🔔 ${L("Rechnungen zu erstellen","Facturas por emitir","Invoices to issue","Fatture da emettere")}: ${fresh.map(g=>g.clientName).join(", ")}`,"info");
+    try{ if("Notification" in window && Notification.permission==="granted") new Notification("🧾 Patjac – "+L("Rechnung erstellen","Emitir factura","Issue invoice","Emetti fattura"),{body:fresh.map(g=>`${g.clientName}: CHF ${g.amount.toFixed(2)}`).join("\n")}); }catch(e){}
+    fresh.forEach(g=>seen[g.key]=1); try{ localStorage.setItem("patjac_billing_notified",JSON.stringify(seen)); }catch(e){}
+  },[billingDue.map(g=>g.key).join("|")]);
   const dayStr = clock.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"long",day:"numeric",month:"long"});
   const todayJobs = jobs.filter(j=>j.date===todayStr);
   const pending = invoices.filter(i=>i.status==="overdue").length;
@@ -1798,10 +1810,11 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:12,marginBottom:20}}>
         {allApps.map(app=>(
           <AppTile key={app.id} app={app} label={app.id==="payroll"?(t.payrollTitle||"Payroll"):t[app.id]||app.id} onOpen={()=>openApp(app.id)}
-            badge={app.id==="messaging"&&unreadMsg>0?unreadMsg:app.id==="invoices"&&pending>0?pending:null}
+            badge={app.id==="messaging"&&unreadMsg>0?unreadMsg:app.id==="invoices"&&(pending+billingDue.length)>0?(pending+billingDue.length):null}
           />
         ))}
       </div>
+      <BillingDuePanel due={billingDue} lang={lang} compact onIssue={g=>onIssueInvoice&&onIssueInvoice(g)}/>
       {todayJobs.length>0&&(
         <CPCard style={{marginBottom:14}}>
           <div style={{color:CP.textSecondary,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:12}}>📋 {t.todayJobs}</div>
@@ -3613,7 +3626,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
               <div style={{color:CP.textSecondary,fontSize:12}}>{c.phone} · {c.email}</div>
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
                 <CPBadge text={freqLabel(c.frequency)} color="blue"/>
-                <CPBadge text={c.billingType==="monthlyContract"?t.monthlyContract:c.billingType==="weeklyContract"?t.weekly:t.perService} color={c.billingType==="monthlyContract"?"green":c.billingType==="weeklyContract"?"blue":"gray"}/>
+                <CPBadge text={`🧾 ${c.billingType==="monthlyContract"?t.monthly:c.billingType==="weeklyContract"?t.weekly:t.perService}`} color={c.billingType==="monthlyContract"?"green":c.billingType==="weeklyContract"?"blue":"gray"}/>
                 <CPBadge text={`CHF ${c.price||0}/h`} color="gray"/>
                 {!c.active&&<CPBadge text={t.inactive||"Inaktiv"} color="gray"/>}
               </div>
@@ -3654,14 +3667,14 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
             </CPField>
             <CPField label={t.billingType}>
               <CPSelect value={form.billingType||"perService"} onChange={e=>setForm(f=>({...f,billingType:e.target.value}))}>
-                <option value="perService">{t.perService}</option><option value="weeklyContract">{t.weekly}</option><option value="monthlyContract">{t.monthlyContract}</option>
+                <option value="perService">🧾 {t.perService}</option><option value="weeklyContract">📅 {t.weekly}</option><option value="monthlyContract">🗓️ {t.monthly}</option>
               </CPSelect>
             </CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.service||"Service"}>
               <CPSelect value={form.serviceType||"cleaning"} onChange={e=>setForm(f=>({...f,serviceType:e.target.value}))}>
-                <option value="cleaning">{t.cleaning}</option><option value="gardening">{t.gardening}</option><option value="other">{t.other}</option>
+                <option value="cleaning">{t.cleaning}</option><option value="gardening">{t.gardening}</option><option value="repairs">🔧 {makeL(lang)("Reparaturen","Reparaciones","Repairs","Riparazioni")}</option><option value="other">{t.other}</option>
               </CPSelect>
             </CPField>
             <CPField label={L("CHF pro Stunde","CHF por hora","CHF per hour","CHF all'ora")}><CPInput type="number" value={form.price||""} onChange={e=>setForm(f=>({...f,price:parseFloat(e.target.value)||""}))} placeholder="z.B. 45"/></CPField>
@@ -4139,7 +4152,64 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
   );
 }
 
-// ─── INVOICES ────────────────────────────────────────────────
+// ─── BILLING REMINDERS ───────────────────────────────────────
+// Client billing type: perService → on the day of each service, weeklyContract → when the week (Mon–Sun) ends,
+// monthlyContract → when the month ends. A job counts as invoiced if an invoice lists it or covers its date for that client.
+const clientBillingMode = c => c?.billingType==="weeklyContract"?"week":c?.billingType==="monthlyContract"?"month":"job";
+const computeBillingDue = (clients, jobs, invoices, today=ymd(new Date())) => {
+  const invoicedIds = new Set(); (invoices||[]).forEach(i=>(i.jobIds||[]).forEach(id=>invoicedIds.add(id)));
+  const covered = (j) => invoicedIds.has(j.id) || (invoices||[]).some(i=>i.clientId===j.clientId && i.periodFrom && i.periodTo && j.date>=i.periodFrom && j.date<=i.periodTo && !(i.jobIds||[]).length);
+  const limit = (()=>{ const d=new Date(today+"T12:00:00"); d.setDate(d.getDate()-120); return ymd(d); })();
+  const out=[];
+  (clients||[]).filter(c=>c.active!==false).forEach(c=>{
+    const mode = clientBillingMode(c);
+    const js = (jobs||[]).filter(j=>j.clientId===c.id && j.date && j.date>=limit && j.date<=today && j.status!=="cancelled" && !covered(j));
+    if(!js.length) return;
+    const groups = {};
+    js.forEach(j=>{
+      let key, from, to;
+      if(mode==="job"){ key=j.teamId||j.id; from=to=j.date; }
+      else if(mode==="week"){ [from,to]=invWeekRange(j.date); key=from; }
+      else { [from,to]=invMonthRange(j.date.slice(0,7)); key=from.slice(0,7); }
+      if(mode!=="job" && today<to) return;               // week / month not finished yet
+      const g = groups[key] || (groups[key]={clientId:c.id, clientName:c.name, mode, from, to, hours:0, jobIds:[]});
+      g.hours += hoursBetween(j.timeStart,j.timeEnd); g.jobIds.push(j.id);
+    });
+    Object.values(groups).forEach(g=>{ g.hours=Math.round(g.hours*100)/100; g.amount=Math.round(g.hours*(parseFloat(c.price)||0)*100)/100; g.key=`${c.id}_${g.mode}_${g.from}`; g.today = g.mode==="job" ? g.from===today : g.to===today; out.push(g); });
+  });
+  let dismissed={}; try{ dismissed=JSON.parse(localStorage.getItem("patjac_billing_dismissed")||"{}"); }catch(e){}
+  return out.filter(g=>!dismissed[g.key]).sort((a,b)=>a.to.localeCompare(b.to));
+};
+function BillingDuePanel({due, lang, onIssue, compact}){
+  const L = makeL(lang);
+  const [hidden,setHidden] = useState({});
+  due = due.filter(g=>!hidden[g.key]);
+  if(!due.length) return null;
+  const dismiss = (g) => { try{ const d=JSON.parse(localStorage.getItem("patjac_billing_dismissed")||"{}"); d[g.key]=1; localStorage.setItem("patjac_billing_dismissed",JSON.stringify(d)); }catch(e){} setHidden(h=>({...h,[g.key]:1})); };
+  const modeTxt = m => m==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):m==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile");
+  const list = compact ? due.slice(0,5) : due;
+  return (
+    <CPCard style={{marginBottom:14,border:"1px solid rgba(250,176,5,.45)",background:"rgba(250,176,5,.08)"}}>
+      <div style={{color:"#FFD43B",fontWeight:700,fontSize:14,marginBottom:10}}>🔔 {L("Rechnungen zu erstellen","Facturas por emitir","Invoices to issue","Fatture da emettere")} ({due.length})</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {list.map(g=>(
+          <div key={g.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",padding:"8px 10px",borderRadius:10,background:"rgba(0,0,0,.2)"}}>
+            <div style={{minWidth:0}}>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{g.clientName} {g.today&&<span style={{color:"#FF8787",fontSize:11,fontWeight:700}}>● {L("HEUTE","HOY","TODAY","OGGI")}</span>}</div>
+              <div style={{color:CP.textSecondary,fontSize:12}}>{modeTxt(g.mode)} · {g.mode==="job"?invFmtDate(g.from):`${invFmtDate(g.from)} – ${invFmtDate(g.to)}`} · {g.hours} h · CHF {g.amount.toFixed(2)}</div>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <CPBtn size="sm" onClick={()=>onIssue(g)}>🧾 {L("Rechnung erstellen","Emitir factura","Issue invoice","Emetti fattura")}</CPBtn>
+              <CPBtn size="sm" variant="secondary" onClick={()=>dismiss(g)}>✓ {L("Schon verrechnet","Ya facturado","Already billed","Già fatturato")}</CPBtn>
+            </div>
+          </div>
+        ))}
+        {compact&&due.length>list.length&&<div style={{color:CP.textSecondary,fontSize:12}}>+ {due.length-list.length} {L("weitere","más","more","altre")}</div>}
+      </div>
+    </CPCard>
+  );
+}
+
 // ─── INVOICES ────────────────────────────────────────────────
 // Billing modes: per job, per week, per month. Amounts = planned hours × client price per hour (no VAT).
 const INV_SERVICES = [
@@ -4185,7 +4255,7 @@ const uploadInvoicePdf = async (blob, path) => {
 function InvoiceDocument({inv, client, cs, lang}){
   const L = makeL(lang);
   const fm = n => Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const modeLabel = inv.billingMode==="job"?L("Pro Einsatz","Por trabajo","Per job","Per intervento"):inv.billingMode==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):inv.billingMode==="month"?L("Monatlich","Mensual","Monthly","Mensile"):"";
+  const modeLabel = inv.billingMode==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):inv.billingMode==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):inv.billingMode==="month"?L("Monatlich","Mensual","Monthly","Mensile"):"";
   const addr = client ? [`${client.street||""} ${client.number||""}`.trim(), `${client.postalCode||""} ${client.city||""}`.trim()].filter(Boolean) : [];
   const th = {padding:"7px 8px",textAlign:"left",fontWeight:700,fontSize:11};
   const td = {padding:"7px 8px",fontSize:11,borderBottom:"1px solid #e5e7eb",verticalAlign:"top"};
@@ -4255,7 +4325,7 @@ function InvoiceDocument({inv, client, cs, lang}){
   );
 }
 
-function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify,onBack,lang}){
+function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify,onBack,lang,invoicePrefill,clearInvoicePrefill}){
   const L = makeL(lang);
   const cs = {name:"Patjac Reinigung Garten & Services",street:"",number:"",postalCode:"",city:"Zürich",phone:"",email:"patjacservices@outlook.com",uid:"",iban:"",bic:"",...(companySettings||{})};
   const [modal,setModal]=useState(null);
@@ -4315,18 +4385,26 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
     setForm(f=>({...f, items, jobIds, ...(f.billingMode==="job"&&!f._selTouched?{_sel:sel}:{})}));
   },[jobGroups, form.billingMode, form._selTouched?JSON.stringify(form._sel||[]):"", rate, modal, form._manual]);
 
-  const pickMode = (mode) => {
+  const pickMode = (mode, clientIdArg) => {
     const today = ymd(new Date());
+    const cid = clientIdArg || form.clientId;
     let from=form.periodFrom, to=form.periodTo;
     if(mode==="week"){ [from,to]=invWeekRange(today); }
     else if(mode==="month"){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); [from,to]=invMonthRange(ymd(d).slice(0,7)); }
     else {
       // Per job: the day of the client's most recent job not yet invoiced (or today)
-      const cand=(jobs||[]).filter(j=>j.clientId===form.clientId&&j.date&&j.date<=today&&!billedJobIds.has(j.id)).map(j=>j.date).sort();
+      const cand=(jobs||[]).filter(j=>j.clientId===cid&&j.date&&j.date<=today&&!billedJobIds.has(j.id)).map(j=>j.date).sort();
       from=to=cand.length?cand[cand.length-1]:today;
     }
-    setForm(f=>({...f,billingMode:mode,periodFrom:from,periodTo:to,_sel:[],_selTouched:false,_manual:false}));
+    setForm(f=>({...f,clientId:cid,billingMode:mode,periodFrom:from,periodTo:to,_sel:[],_selTouched:false,_manual:false}));
   };
+  // Open a new invoice already filled for a reminder (client + billing type + period)
+  const issueFromDue = (g) => {
+    newInvoice();
+    setForm(f=>({...f,clientId:g.clientId,billingMode:g.mode,periodFrom:g.from,periodTo:g.to,_sel:[],_selTouched:false,_manual:false}));
+  };
+  useEffect(()=>{ if(invoicePrefill){ issueFromDue(invoicePrefill); clearInvoicePrefill&&clearInvoicePrefill(); } },[invoicePrefill]);
+  const due = useMemo(()=>computeBillingDue(clients,jobs,invoices),[clients,jobs,invoices]);
 
   const newInvoice = () => {
     const yr=new Date().getFullYear();
@@ -4389,6 +4467,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
   return (
     <CPScreen title={t.invoices} icon="🧾" onBack={onBack} t={t}
       actions={<CPBtn onClick={newInvoice} size="sm">＋ {t.generateInvoice}</CPBtn>}>
+      <BillingDuePanel due={due} lang={lang} onIssue={issueFromDue}/>
       <BulkBar bulk={bulk} visibleIds={invoices.map(i=>i.id)} lang={lang}
         itemWord={{DE:"Rechnungen",ES:"facturas",EN:"invoices",IT:"fatture"}}
         onDelete={ids=>{setInvoices(p=>p.filter(i=>!ids.has(i.id)));notify(L("Rechnungen gelöscht","Facturas eliminadas","Invoices deleted","Fatture eliminate"),"success");}}/>
@@ -4422,18 +4501,19 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
         <CPModal title={t.generateInvoice} onClose={()=>setModal(null)} width={640}>
           {/* 1. Client */}
           <CPField label={`1. ${L("Kunde","Cliente","Client","Cliente")}`}>
-            <CPSelect value={form.clientId} onChange={e=>setForm(f=>({...f,clientId:e.target.value,_sel:[],_manual:false}))}>
+            <CPSelect value={form.clientId} onChange={e=>{ const id=e.target.value; const c=clients.find(x=>x.id===id); if(c) pickMode(clientBillingMode(c), id); else setForm(f=>({...f,clientId:id,billingMode:"",_sel:[],_manual:false})); }}>
               <option value="">— {L("Kunde wählen","Elija un cliente","Choose a client","Scegli un cliente")} —</option>
               {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </CPSelect>
           </CPField>
-          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"-4px 0 10px"}}>💶 {L("Preis pro Stunde","Precio por hora","Price per hour","Prezzo orario")}: <strong style={{color:rate?"#69DB7C":"#FF8787"}}>CHF {rate.toFixed(2)}</strong>{!rate&&` — ${L("im Kunden erfassen","añádalo en la ficha del cliente","set it on the client","impostalo nel cliente")}`}</div>}
+          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"-4px 0 4px"}}>🧾 {L("Abrechnung des Kunden","Facturación del cliente","Client billing","Fatturazione del cliente")}: <strong style={{color:"#74C0FC"}}>{clientBillingMode(client)==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):clientBillingMode(client)==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile")}</strong></div>}
+          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 10px"}}>💶 {L("Preis pro Stunde","Precio por hora","Price per hour","Prezzo orario")}: <strong style={{color:rate?"#69DB7C":"#FF8787"}}>CHF {rate.toFixed(2)}</strong>{!rate&&` — ${L("im Kunden erfassen","añádalo en la ficha del cliente","set it on the client","impostalo nel cliente")}`}</div>}
 
           {/* 2. Billing mode */}
           {form.clientId&&(<>
             <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"4px 0 8px",textTransform:"uppercase",letterSpacing:.5}}>2. {L("Abrechnungsart","Tipo de facturación","Billing type","Tipo di fatturazione")}</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-              {modeBtn("job","🧾",L("Pro Einsatz","Por trabajo","Per job","Per intervento"),L("Einsätze auswählen","Elegir trabajos","Pick jobs","Scegli interventi"))}
+              {modeBtn("job","🧾",L("Pro Dienst","Por servicio","Per service","Per servizio"),L("Tag des Dienstes","Día del servicio","Day of service","Giorno del servizio"))}
               {modeBtn("week","📅",L("Woche","Semana","Week","Settimana"),L("Mo – So","Lun – Dom","Mon – Sun","Lun – Dom"))}
               {modeBtn("month","🗓️",L("Monat","Mensual","Monthly","Mensile"),L("Ganzer Monat","Mes completo","Whole month","Mese intero"))}
             </div>
@@ -4447,7 +4527,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
               const clampTo = (v,min,max)=> v<min?min:v>max?max:v;
               if(form.billingMode==="job") return (
                 <div style={{display:"grid",gridTemplateColumns:"1fr",gap:"0 10px"}}>
-                  <CPField label={L("Datum des Einsatzes","Fecha del trabajo","Job date","Data dell'intervento")}>
+                  <CPField label={L("Datum des Dienstes","Fecha del servicio","Service date","Data del servizio")}>
                     <CPInput type="date" value={form.periodFrom} onChange={e=>{const v=e.target.value; setForm(f=>({...f,periodFrom:v,periodTo:v,_sel:[],_selTouched:false,_manual:false}));}}/>
                   </CPField>
                   {(()=>{ const days=[...new Set((jobs||[]).filter(j=>j.clientId===form.clientId&&j.date).map(j=>j.date))].sort().reverse().slice(0,12); return days.length?(
