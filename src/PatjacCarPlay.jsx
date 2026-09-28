@@ -654,18 +654,46 @@ const gPinUnique = (existingEmployees, excludeId) => {
   return pin;
 };
 
-// ─── SEND BY EMAIL (opens Outlook/Gmail with prefilled content) ───
+// ─── COMPANY E-MAIL ─────────────────────────────────────────
+// All e-mails leave from the company mailbox info@patjacservices.ch (Infomaniak).
+// "mailto" links open the default mail program; set Infomaniak Mail as default once (see InfomaniakSetupHint).
+const COMPANY_EMAIL = "info@patjacservices.ch";
+const INFOMANIAK_MAIL_URL = "https://mail.infomaniak.com";
+const INFOMANIAK_DEFAULT_HELP = "https://www.infomaniak.com/es/soporte/faq/2639";
+const mailtoUrl = ({to="",subject="",body=""}) => `mailto:${encodeURIComponent(to).replace(/%40/g,"@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+// E-mail buttons used everywhere a message is sent: opens the company mailbox with everything already written
+function CompanyEmailButtons({to, subject, body, lang, disabled}){
+  const L = makeL(lang||appLang);
+  const [copied,setCopied] = useState(false);
+  const b = bg => ({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"11px 12px",cursor:disabled?"not-allowed":"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font,opacity:disabled?.45:1,boxSizing:"border-box"});
+  const copyAndOpen = () => {
+    const txt = `${L("An","Para","To","A")}: ${to}\n${L("Betreff","Asunto","Subject","Oggetto")}: ${subject}\n\n${body}`;
+    try{ navigator.clipboard.writeText(txt); }catch(e){}
+    setCopied(true); setTimeout(()=>setCopied(false),4000);
+    window.open(INFOMANIAK_MAIL_URL,"_blank","noopener");
+  };
+  return (
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+        <a href={disabled?undefined:mailtoUrl({to,subject,body})} onClick={e=>{if(disabled)e.preventDefault();}} style={b("#E0115F")}>📧 E-mail · {COMPANY_EMAIL}</a>
+        <button disabled={disabled} onClick={copyAndOpen} style={b("rgba(255,255,255,.14)")}>{copied?`✅ ${L("Kopiert – im Mail einfügen","Copiado: pégalo en el correo","Copied – paste it in the mail","Copiato – incollalo nella mail")}`:`📋 ${L("Kopieren + Infomaniak Mail öffnen","Copiar y abrir Infomaniak Mail","Copy + open Infomaniak Mail","Copia + apri Infomaniak Mail")}`}</button>
+      </div>
+      <div style={{color:CP.textTertiary,fontSize:11,marginTop:5,lineHeight:1.45}}>
+        ℹ️ {L("Öffnet sich nicht Infomaniak Mail? Einmal als Standard-Mailprogramm einrichten:","¿No se abre Infomaniak Mail? Configúralo una vez como correo predeterminado:","Infomaniak Mail doesn't open? Set it once as default mail program:","Non si apre Infomaniak Mail? Impostalo una volta come posta predefinita:")} <a href={INFOMANIAK_DEFAULT_HELP} target="_blank" rel="noopener noreferrer" style={{color:"#74C0FC"}}>{L("Anleitung","instrucciones","instructions","istruzioni")}</a>
+      </div>
+    </div>
+  );
+}
+
+// ─── SEND BY EMAIL (opens the company mailbox with prefilled content) ───
 const sendByEmail = ({to="", subject="", body=""}) => {
-  const from = "patjacservices@outlook.com";
+  const from = COMPANY_EMAIL;
   const mailto = `mailto:${encodeURIComponent(to).replace(/%40/g,"@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   // A link click (not window.open) is what phones and browsers reliably hand over to the mail app
   const a = document.createElement("a"); a.href = mailto; a.rel = "noopener"; a.style.display = "none";
   document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(), 500);
   void from;
 };
-// Web mail composers: work on any computer even when no mail program is set up
-const outlookWebUrl = ({to="",subject="",body=""}) => `https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-const gmailWebUrl = ({to="",subject="",body=""}) => `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 // SMS link: iPhone uses "&body=", Android uses "?body="
 const isIOS = () => /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent||"") && ("ontouchend" in document || /iPhone|iPad|iPod/.test(navigator.userAgent||""));
 const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||"") || isIOS();
@@ -1411,10 +1439,10 @@ export default function PatjacCarPlay(){
   const [companySettings, setCompanySettings] = useState({
     name:"Patjac Reinigung Garten & Services",
     street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich",
-    phone:"+41 44 123 4567",email:"patjacservices@outlook.com",
+    phone:"+41 44 123 4567",email:"info@patjacservices.ch",
     uid:"CHE-123.456.789",mwstNr:"CHE-123.456.789 MWST",
     iban:"CH56 0483 5012 3456 7800 9",bic:"CRESCHZZ80A",
-    adminEmail:"patjacservices@outlook.com",
+    adminEmail:"info@patjacservices.ch",
     logo:"🌿",
   });
 
@@ -2514,7 +2542,7 @@ function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings,
   const cs = companySettings || {
     name:"Patjac Reinigung Garten & Services",logo:"🌿",
     street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich",
-    phone:"+41 44 123 4567",email:"patjacservices@outlook.com",
+    phone:"+41 44 123 4567",email:"info@patjacservices.ch",
     uid:"CHE-123.456.789",mwstNr:"CHE-123.456.789 MWST",
     iban:"CH56 0483 5012 3456 7800 9",bic:"CRESCHZZ80A",
   };
@@ -2962,11 +2990,7 @@ function AccessInviteModal({emp, lang, onClose}){
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
         <button disabled={!wa} onClick={()=>window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg.body)}`,"_blank")} style={{...btn("#25D366"),opacity:wa?1:.4}}>💬 WhatsApp {emp.phone?`→ ${emp.phone}`:`(${L("keine Nummer","sin teléfono","no number","nessun numero")})`}</button>
         <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📧 E-mail {emp.email?`→ ${emp.email}`:`(${L("keine E-Mail erfasst – bitte im Mitarbeiter speichern","sin e-mail guardado – agréguelo en la ficha del empleado","no email saved","nessuna e-mail")})`}</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,opacity:emp.email?1:.4}}>
-          <a href={emp.email?outlookWebUrl({to:emp.email,subject:msg.subject,body:msg.body}):undefined} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!emp.email)e.preventDefault();}} style={{...btn("#0F6CBD"),textAlign:"center",textDecoration:"none",boxSizing:"border-box"}}>Outlook</a>
-          <a href={emp.email?gmailWebUrl({to:emp.email,subject:msg.subject,body:msg.body}):undefined} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!emp.email)e.preventDefault();}} style={{...btn("#D93025"),textAlign:"center",textDecoration:"none",boxSizing:"border-box"}}>Gmail</a>
-          <a href={emp.email?`mailto:${emp.email}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`:undefined} onClick={e=>{if(!emp.email)e.preventDefault();}} style={{...btn("#1C7ED6"),textAlign:"center",textDecoration:"none",boxSizing:"border-box"}}>{L("Mail-App","App de correo","Mail app","App mail")}</a>
-        </div>
+        <CompanyEmailButtons to={emp.email||""} subject={msg.subject} body={msg.body} lang={lang} disabled={!emp.email}/>
         <a href={emp.phone?smsUrl(emp.phone,msg.body):undefined} onClick={e=>{if(!emp.phone)e.preventDefault();}} style={{...btn("#7048E8"),opacity:emp.phone?1:.4,textDecoration:"none",boxSizing:"border-box",marginTop:4}}>📱 SMS {emp.phone?`→ ${emp.phone}`:""}</a>
         {!isMobile()&&<div style={{color:"#FAB005",fontSize:12}}>ℹ️ {L("SMS funktioniert nur vom Handy aus. Öffnen Sie die App auf dem Handy oder nutzen Sie WhatsApp / E-Mail.","El SMS solo funciona desde el móvil. Abra la app en su teléfono o use WhatsApp / e-mail.","SMS only works from a phone. Open the app on your phone or use WhatsApp / email.","L'SMS funziona solo dal telefono. Apri l'app sul telefono o usa WhatsApp / e-mail.")}</div>}
         <button onClick={()=>{ try{ navigator.clipboard.writeText(msg.body); }catch(e){} }} style={btn("rgba(255,255,255,.12)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
@@ -3185,7 +3209,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                       sendByEmail({
                         to: emp.email||"",
                         subject: `Lohnabrechnung / Nómina — ${emp.name} — ${selMonth}/${selYear}`,
-                        body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${emp.name},\n\n${L("Anbei Ihre Lohnabrechnung","Adjunto su nómina","Please find your payslip","In allegato la sua busta paga")} ${selMonth}/${selYear}:\n\n${L("Bruttolohn","Salario bruto","Gross salary","Salario lordo")}: CHF ${Number(pay.grossTotal||0).toFixed(2)}\n${L("Nettolohn","Salario neto","Net salary","Salario netto")}: CHF ${Number(pay.net||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+                        body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${emp.name},\n\n${L("Anbei Ihre Lohnabrechnung","Adjunto su nómina","Please find your payslip","In allegato la sua busta paga")} ${selMonth}/${selYear}:\n\n${L("Bruttolohn","Salario bruto","Gross salary","Salario lordo")}: CHF ${Number(pay.grossTotal||0).toFixed(2)}\n${L("Nettolohn","Salario neto","Net salary","Salario netto")}: CHF ${Number(pay.net||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
                       });
                     }} variant="secondary" size="sm">
                       📧 {t.payrollSend||"Senden"}
@@ -3588,7 +3612,7 @@ function DashApp({t,clients,jobs,invoices,employees,timeclock,notify,openApp,onB
   const incompleteJobs=jobs.filter(j=>j.status!=="completed"&&j.date===today);
   return (
     <CPScreen title={t.dashboard} icon="🏠" onBack={onBack} t={t}
-      actions={<CPBtn onClick={()=>sendByEmail({to:companySettings?.email||"patjacservices@outlook.com",subject:`${t.sendReport} — Patjac Business Suite`,body:`${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${t.sendReport}.\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services`})} variant="secondary" size="sm">📧 {t.sendReport||"Bericht"}</CPBtn>}
+      actions={<CPBtn onClick={()=>sendByEmail({to:companySettings?.email||"info@patjacservices.ch",subject:`${t.sendReport} — Patjac Business Suite`,body:`${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${t.sendReport}.\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services`})} variant="secondary" size="sm">📧 {t.sendReport||"Bericht"}</CPBtn>}
     >
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
         <CPStat label={t.totalClients} value={clients.filter(c=>c.active).length} icon="👥" accent="#1C7ED6"/>
@@ -4512,7 +4536,7 @@ function InvoiceDocument({inv, client, cs, lang}){
 
 function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify,onBack,lang,invoicePrefill,clearInvoicePrefill}){
   const L = makeL(lang);
-  const cs = {name:"Patjac Reinigung Garten & Services",street:"",number:"",postalCode:"",city:"Zürich",phone:"",email:"patjacservices@outlook.com",uid:"",iban:"",bic:"",...(companySettings||{})};
+  const cs = {name:"Patjac Reinigung Garten & Services",street:"",number:"",postalCode:"",city:"Zürich",phone:"",email:"info@patjacservices.ch",uid:"",iban:"",bic:"",...(companySettings||{})};
   const [modal,setModal]=useState(null);
   const [selInv,setSelInv]=useState(null);   // invoice object (preview) or id (edit)
   const [form,setForm]=useState({});
@@ -4819,13 +4843,11 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
               {ready&&(
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
                   <a href={wa?`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`:undefined} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!wa){e.preventDefault();notify(L("Kunde hat keine Telefonnummer","El cliente no tiene teléfono","Client has no phone","Il cliente non ha telefono"),"error");}}} style={{...aBtn("#25D366"),opacity:wa?1:.45}}>💬 WhatsApp</a>
-                  <a href={outlookWebUrl({to:c?.email||"",subject:subj,body:msg})} target="_blank" rel="noopener noreferrer" style={aBtn("#0F6CBD")}>📧 Outlook</a>
-                  <a href={gmailWebUrl({to:c?.email||"",subject:subj,body:msg})} target="_blank" rel="noopener noreferrer" style={aBtn("#D93025")}>📧 Gmail</a>
-                  <a href={`mailto:${c?.email||""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`} style={aBtn("#1C7ED6")}>📧 {L("Mail-App","App de correo","Mail app","App mail")}</a>
                   {canShareFile&&<button onClick={async()=>{ try{ await navigator.share({files:[new File([sendState.blob],pdfName(inv),{type:"application/pdf"})],title:subj,text:msg}); }catch(e){} }} style={aBtn("#7048E8")}>📱 {L("PDF teilen","Compartir PDF","Share PDF","Condividi PDF")}</button>}
                   <button onClick={async()=>{ if(sendState.blob) downloadBlob(sendState.blob,pdfName(inv)); else if(sendState.url) window.open(sendState.url,"_blank"); }} style={aBtn("rgba(255,255,255,.15)")}>⬇️ {L("PDF herunterladen","Descargar PDF","Download PDF","Scarica PDF")}</button>
                 </div>
               )}
+              {ready&&<div style={{marginTop:8}}><CompanyEmailButtons to={c?.email||""} subject={subj} body={msg} lang={lang} disabled={!c?.email}/></div>}
               {ready&&<div style={{color:CP.textSecondary,fontSize:11.5,marginTop:8,lineHeight:1.5}}>
                 ℹ️ {sendState.url
                   ? L("Die Nachricht enthält einen Link zum PDF. Der Kunde öffnet ihn mit einem Tipp.","El mensaje lleva un enlace al PDF: el cliente lo abre con un toque.","The message contains a link to the PDF – the client opens it with one tap.","Il messaggio contiene un link al PDF: il cliente lo apre con un tocco.")
@@ -4941,7 +4963,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
     <CPScreen title={t.finance} icon="💰" onBack={onBack} t={t}
       actions={<>
         <CPBtn onClick={()=>setModal("exp")} variant="secondary" size="sm">＋ {t.addExpense}</CPBtn>
-        <CPBtn onClick={()=>sendByEmail({to:cs.email||"patjacservices@outlook.com",subject:`${t.annualReport} — Patjac Reinigung Garten & Services`,body:`${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Jahresbericht","Adjunto el informe anual","Please find the annual report","In allegato il rapporto annuale")}.\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\n${cs.email}`})} size="sm">📧 {t.annualReport}</CPBtn>
+        <CPBtn onClick={()=>sendByEmail({to:cs.email||"info@patjacservices.ch",subject:`${t.annualReport} — Patjac Reinigung Garten & Services`,body:`${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Jahresbericht","Adjunto el informe anual","Please find the annual report","In allegato il rapporto annuale")}.\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\n${cs.email}`})} size="sm">📧 {t.annualReport}</CPBtn>
       </>}
     >
       {/* ── KPI ROW ── */}
@@ -5043,7 +5065,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
             </div>
           ))}
           <div style={{marginTop:10}}>
-            <CPBtn onClick={()=>sendByEmail({to:cs.email||"patjacservices@outlook.com",subject:`${t.taxReport} — Patjac Reinigung Garten & Services`,body:`${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Steuerbericht","Adjunto el informe fiscal","Please find the tax report","In allegato il rapporto fiscale")}.\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\n${cs.email}`})} variant="warning" size="sm">📧 {t.taxReport}</CPBtn>
+            <CPBtn onClick={()=>sendByEmail({to:cs.email||"info@patjacservices.ch",subject:`${t.taxReport} — Patjac Reinigung Garten & Services`,body:`${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Steuerbericht","Adjunto el informe fiscal","Please find the tax report","In allegato il rapporto fiscale")}.\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\n${cs.email}`})} variant="warning" size="sm">📧 {t.taxReport}</CPBtn>
           </div>
         </CPCard>
       </div>
@@ -5928,7 +5950,7 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
 // ─── REPORTS ─────────────────────────────────────────────────
 function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timeclock,companySettings,products=[],setProducts,suppliers=[]}){
   const L = makeL(lang);
-  const cs = companySettings||{name:"Patjac Reinigung Garten & Services",email:"patjacservices@outlook.com",uid:"CHE-123.456.789",mwstNr:"CHE-123.456.789 MWST",iban:"CH56 0483 5012 3456 7800 9",street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich"};
+  const cs = companySettings||{name:"Patjac Reinigung Garten & Services",email:"info@patjacservices.ch",uid:"CHE-123.456.789",mwstNr:"CHE-123.456.789 MWST",iban:"CH56 0483 5012 3456 7800 9",street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich"};
   const [preview,setPreview] = useState(null); // null | "monthly"|"annual"|"tax"|"payroll"|"inventory"
   const [counts,setCounts] = useState({}); // physical stock count entered during an inventory
   const now = new Date();
@@ -6182,9 +6204,9 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
                 👁️ {L("Anzeigen","Ver","View","Vedi")}
               </CPBtn>
               <CPBtn onClick={()=>sendByEmail({
-                to: cs.email||"patjacservices@outlook.com",
+                to: cs.email||"info@patjacservices.ch",
                 subject: `${r.l} — Patjac Reinigung Garten & Services`,
-                body: `${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Bericht","Adjunto el informe","Please find the report","In allegato il rapporto")}: ${r.l}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+                body: `${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Bericht","Adjunto el informe","Please find the report","In allegato il rapporto")}: ${r.l}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
               })} size="sm">📧</CPBtn>
             </div>
           </CPCard>
@@ -6551,9 +6573,9 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
               notify(L("Backup heruntergeladen ✓","Copia descargada ✓","Backup downloaded ✓","Backup scaricato ✓"),"success");
             }, variant:"secondary"},
             {l:"📧 "+L("Systembericht senden","Enviar informe sistema","Send system report","Invia rapporto sistema"), v:()=>sendByEmail({
-              to: companySettings.email||"patjacservices@outlook.com",
+              to: companySettings.email||"info@patjacservices.ch",
               subject: `Patjac Business Suite — ${L("Systembericht","Informe del sistema","System Report","Rapporto di sistema")}`,
-              body: `${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Systembericht von Patjac Business Suite.","Adjunto el informe del sistema de Patjac Business Suite.","Please find the system report from Patjac Business Suite.","In allegato il rapporto di sistema di Patjac Business Suite.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+              body: `${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Systembericht von Patjac Business Suite.","Adjunto el informe del sistema de Patjac Business Suite.","Please find the system report from Patjac Business Suite.","In allegato il rapporto di sistema di Patjac Business Suite.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
             }), variant:"secondary"},
             {l:"🔄 "+t.reset, v:()=>window.location.reload(), variant:"danger"},
           ].map(btn=>(
@@ -8341,7 +8363,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                 </div>
                 <div style={{display:"flex",gap:6,justifyContent:"center",marginTop:10}}>
                   <CPBtn onClick={()=>setQuizState({step:0,answers:[],done:false})} variant="secondary" size="sm">🔄 {t.tryAgain||"Retry"}</CPBtn>
-                  {course.progress===100&&<CPBtn onClick={()=>sendByEmail({to:"patjacservices@outlook.com",subject:(t.certificate||"Certificate")+" — Patjac Academy",body:"Patjac Academy — "+(course.titleKey?.[lang]||"")+" — "+(t.certificate||"Certificate")})} variant="success" size="sm">🏅 PDF</CPBtn>}
+                  {course.progress===100&&<CPBtn onClick={()=>sendByEmail({to:"info@patjacservices.ch",subject:(t.certificate||"Certificate")+" — Patjac Academy",body:"Patjac Academy — "+(course.titleKey?.[lang]||"")+" — "+(t.certificate||"Certificate")})} variant="success" size="sm">🏅 PDF</CPBtn>}
 
                 </div>
               </div>
@@ -8362,7 +8384,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                 <div style={{color:"#69DB7C",fontWeight:700,fontSize:14}}>{t.completed||"Completed"}</div>
                 <div style={{color:CP.textSecondary,fontSize:12}}>{t.certificate||"Certificate"} {lang==="DE"?"verfügbar":lang==="ES"?"disponible":lang==="IT"?"disponibile":"available"}</div>
               </div>
-              <CPBtn onClick={()=>sendByEmail({to:"patjacservices@outlook.com",subject:(t.certificate||"Certificate")+" — Patjac Academy",body:"Patjac Academy — "+(selCourse?.titleKey?.[lang]||"")+" — "+(t.certificate||"Certificate")})} variant="success" size="sm" style={{marginLeft:"auto"}}>
+              <CPBtn onClick={()=>sendByEmail({to:"info@patjacservices.ch",subject:(t.certificate||"Certificate")+" — Patjac Academy",body:"Patjac Academy — "+(selCourse?.titleKey?.[lang]||"")+" — "+(t.certificate||"Certificate")})} variant="success" size="sm" style={{marginLeft:"auto"}}>
                 📧 {t.download||"Get"}
               </CPBtn>
             </div>
@@ -8732,10 +8754,10 @@ function HelpModal({t, lang, onClose}){
         },
         {
           h:{DE:"Schweizer Steuern (Schätzung)",ES:"Impuestos suizos (estimación)",EN:"Swiss Taxes (Estimate)",IT:"Imposte svizzere (stima)"},
-          b:{DE:"Automatisch berechnet (Schätzwerte):\n• Gewinnsteuer Kanton Zürich: ~12% des Betriebsgewinns\n• Gewinnsteuer Bund: ~8.5%\n• MWST netto: 8.1% − Vorsteuer\n• AHV Arbeitgeber: 5.3%\n\n📧 Steuerbericht senden: Button 'Steuerbericht' → Bericht an patjacservices@outlook.com\n\n⚠️ Für die offizielle Steuerklärung: Treuhänder oder Steuerbehörde kontaktieren.",
-             ES:"Calculado automáticamente (valores estimados):\n• Impuesto beneficios Cantón Zúrich: ~12% del resultado operativo\n• Impuesto federal: ~8.5%\n• IVA neto: 8.1% − IVA soportado\n• AVS empresa: 5.3%\n\n📧 Enviar informe fiscal: Botón 'Informe fiscal' → Informe a patjacservices@outlook.com\n\n⚠️ Para la declaración fiscal oficial: Contactar al asesor fiscal o autoridades.",
-             EN:"Automatically calculated (estimated values):\n• Profit tax Canton Zurich: ~12% of operating profit\n• Federal tax: ~8.5%\n• VAT net: 8.1% − input VAT\n• AHV employer: 5.3%\n\n📧 Send tax report: 'Tax Report' button → Report to patjacservices@outlook.com\n\n⚠️ For the official tax return: Contact your tax advisor or authorities.",
-             IT:"Calcolato automaticamente (valori stimati):\n• Imposta utili Cantone Zurigo: ~12% del risultato operativo\n• Imposta federale: ~8.5%\n• IVA netta: 8.1% − IVA a credito\n• AVS azienda: 5.3%\n\n📧 Invia rapporto fiscale: Pulsante 'Rapporto fiscale' → Rapporto a patjacservices@outlook.com\n\n⚠️ Per la dichiarazione fiscale ufficiale: Contattare il consulente fiscale o le autorità."}
+          b:{DE:"Automatisch berechnet (Schätzwerte):\n• Gewinnsteuer Kanton Zürich: ~12% des Betriebsgewinns\n• Gewinnsteuer Bund: ~8.5%\n• MWST netto: 8.1% − Vorsteuer\n• AHV Arbeitgeber: 5.3%\n\n📧 Steuerbericht senden: Button 'Steuerbericht' → Bericht an info@patjacservices.ch\n\n⚠️ Für die offizielle Steuerklärung: Treuhänder oder Steuerbehörde kontaktieren.",
+             ES:"Calculado automáticamente (valores estimados):\n• Impuesto beneficios Cantón Zúrich: ~12% del resultado operativo\n• Impuesto federal: ~8.5%\n• IVA neto: 8.1% − IVA soportado\n• AVS empresa: 5.3%\n\n📧 Enviar informe fiscal: Botón 'Informe fiscal' → Informe a info@patjacservices.ch\n\n⚠️ Para la declaración fiscal oficial: Contactar al asesor fiscal o autoridades.",
+             EN:"Automatically calculated (estimated values):\n• Profit tax Canton Zurich: ~12% of operating profit\n• Federal tax: ~8.5%\n• VAT net: 8.1% − input VAT\n• AHV employer: 5.3%\n\n📧 Send tax report: 'Tax Report' button → Report to info@patjacservices.ch\n\n⚠️ For the official tax return: Contact your tax advisor or authorities.",
+             IT:"Calcolato automaticamente (valori stimati):\n• Imposta utili Cantone Zurigo: ~12% del risultato operativo\n• Imposta federale: ~8.5%\n• IVA netta: 8.1% − IVA a credito\n• AVS azienda: 5.3%\n\n📧 Invia rapporto fiscale: Pulsante 'Rapporto fiscale' → Rapporto a info@patjacservices.ch\n\n⚠️ Per la dichiarazione fiscale ufficiale: Contattare il consulente fiscale o le autorità."}
         },
       ]
     },
@@ -8830,10 +8852,10 @@ function HelpModal({t, lang, onClose}){
       items:[
         {
           h:{DE:"4 Berichtstypen",ES:"4 tipos de informes",EN:"4 Report Types",IT:"4 tipi di rapporti"},
-          b:{DE:"📅 MONATSÜBERSICHT:\n• KPIs: Einnahmen, Personalkosten, Betriebsergebnis\n• Letzte Rechnungen mit Status\n• Aufträge nach Status (Balken)\n\n📈 JAHRESBERICHT:\n• Gleiche Struktur, aber mit Jahresdaten\n• Jahres-Vergleich von Einnahmen & Kosten\n\n🏛️ STEUERBERICHT:\n• MWST: Einnahmen 8.1%, Vorsteuer, Zahlbar\n• Gewinnsteuer: Kanton ZH ~12%, Bund ~8.5%\n• Steuerschätzungen (keine offizielle Deklaration!)\n\n💼 LOHNABRECHNUNG:\n• Alle aktiven Mitarbeiter\n• Brutto / Abzüge / Netto pro Mitarbeiter\n• Gesamtkosten Arbeitgeber\n\n⬇️ Alle Berichte: Herunterladen-Button (HTML)\n📧 Alle Berichte: E-Mail an patjacservices@outlook.com",
-             ES:"📅 RESUMEN MENSUAL:\n• KPIs: Ingresos, costes personal, resultado operativo\n• Últimas facturas con estado\n• Trabajos por estado (barras)\n\n📈 INFORME ANUAL:\n• Misma estructura, pero con datos anuales\n• Comparación anual de ingresos y costes\n\n🏛️ INFORME FISCAL:\n• IVA: Ingresos 8.1%, IVA soportado, A pagar\n• Impuesto beneficios: Cantón ZH ~12%, Federal ~8.5%\n• Estimaciones fiscales (¡no declaración oficial!)\n\n💼 NÓMINAS:\n• Todos los empleados activos\n• Bruto / Deducciones / Neto por empleado\n• Coste total empresa\n\n⬇️ Todos los informes: Botón Descargar (HTML)\n📧 Todos los informes: Email a patjacservices@outlook.com",
-             EN:"📅 MONTHLY SUMMARY:\n• KPIs: Income, payroll costs, operating result\n• Recent invoices with status\n• Jobs by status (bars)\n\n📈 ANNUAL REPORT:\n• Same structure but with annual data\n• Annual comparison of income & costs\n\n🏛️ TAX REPORT:\n• VAT: Income 8.1%, input VAT, payable\n• Profit tax: Canton ZH ~12%, Federal ~8.5%\n• Tax estimates (not an official declaration!)\n\n💼 PAYROLL:\n• All active employees\n• Gross / Deductions / Net per employee\n• Total employer cost\n\n⬇️ All reports: Download button (HTML)\n📧 All reports: Email to patjacservices@outlook.com",
-             IT:"📅 RIEPILOGO MENSILE:\n• KPIs: Entrate, costi personale, risultato operativo\n• Ultime fatture con stato\n• Lavori per stato (barre)\n\n📈 RAPPORTO ANNUALE:\n• Stessa struttura ma con dati annuali\n• Confronto annuale entrate e costi\n\n🏛️ RAPPORTO FISCALE:\n• IVA: Entrate 8.1%, IVA a credito, Da pagare\n• Imposta utili: Cantone ZH ~12%, Federale ~8.5%\n• Stime fiscali (non dichiarazione ufficiale!)\n\n💼 STIPENDI:\n• Tutti i dipendenti attivi\n• Lordo / Deduzioni / Netto per dipendente\n• Costo totale azienda\n\n⬇️ Tutti i rapporti: Pulsante Scarica (HTML)\n📧 Tutti i rapporti: Email a patjacservices@outlook.com"}
+          b:{DE:"📅 MONATSÜBERSICHT:\n• KPIs: Einnahmen, Personalkosten, Betriebsergebnis\n• Letzte Rechnungen mit Status\n• Aufträge nach Status (Balken)\n\n📈 JAHRESBERICHT:\n• Gleiche Struktur, aber mit Jahresdaten\n• Jahres-Vergleich von Einnahmen & Kosten\n\n🏛️ STEUERBERICHT:\n• MWST: Einnahmen 8.1%, Vorsteuer, Zahlbar\n• Gewinnsteuer: Kanton ZH ~12%, Bund ~8.5%\n• Steuerschätzungen (keine offizielle Deklaration!)\n\n💼 LOHNABRECHNUNG:\n• Alle aktiven Mitarbeiter\n• Brutto / Abzüge / Netto pro Mitarbeiter\n• Gesamtkosten Arbeitgeber\n\n⬇️ Alle Berichte: Herunterladen-Button (HTML)\n📧 Alle Berichte: E-Mail an info@patjacservices.ch",
+             ES:"📅 RESUMEN MENSUAL:\n• KPIs: Ingresos, costes personal, resultado operativo\n• Últimas facturas con estado\n• Trabajos por estado (barras)\n\n📈 INFORME ANUAL:\n• Misma estructura, pero con datos anuales\n• Comparación anual de ingresos y costes\n\n🏛️ INFORME FISCAL:\n• IVA: Ingresos 8.1%, IVA soportado, A pagar\n• Impuesto beneficios: Cantón ZH ~12%, Federal ~8.5%\n• Estimaciones fiscales (¡no declaración oficial!)\n\n💼 NÓMINAS:\n• Todos los empleados activos\n• Bruto / Deducciones / Neto por empleado\n• Coste total empresa\n\n⬇️ Todos los informes: Botón Descargar (HTML)\n📧 Todos los informes: Email a info@patjacservices.ch",
+             EN:"📅 MONTHLY SUMMARY:\n• KPIs: Income, payroll costs, operating result\n• Recent invoices with status\n• Jobs by status (bars)\n\n📈 ANNUAL REPORT:\n• Same structure but with annual data\n• Annual comparison of income & costs\n\n🏛️ TAX REPORT:\n• VAT: Income 8.1%, input VAT, payable\n• Profit tax: Canton ZH ~12%, Federal ~8.5%\n• Tax estimates (not an official declaration!)\n\n💼 PAYROLL:\n• All active employees\n• Gross / Deductions / Net per employee\n• Total employer cost\n\n⬇️ All reports: Download button (HTML)\n📧 All reports: Email to info@patjacservices.ch",
+             IT:"📅 RIEPILOGO MENSILE:\n• KPIs: Entrate, costi personale, risultato operativo\n• Ultime fatture con stato\n• Lavori per stato (barre)\n\n📈 RAPPORTO ANNUALE:\n• Stessa struttura ma con dati annuali\n• Confronto annuale entrate e costi\n\n🏛️ RAPPORTO FISCALE:\n• IVA: Entrate 8.1%, IVA a credito, Da pagare\n• Imposta utili: Cantone ZH ~12%, Federale ~8.5%\n• Stime fiscali (non dichiarazione ufficiale!)\n\n💼 STIPENDI:\n• Tutti i dipendenti attivi\n• Lordo / Deduzioni / Netto per dipendente\n• Costo totale azienda\n\n⬇️ Tutti i rapporti: Pulsante Scarica (HTML)\n📧 Tutti i rapporti: Email a info@patjacservices.ch"}
         },
       ]
     },
@@ -9038,7 +9060,7 @@ function HelpModal({t, lang, onClose}){
           flexShrink:0,
         }}>
           <div style={{color:"rgba(255,255,255,0.3)",fontSize:12}}>
-            📧 patjacservices@outlook.com · 🇨🇭 Swiss Standard 2024
+            📧 info@patjacservices.ch · 🇨🇭 Swiss Standard 2024
           </div>
           <button onClick={onClose} style={{
             background:"linear-gradient(90deg,#1C7ED6,#00bcf2)",
@@ -9321,7 +9343,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     sendByEmail({
                       to: sup?.email||"",
                       subject: `${L("Bestellung","Pedido","Order","Ordine")} — Patjac Reinigung Garten & Services`,
-                      body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${order.supplierName||sup?.name||""},\n\n${L("Hiermit bestellen wir folgende Artikel:","Nos gustaría pedir los siguientes artículos:","We would like to order the following items:","Vorremmo ordinare i seguenti articoli:")}\n\n${(order.items||[]).map(it=>`- ${it.productName||it.name||""}: ${it.qty||""} ${it.unit||"x"}`).join("\n")}\n\n${L("Gesamtbetrag","Total","Total","Totale")}: CHF ${(order.total||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+                      body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${order.supplierName||sup?.name||""},\n\n${L("Hiermit bestellen wir folgende Artikel:","Nos gustaría pedir los siguientes artículos:","We would like to order the following items:","Vorremmo ordinare i seguenti articoli:")}\n\n${(order.items||[]).map(it=>`- ${it.productName||it.name||""}: ${it.qty||""} ${it.unit||"x"}`).join("\n")}\n\n${L("Gesamtbetrag","Total","Total","Totale")}: CHF ${(order.total||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
                     });
                   }} variant="secondary" size="sm">
                     📧 {L("PDF senden","Enviar PDF","Send PDF","Invia PDF")}
@@ -9368,7 +9390,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                   <CPBtn onClick={()=>sendByEmail({
                     to: sup.email||"",
                     subject: `${L("Bestellung","Pedido","Order","Ordine")} — Patjac Reinigung Garten & Services`,
-                    body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${sup.name},\n\n${L("Wir möchten eine Bestellung aufgeben.","Nos gustaría realizar un pedido.","We would like to place an order.","Vorremmo effettuare un ordine.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+                    body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${sup.name},\n\n${L("Wir möchten eine Bestellung aufgeben.","Nos gustaría realizar un pedido.","We would like to place an order.","Vorremmo effettuare un ordine.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
                   })} variant="secondary" size="sm">📧</CPBtn>
                   {sup.website&&<CPBtn onClick={()=>window.open(sup.website.startsWith("http")?sup.website:`https://${sup.website}`,"_blank")} variant="secondary" size="sm">🌐</CPBtn>}
                   {sup.phone&&<CPBtn onClick={()=>window.open(`tel:${sup.phone}`,"_self")} variant="secondary" size="sm">📞</CPBtn>}
@@ -10043,7 +10065,7 @@ function EmbedOrScreen({embedded,children,...rest}){ return embedded ? <>{childr
 
 function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,currentUser,contracts,setContracts,embedded,viewAsId}){
   const L = makeL(lang);
-  const cs = companySettings||{name:"Patjac Reinigung Garten & Services",street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich",phone:"+41 44 123 4567",email:"patjacservices@outlook.com",uid:"CHE-123.456.789",iban:"CH56 0483 5012 3456 7800 9"};
+  const cs = companySettings||{name:"Patjac Reinigung Garten & Services",street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich",phone:"+41 44 123 4567",email:"info@patjacservices.ch",uid:"CHE-123.456.789",iban:"CH56 0483 5012 3456 7800 9"};
   const [modal,setModal] = useState(null); // null | "form" | "preview" | "sign"
   const [filter,setFilter] = useState("all"); // all | client | employee
   const [selContract,setSelContract] = useState(null);
@@ -10488,7 +10510,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                           body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${c.entityName||entity?.name||""},\n\n${isEmp
                             ? L("Anbei Ihr Arbeitsvertrag ab","Adjunto su contrato laboral desde","Please find your employment contract from","In allegato il suo contratto di lavoro dal")
                             : L("Anbei Ihr Dienstleistungsvertrag ab","Adjunto su contrato de servicios desde","Please find your service contract from","In allegato il suo contratto di servizi dal")
-                          } ${c.startDate||""}.\n\n${L("Bitte unterschreiben Sie und senden Sie uns eine Kopie zurück.","Por favor firme y envíenos una copia de vuelta.","Please sign and return a copy to us.","Si prega di firmare e restituirci una copia.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+                          } ${c.startDate||""}.\n\n${L("Bitte unterschreiben Sie und senden Sie uns eine Kopie zurück.","Por favor firme y envíenos una copia de vuelta.","Please sign and return a copy to us.","Si prega di firmare e restituirci una copia.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
                         });
                       }} variant="primary" size="sm">📧</CPBtn>
                       {c.status==="draft"&&<CPBtn onClick={()=>{setContracts(p=>p.map(x=>x.id===c.id?{...x,status:"signed"}:x));notify(t.contractSigned,"success");}} variant="success" size="sm">✍️</CPBtn>}
