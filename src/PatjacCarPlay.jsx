@@ -339,7 +339,7 @@ const T = {
     addExpense:"Add expense", annualReport:"Annual report",
     taxReport:"Tax report", language:"Language", security:"Security",
     companyInfo:"Company", companyName:"Company name",
-    adminLogin:"Administrator", employeeLogin:"Employee",
+    adminLogin:"Administrator", employeeLogin:"Employee", tagline:"Cleaning · Garden · Services",
     password:"Password", pin:"PIN", code:"Code", loginBtn:"Login",
     cleaning:"Cleaning", gardening:"Gardening", other:"Other",
     userCode:"User code", regenerateAccess:"Regenerate",
@@ -490,7 +490,7 @@ const T = {
     addExpense:"Aggiungi spesa", annualReport:"Rapporto annuale",
     taxReport:"Rapporto fiscale", language:"Lingua", security:"Sicurezza",
     companyInfo:"Azienda", companyName:"Nome azienda",
-    adminLogin:"Amministratore", employeeLogin:"Dipendente",
+    adminLogin:"Amministratore", employeeLogin:"Dipendente", tagline:"Pulizie · Giardino · Servizi",
     password:"Password", pin:"PIN", code:"Codice", loginBtn:"Accedi",
     cleaning:"Pulizie", gardening:"Giardinaggio", other:"Altro",
     userCode:"Codice utente", regenerateAccess:"Rigenera",
@@ -708,7 +708,26 @@ const GAV_CATEGORIES = [
   {id:"garten_teamleiter",  label:"Teamleiter/in Gartenbau",              hourly:27.00, monthly:null, sector:"garten",
    description:{DE:"Teamleiter/in im Garten- und Landschaftsbau. Verantwortlich für Baustelle und Team.",ES:"Jefe/a de equipo en jardinería. Responsable de obra y equipo.",EN:"Team leader in landscaping. Responsible for site and team.",IT:"Team leader in giardinaggio. Responsabile del cantiere e del team."}},
 ];
-const todayStr = ymd(new Date());
+// Local cache write that never crashes the app when the phone's storage is full (e.g. many photos)
+const lsSafeSet = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){ try{ localStorage.removeItem(k); }catch(_){} } };
+// ─── DATE FORMAT used everywhere: day, month name, year (e.g. "28 septiembre 2026") ───
+let appLang = "ES";   // updated by the main component when the language changes
+const MONTH_NAMES = {
+  DE:["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"],
+  ES:["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"],
+  EN:["January","February","March","April","May","June","July","August","September","October","November","December"],
+  IT:["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"],
+};
+const toYmd = d => { if(!d) return ""; if(d instanceof Date) return ymd(d); const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[1]}-${m[2]}-${m[3]}`:""; };
+const fmtDate = (d, lang=appLang) => {
+  const s = toYmd(d); if(!s) return d ? String(d) : "";
+  const [y,m,dd] = s.split("-").map(Number); const mn=(MONTH_NAMES[lang]||MONTH_NAMES.ES)[m-1];
+  return lang==="DE" ? `${dd}. ${mn} ${y}` : `${dd} ${mn} ${y}`;
+};
+// Short version for lists of several days: "3 sep"
+const fmtDateShort = (d, lang=appLang) => { const s=toYmd(d); if(!s) return ""; const [,m,dd]=s.split("-").map(Number); return `${dd}${lang==="DE"?".":""} ${(MONTH_NAMES[lang]||MONTH_NAMES.ES)[m-1].slice(0,3)}`; };
+// "Today" (local date). Kept up to date by the clock in the main component, so it changes at midnight.
+let todayStr = ymd(new Date());
 
 const DEMO_CLIENTS = [
   {id:"8fbebdda-e071-4d95-a935-6dd2b1d7c78c",firstName:"Hans",lastName:"Müller",name:"Hans Müller",street:"Bahnhofstrasse",number:"15",postalCode:"8001",city:"Zürich",phone:"+41 79 123 4567",email:"hans@email.ch",frequency:"weekly",billingType:"perService",price:120,serviceType:"cleaning",notes:"Schlüssel unter Matte",active:true},
@@ -856,16 +875,21 @@ function CPCard({children, style:xs, onClick}){
 }
 
 function CPInput({value,onChange,placeholder,type="text",style:xs,min,max}){
-  return (
-    <input type={type} value={value} onChange={onChange} placeholder={placeholder} min={min} max={max}
+  const input = (
+    <input type={type} value={value??""} onChange={onChange} placeholder={placeholder} min={min} max={max}
       style={{
         width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.07)",
         border:`1px solid ${CP.border}`, borderRadius: CP.radiusSm,
         color: CP.textPrimary, fontSize:15, fontFamily: CP.font,
-        outline:"none", boxSizing:"border-box", ...xs,
+        outline:"none", boxSizing:"border-box", colorScheme:"dark", ...xs,
       }}
     />
   );
+  // Dates: also show the chosen day written out (e.g. "28 septiembre 2026"), whatever the phone's format is
+  if(type==="date" && value) return (
+    <div>{input}<div style={{color:CP.textTertiary,fontSize:11.5,marginTop:3,paddingLeft:4}}>📅 {fmtDate(value)}</div></div>
+  );
+  return input;
 }
 function CPSelect({value,onChange,children,style:xs}){
   return (
@@ -1072,7 +1096,7 @@ function CPScreen({title,icon,onBack,actions,children,t}){
 // ─── MAIN APP ────────────────────────────────────────────────
 export default function PatjacCarPlay(){
   const [lang,setLangRaw] = useState(()=>localStorage.getItem('patjac_lang')||"ES");
-  const setLang = (l) => { setLangRaw(l); try{localStorage.setItem('patjac_lang',l);}catch(e){} };
+  const setLang = (l) => { setLangRaw(l); try{lsSafeSet('patjac_lang',l);}catch(e){} };
   const t = T[lang];
 
   const [authState,setAuthState] = useState("login");
@@ -1090,6 +1114,8 @@ export default function PatjacCarPlay(){
   const [clock,setClock] = useState(new Date());
   const [dbReady,setDbReady] = useState(false);
   const [invoicePrefill,setInvoicePrefill] = useState(null); // reminder → open a pre-filled invoice
+  const [showSearch,setShowSearch] = useState(false);
+  const [showShare,setShowShare] = useState(false);
   const [dbError,setDbError] = useState(null);
 
   // ─── SUPABASE REST API ───────────────────────────────────
@@ -1156,7 +1182,7 @@ export default function PatjacCarPlay(){
       Object.keys(row).forEach(k => (row[k]===undefined||row[k]===null) && delete row[k]);
       // Convert empty strings to null for numeric and date fields
       const numericFields = ['price','amount','salary','hourly_rate','fixed_salary','total','vat_amount','hours','actual_hours'];
-      const dateFields = ['date','start_date','end_date','due_date','contract_date','delivery_date','clock_in','clock_out'];
+      const dateFields = ['date','start_date','end_date','due_date','contract_date','delivery_date','clock_in','clock_out','trial_period','birth_date','period_from','period_to'];
       const uuidFields = ['client_id','employee_id','supplier_id','job_id'];
       numericFields.forEach(k => { if(row[k]==="") row[k]=null; if(row[k]!==undefined&&row[k]!==null&&isNaN(Number(row[k]))) delete row[k]; });
       dateFields.forEach(k => { if(row[k]==="") row[k]=null; });
@@ -1281,7 +1307,6 @@ export default function PatjacCarPlay(){
             mwstNr:sett.mwst_nr||prev.mwstNr, iban:sett.iban||prev.iban,
             bic:sett.bic||prev.bic,
             adminEmail:sett.admin_email||prev.adminEmail,
-            adminPassword:sett.admin_password||prev.adminPassword,
             logo:sett.logo||prev.logo,
           }));
         }
@@ -1352,6 +1377,8 @@ export default function PatjacCarPlay(){
       const maxDate = group.reduce((m,j)=>j.date>m?j.date:m, group[0].date);
       const maxD = new Date(maxDate+"T00:00:00");
       const daysUntilEnd = Math.round((maxD - todayD)/86400000);
+      // Only extend series that are still running (a series whose future jobs were deleted stays stopped)
+      if(daysUntilEnd < 0) return;
       if(sample.recurrence==="weekly" && (sample.recurWeekdays||[]).length && daysUntilEnd < 21){
         let cursor = new Date(maxD); cursor.setDate(cursor.getDate()+1);
         const end = new Date(maxD); end.setDate(end.getDate()+12*7);
@@ -1374,7 +1401,7 @@ export default function PatjacCarPlay(){
     if(toAdd.length){
       setJobs(prev=>{
         const next=[...prev,...toAdd];
-        localStorage.setItem('patjac_jobs',JSON.stringify(next));
+        lsSafeSet('patjac_jobs',JSON.stringify(next));
         return next;
       });
       if(supa) toAdd.forEach(x=>dbSave('jobs',x));
@@ -1387,11 +1414,12 @@ export default function PatjacCarPlay(){
     phone:"+41 44 123 4567",email:"patjacservices@outlook.com",
     uid:"CHE-123.456.789",mwstNr:"CHE-123.456.789 MWST",
     iban:"CH56 0483 5012 3456 7800 9",bic:"CRESCHZZ80A",
-    adminEmail:"patjacservices@outlook.com",adminPassword:"Patjac7684Patjac",
+    adminEmail:"patjacservices@outlook.com",
     logo:"🌿",
   });
 
-  useEffect(()=>{ const i=setInterval(()=>setClock(new Date()),1000); return()=>clearInterval(i); },[]);
+  useEffect(()=>{ const i=setInterval(()=>{ const now=new Date(); todayStr=ymd(now); setClock(now); },1000); return()=>clearInterval(i); },[]);
+  appLang = lang;
 
   const notify = useCallback((msg,type="success",ms=3000)=>{
     setNotification({msg,type});
@@ -1414,15 +1442,32 @@ export default function PatjacCarPlay(){
     });
   },[messages, currentUser?.id]);
 
+  // Unpaid invoices past their due date become "overdue" automatically
+  useEffect(()=>{
+    if(!dbReady) return;
+    const late = invoices.filter(i=>i.status!=="paid"&&i.status!=="overdue"&&i.dueDate&&i.dueDate<todayStr);
+    if(!late.length) return;
+    const ids = new Set(late.map(i=>i.id));
+    setInvoices(prev=>prev.map(i=>ids.has(i.id)?{...i,status:"overdue"}:i));
+    late.forEach(i=>dbSave('invoices',{...i,status:"overdue"}));
+  },[invoices, dbReady, ymd(clock)]);
+
   // ─── LOGIN ──────────────────────────────────────────────
   const L = makeL(lang);
-  const handleLogin = () => {
+  const [loginBusy,setLoginBusy] = useState(false);
+  const handleLogin = async () => {
     setLoginErr("");
     if(authType==="admin"){
-      if(loginEmail===companySettings.adminEmail && loginPw===companySettings.adminPassword){
+      if(loginBusy) return;
+      setLoginBusy(true);
+      let ok=false;
+      try{ ok = await supaRpc("admin_login",{p_email:loginEmail.trim(),p_password:loginPw}); }
+      catch(e){ setLoginErr(L("Keine Verbindung – bitte erneut versuchen","Sin conexión – inténtelo de nuevo","No connection – please try again","Nessuna connessione – riprova")); setLoginBusy(false); return; }
+      setLoginBusy(false);
+      if(ok===true){
         setCurrentUser({id:"admin",name:"Administrator",role:"admin"});
-        setAuthState("app");
-      } else setLoginErr(L("Ungültige E-Mail oder Passwort","Correo o contraseña incorrectos","Invalid email or password","Email o password non corretti"));
+        setAuthState("app"); setLoginPw("");
+      } else setLoginErr(L("Ungültige E-Mail oder Passwort (nach 5 Fehlversuchen 15 Min. gesperrt)","Correo o contraseña incorrectos (tras 5 intentos fallidos se bloquea 15 min)","Invalid email or password (locked 15 min after 5 failed attempts)","Email o password non corretti (bloccato 15 min dopo 5 tentativi)"));
     } else {
       const emp = employees.find(e=>e.pin===loginPin.trim());
       if(emp){ setCurrentUser({id:emp.id,name:emp.name,role:"employee",code:emp.code||emp.userCode}); setAuthState("app"); }
@@ -1459,17 +1504,17 @@ export default function PatjacCarPlay(){
 
   const renderApp = () => {
     // Supabase-aware setters
-    const dbSetClients   = (fn) => { setClients(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_clients',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('clients',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('clients',x);}); }return next;}); };
-    const dbSetEmployees = (fn) => { setEmployees(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_employees',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('employees',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('employees',x);}); }return next;}); };
-    const dbSetJobs      = (fn) => { setJobs(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_jobs',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('jobs',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('jobs',x);}); }return next;}); };
-    const dbSetInvoices  = (fn) => { setInvoices(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_invoices',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('invoices',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('invoices',x);}); }return next;}); };
-    const dbSetTimeclock = (fn) => { setTimeclock(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_timeclock',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('timeclock',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('timeclock',x);}); }return next;}); };
-    const dbSetMessages  = (fn) => { setMessages(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_messages',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('messages',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('messages',x);}); }return next;}); };
-    const dbSetExpenses  = (fn) => { setExpenses(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_expenses',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('expenses',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('expenses',x);}); }return next;}); };
-    const dbSetOrders    = (fn) => { setOrders(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_orders',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('orders',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('orders',x);}); }return next;}); };
-    const dbSetContracts = (fn) => { setContracts(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_contracts',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('contracts',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('contracts',x);}); }return next;}); };
-    const dbSetProducts  = (fn) => { setProducts(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_products',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('products',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('products',x);}); }return next;}); };
-    const dbSetSuppliers = (fn) => { setSuppliers(prev=>{ const next=typeof fn==='function'?fn(prev):fn; localStorage.setItem('patjac_suppliers',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('suppliers',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('suppliers',x);}); }return next;}); };
+    const dbSetClients   = (fn) => { setClients(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_clients',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('clients',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('clients',x);}); }return next;}); };
+    const dbSetEmployees = (fn) => { setEmployees(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_employees',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('employees',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('employees',x);}); }return next;}); };
+    const dbSetJobs      = (fn) => { setJobs(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_jobs',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('jobs',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('jobs',x);}); }return next;}); };
+    const dbSetInvoices  = (fn) => { setInvoices(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_invoices',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('invoices',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('invoices',x);}); }return next;}); };
+    const dbSetTimeclock = (fn) => { setTimeclock(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_timeclock',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('timeclock',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('timeclock',x);}); }return next;}); };
+    const dbSetMessages  = (fn) => { setMessages(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_messages',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('messages',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('messages',x);}); }return next;}); };
+    const dbSetExpenses  = (fn) => { setExpenses(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_expenses',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('expenses',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('expenses',x);}); }return next;}); };
+    const dbSetOrders    = (fn) => { setOrders(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_orders',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('orders',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('orders',x);}); }return next;}); };
+    const dbSetContracts = (fn) => { setContracts(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_contracts',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('contracts',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('contracts',x);}); }return next;}); };
+    const dbSetProducts  = (fn) => { setProducts(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_products',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('products',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('products',x);}); }return next;}); };
+    const dbSetSuppliers = (fn) => { setSuppliers(prev=>{ const next=typeof fn==='function'?fn(prev):fn; lsSafeSet('patjac_suppliers',JSON.stringify(next)); if(supa){const p=new Set((prev||[]).map(x=>x.id));const n=new Set(next.map(x=>x.id));(prev||[]).filter(x=>!n.has(x.id)).forEach(x=>dbDelete('suppliers',x.id));next.forEach(x=>{const o=(prev||[]).find(p=>p.id===x.id);if(!o||JSON.stringify(o)!==JSON.stringify(x))dbSave('suppliers',x);}); }return next;}); };
     const dbSetCompanySettings = (fn) => { setCompanySettings(prev=>{ const next=typeof fn==='function'?fn(prev):fn; if(supa) dbSave('settings', {id:'company', ...next}); return next; }); };
 
     const props = {t,lang,clients,setClients:dbSetClients,employees,setEmployees:dbSetEmployees,jobs,setJobs:dbSetJobs,invoices,setInvoices:dbSetInvoices,timeclock,setTimeclock:dbSetTimeclock,messages,setMessages:dbSetMessages,expenses,setExpenses:dbSetExpenses,orders,setOrders:dbSetOrders,contracts,setContracts:dbSetContracts,products,setProducts:dbSetProducts,suppliers,setSuppliers:dbSetSuppliers,notify,currentUser,companySettings,setCompanySettings:dbSetCompanySettings,openApp,onBack:()=>setActiveApp(null)};
@@ -1654,6 +1699,8 @@ export default function PatjacCarPlay(){
           )}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:16}}>
+          {currentUser?.role==="admin"&&<button onClick={()=>setShowSearch(true)} title={L("Alles suchen","Buscar en toda la app","Search everything","Cerca ovunque")} style={{background:"rgba(28,126,214,0.25)",border:"1px solid rgba(28,126,214,0.5)",borderRadius:10,color:"#fff",padding:"4px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>🔍 {L("Suchen","Buscar","Search","Cerca")}</button>}
+          <button onClick={()=>setShowShare(true)} title={L("App teilen","Compartir la app","Share the app","Condividi l'app")} style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:10,color:"#fff",padding:"4px 9px",cursor:"pointer",fontSize:14}}>📲</button>
           {/* Lang */}
           <div style={{display:"flex",gap:4}}>
             {["DE","ES","EN","IT"].map(l=>(
@@ -1678,6 +1725,9 @@ export default function PatjacCarPlay(){
         </div>
       </div>
 
+      {showSearch&&<GlobalSearch lang={lang} onClose={()=>setShowSearch(false)} openApp={(id)=>{ setActiveApp(null); setTimeout(()=>openApp(id),0); }}
+        clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} orders={orders} products={products} suppliers={suppliers}/>}
+      {showShare&&<ShareAppModal lang={lang} onClose={()=>setShowShare(false)}/>}
       {/* ── CONTENT ── */}
       <div style={{flex:1,overflow:"hidden",position:"relative"}}>
         {activeApp ? (
@@ -1791,7 +1841,7 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
   const dayStr = clock.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"long",day:"numeric",month:"long"});
   const todayJobs = jobs.filter(j=>j.date===todayStr);
   const pending = invoices.filter(i=>i.status==="overdue").length;
-  const unreadMsg = messages.filter(m=>!m.read).length;
+  const unreadMsg = messages.filter(m=>!m.read&&m.to===(currentUser?.id||"admin")).length;
   const allApps = APPS;
   return (
     <div style={{height:"100%",overflow:"auto",padding:"20px 28px 10px"}}>
@@ -1920,7 +1970,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
         <div style={{fontSize:48,fontWeight:700,color:"#fff",letterSpacing:-2,margin:"14px 0 4px",lineHeight:1}}>
           {clock.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
         </div>
-        <div style={{color:CP.textSecondary,fontSize:13}}>{clock.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB")}</div>
+        <div style={{color:CP.textSecondary,fontSize:13}}>{fmtDate(clock,lang)}</div>
       </div>
 
       <div style={{padding:"16px 20px 100px"}}>
@@ -2330,7 +2380,7 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
   useEffect(()=>{ if(totals){ saveSpesen(emp.id,year,month,spesenTotal); onSpesen&&onSpesen(spesenTotal); } },[rows, withMeals]);
 
   const fm = n=>Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const fd = d=>{ const x=new Date(d+"T00:00:00"); return x.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"short",day:"2-digit",month:"2-digit"}); };
+  const fd = d=>{ const x=new Date(d+"T00:00:00"); return x.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"short"})+" "+fmtDate(d,lang); };
   const th = {padding:"5px 6px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #000",fontSize:10.5};
   const td = {padding:"4px 6px",borderBottom:"1px solid #eee",fontSize:10.5,verticalAlign:"top"};
 
@@ -2470,9 +2520,7 @@ function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings,
   };
   const monthNames = MONTHS[lang]||MONTHS.EN;
   const monthName  = monthNames[month-1];
-  const payDate    = new Date(year, month, 4).toLocaleDateString(
-    lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB"
-  );
+  const payDate    = fmtDate(new Date(year, month, 4), lang);
   const L = makeL(lang);
 
   const generatePDF = (returnHtml) => {
@@ -2831,7 +2879,7 @@ td:last-child{text-align:right;font-weight:600}
           {/* ── Footer ── */}
           <div style={{marginTop:18,borderTop:"1px solid #eee",paddingTop:10,display:"flex",justifyContent:"space-between",fontSize:10,color:"#888"}}>
             <span>{cs.name} · {cs.uid}</span>
-            <span>{L("Erstellt am","Generado el","Generated on","Generato il")} {new Date().toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB")}</span>
+            <span>{L("Erstellt am","Generado el","Generated on","Generato il")} {fmtDate(new Date(),lang)}</span>
             <span>🇨🇭 Swiss Payroll {year}</span>
           </div>
 
@@ -2944,10 +2992,9 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
   const [selYear,setSelYear] = useState(now.getFullYear());
   const isAdmin = currentUser?.role==="admin";
-  const [empSearch,setEmpSearch] = useState("");
+  const [empSearch,setEmpSearch] = useState(()=>takePendingSearch("employees"));
   const visibleEmps = (isAdmin ? employees : employees.filter(e=>e.id===currentUser?.id))
-    .filter(e=>{ const q=empSearch.trim().toLowerCase(); if(!q) return true;
-      return [e.name,e.city,e.phone,e.email,e.ahv,e.street].some(v=>String(v||"").toLowerCase().includes(q)); });
+    .filter(e=>matchSearch(empSearch,e.name,e.city,e.phone,e.email,e.ahv,e.street,e.startDate));
   const monthNames = MONTHS[lang]||MONTHS.EN;
 
   const openPayslip = (emp) => {
@@ -3080,7 +3127,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                   </div>
                   {[
                     ["AHV/AVS",pay.ahvEmp],["ALV/AD",pay.alvEmp],
-                    ["NBUV/AINF",pay.nbuvEmp],["BVG/LPP",pay.bvgEmp],["KTG/IS",pay.ktgEmp],
+                    ["NBUV/AINF",pay.nbuvEmp],["BVG/LPP",pay.bvgEmp],["KTG/IS",pay.ktgEmp],...(parseFloat(pay.qstEmp)>0?[["QST/IF",pay.qstEmp]]:[]),
                   ].map(([l,v])=>(
                     <div key={l} style={{background:"rgba(201,42,42,0.07)",border:"1px solid rgba(201,42,42,0.15)",borderRadius:10,padding:"8px 10px"}}>
                       <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>− {l}</div>
@@ -3138,7 +3185,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                       sendByEmail({
                         to: emp.email||"",
                         subject: `Lohnabrechnung / Nómina — ${emp.name} — ${selMonth}/${selYear}`,
-                        body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${emp.name},\n\n${L("Anbei Ihre Lohnabrechnung","Adjunto su nómina","Please find your payslip","In allegato la sua busta paga")} ${selMonth}/${selYear}:\n\n${L("Bruttolohn","Salario bruto","Gross salary","Salario lordo")}: CHF ${Number(pay.gross||0).toFixed(2)}\n${L("Nettolohn","Salario neto","Net salary","Salario netto")}: CHF ${Number(pay.net||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+                        body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${emp.name},\n\n${L("Anbei Ihre Lohnabrechnung","Adjunto su nómina","Please find your payslip","In allegato la sua busta paga")} ${selMonth}/${selYear}:\n\n${L("Bruttolohn","Salario bruto","Gross salary","Salario lordo")}: CHF ${Number(pay.grossTotal||0).toFixed(2)}\n${L("Nettolohn","Salario neto","Net salary","Salario netto")}: CHF ${Number(pay.net||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
                       });
                     }} variant="secondary" size="sm">
                       📧 {t.payrollSend||"Senden"}
@@ -3407,7 +3454,8 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
   const [,setSpesenTick] = useState(0);
   useQstTariffs(employees);
   const isAdmin = currentUser?.role==="admin";
-  const visibleEmps = isAdmin ? employees : employees.filter(e=>e.id===currentUser?.id);
+  const [paySearch,setPaySearch] = useState("");
+  const visibleEmps = (isAdmin ? employees : employees.filter(e=>e.id===currentUser?.id)).filter(e=>matchSearch(paySearch,e.name,e.ahv,e.phone));
   const monthNames = MONTHS[lang]||MONTHS.EN;
   const L = makeL(lang);
 
@@ -3460,6 +3508,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
       </CPCard>
 
       {/* Employee list */}
+      {isAdmin&&<SearchBox value={paySearch} onChange={setPaySearch} lang={lang} placeholder={`🔍 ${makeL(lang)("Mitarbeiter suchen","Buscar empleado","Search employee","Cerca dipendente")}`}/>}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {visibleEmps.map(emp=>{
           const pay=calcSwissPayroll(emp,timeclock,selMonth,selYear,jobs,{spesen:getSavedSpesen(emp.id,selYear,selMonth)});
@@ -3531,7 +3580,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
 function DashApp({t,clients,jobs,invoices,employees,timeclock,notify,openApp,onBack,lang,companySettings}){
   const L = makeL(lang);
   const today=ymd(new Date());
-  const income=invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+(i.total||0),0);
+  const income=invoices.filter(i=>i.status==="paid"&&(i.date||"").startsWith(today.slice(0,7))).reduce((s,i)=>s+(Number(i.total)||0),0);
   const pending=invoices.filter(i=>i.status==="pending"||i.status==="overdue").length;
   const overdue=invoices.filter(i=>i.status==="overdue");
   const todayJobs=jobs.filter(j=>j.date===today);
@@ -3594,8 +3643,8 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
   const [modal,setModal]=useState(null);
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState({});
-  const [search,setSearch]=useState("");
-  const ff=clients.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())||c.city?.toLowerCase().includes(search.toLowerCase()));
+  const [search,setSearch]=useState(()=>takePendingSearch("clients"));
+  const ff=clients.filter(c=>matchSearch(search,c.name,c.street,c.city,c.postalCode,c.phone,c.email,c.notes));
   const bulk=useBulkSelect();
 
   const openAdd=()=>{setForm({firstName:"",lastName:"",street:"",number:"",postalCode:"",city:"",phone:"",email:"",frequency:"weekly",billingType:"perService",price:"",serviceType:"cleaning",notes:"",active:true});setEditId(null);setModal("form");};
@@ -3612,7 +3661,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
     <CPScreen title={t.clients} icon="👥" onBack={onBack} t={t}
       actions={<CPBtn onClick={openAdd}>＋ {t.addClient}</CPBtn>}
     >
-      <div style={{marginBottom:14}}><CPInput value={search} onChange={e=>setSearch(e.target.value)} placeholder={`🔍 ${t.search||"Suchen..."}`}/></div>
+      <SearchBox value={search} onChange={setSearch} lang={lang} placeholder={`🔍 ${L("Kunde suchen (Name, Adresse, Telefon …)","Buscar cliente (nombre, dirección, teléfono …)","Search client (name, address, phone …)","Cerca cliente (nome, indirizzo, telefono …)")}`}/>
       <BulkBar bulk={bulk} visibleIds={ff.map(c=>c.id)} lang={lang}
         itemWord={{DE:"Kunden",ES:"clientes",EN:"clients",IT:"clienti"}}
         onDelete={ids=>{setClients(p=>p.filter(c=>!ids.has(c.id)));notify(t.success);}}/>
@@ -3719,8 +3768,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
     ? jobs
     : jobs.filter(j=>j.employeeId===currentUser?.id);
 
+  const [jobSearch,setJobSearch] = useState(()=>takePendingSearch("jobs"));
   const ff = visibleJobs
     .filter(j=>filter==="all"?true:j.status===filter)
+    .filter(j=>matchSearch(jobSearch,j.clientName,j.employeeName,j.date,j.description,fmtAddr(clients.find(c=>c.id===j.clientId))))
     .sort((a,b)=>`${a.date||""}${a.timeStart||""}`.localeCompare(`${b.date||""}${b.timeStart||""}`));
   const bulk = useBulkSelect();
   // Client price is CHF per hour → job amount = rate × planned hours
@@ -3825,6 +3876,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
           </div>
         }
       >
+        <SearchBox value={jobSearch} onChange={setJobSearch} lang={lang}/>
         {/* Summary bar */}
         <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
           {[
@@ -3931,7 +3983,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                         borderRadius:10,padding:"6px 12px",display:"flex",alignItems:"center",gap:6,
                       }}>
                         <span style={{fontSize:14}}>📅</span>
-                        <div style={{color:CP.textSecondary,fontSize:13}}>{job.date}</div>
+                        <div style={{color:CP.textSecondary,fontSize:13}}>{fmtDate(job.date)}</div>
                       </div>
                     </div>
                   </div>
@@ -3962,6 +4014,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         {<CPBtn onClick={()=>{setForm(withAutoAmount({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",employeeIds:employees[0]?[employees[0].id]:[],totalHours:2,serviceType:"cleaning",description:"",date:ymd(new Date()),timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]}));setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
       </>}
     >
+      <SearchBox value={jobSearch} onChange={setJobSearch} lang={lang} placeholder={`🔍 ${L("Auftrag suchen (Kunde, Mitarbeiter, Datum, Adresse …)","Buscar trabajo (cliente, empleado, fecha, dirección …)","Search job (client, employee, date, address …)","Cerca lavoro (cliente, dipendente, data, indirizzo …)")}`}/>
       {isAdmin&&<BulkBar bulk={bulk} visibleIds={ff.map(j=>j.id)} lang={lang}
         itemWord={{DE:"Aufträge",ES:"trabajos",EN:"jobs",IT:"lavori"}}
         onDelete={ids=>{setJobs(p=>p.filter(j=>!ids.has(j.id)));notify(L("Aufträge gelöscht","Trabajos eliminados","Jobs deleted","Lavori eliminati"),"success");}}/>}
@@ -3976,7 +4029,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                   <span style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{job.clientName}</span>
                   <CPBadge text={statusLabel(job.status)} color={statusColor(job.status)}/>
                 </div>
-                <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {job.date} · {job.timeStart}–{job.timeEnd}</div>
+                <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {fmtDate(job.date)} · {job.timeStart}–{job.timeEnd}</div>
                 {(()=>{const c=clients.find(x=>x.id===job.clientId); const addr=c?fmtAddr(c):(job.clientAddress||""); return addr?(
                   <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
                     style={{display:"inline-block",color:"#74C0FC",fontSize:12.5,marginTop:3,textDecoration:"none"}}>📍 {addr}</a>
@@ -4135,7 +4188,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
                 <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>{job?.serviceType==="cleaning"?"🧹":"🌿"} {job?.clientName}</div>
-                <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{job?.date} · {job?.timeStart}–{job?.timeEnd} · CHF {(job?.amount||0).toFixed(2)}</div>
+                <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{fmtDate(job?.date)} · {job?.timeStart}–{job?.timeEnd} · CHF {(job?.amount||0).toFixed(2)}</div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
                 {L("Dieser Auftrag wird permanent gelöscht.","Este trabajo será eliminado permanentemente.","This job will be permanently deleted.","Questo lavoro verrà eliminato definitivamente.")}
@@ -4149,6 +4202,138 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         );
       })()}
     </CPScreen>
+  );
+}
+
+// ─── SEARCH (names, numbers and dates in any format) ─────────
+const normTxt = v => String(v??"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+// A date is searchable as 2026-09-28, 28.09.2026, 28/09/2026 and "28 septiembre 2026" in all 4 languages
+const dateSearchText = d => {
+  const s = toYmd(d); if(!s) return "";
+  const [y,m,dd] = s.split("-");
+  return [s, `${dd}.${m}.${y}`, `${+dd}.${+m}.${y}`, `${dd}/${m}/${y}`, `${+dd}/${+m}/${y}`, ...["DE","ES","EN","IT"].map(l=>fmtDate(s,l).replace(".",""))].join(" ");
+};
+const searchText = (...vals) => normTxt(vals.map(v => (typeof v==="string" && /^\d{4}-\d{2}-\d{2}/.test(v)) ? `${v} ${dateSearchText(v)}` : v).join(" "));
+// Every word typed must appear (order does not matter): "hans septiembre" finds Hans's items in September
+const matchSearch = (q, ...vals) => { const words = normTxt(q).replace(/[,;]/g," ").split(/\s+/).filter(Boolean); if(!words.length) return true; const txt = searchText(...vals); return words.every(w=>txt.includes(w)); };
+
+// Search box used inside each section
+function SearchBox({value, onChange, placeholder, lang}){
+  const L = makeL(lang||appLang);
+  return (
+    <div style={{position:"relative",marginBottom:14}}>
+      <CPInput value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder||`🔍 ${L("Suchen (Name, Datum …)","Buscar (nombre, fecha …)","Search (name, date …)","Cerca (nome, data …)")}`}/>
+      {value&&<button onClick={()=>onChange("")} style={{position:"absolute",right:10,top:9,background:"rgba(255,255,255,.12)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"4px 9px"}}>✕</button>}
+    </div>
+  );
+}
+
+// Search that a section should start with (set by the global search when opening a result)
+let pendingSectionSearch = null;
+const takePendingSearch = (app) => { if(pendingSectionSearch && pendingSectionSearch.app===app){ const q=pendingSectionSearch.q; pendingSectionSearch=null; return q; } return ""; };
+
+// ─── GLOBAL SEARCH (everything in the app) ───────────────────
+function GlobalSearch({lang, onClose, openApp, clients, employees, jobs, invoices, contracts, orders, products, suppliers}){
+  const L = makeL(lang);
+  const [q,setQ] = useState("");
+  const [docs,setDocs] = useState([]);
+  useEffect(()=>{ docsFetch("employee_documents?select=id,employee_id,title,category,period,created_at&order=created_at.desc&limit=500").then(r=>setDocs(r||[])).catch(()=>{}); },[]);
+  const empName = id => (employees||[]).find(e=>e.id===id)?.name || L("Alle","Todos","All","Tutti");
+  const fm = n => `CHF ${Number(n||0).toFixed(2)}`;
+  const groups = useMemo(()=>{
+    if(normTxt(q).trim().length<2) return [];
+    const G = (key, icon, title, app, items) => ({key,icon,title,app,items:items.slice(0,30),count:items.length});
+    return [
+      G("clients","👥",L("Kunden","Clientes","Clients","Clienti"),"clients",
+        (clients||[]).filter(c=>matchSearch(q,c.name,c.street,c.city,c.postalCode,c.phone,c.email,c.notes))
+          .map(c=>({id:c.id,title:c.name,sub:[fmtAddr(c),c.phone].filter(Boolean).join(" · "),search:c.name}))),
+      G("employees","👤",L("Mitarbeiter","Empleados","Employees","Dipendenti"),"employees",
+        (employees||[]).filter(e=>matchSearch(q,e.name,e.city,e.phone,e.email,e.ahv,e.startDate))
+          .map(e=>({id:e.id,title:e.name,sub:[e.phone,e.email].filter(Boolean).join(" · "),search:e.name}))),
+      G("jobs","📋",L("Aufträge","Trabajos","Jobs","Lavori"),"jobs",
+        (jobs||[]).filter(j=>matchSearch(q,j.clientName,j.employeeName,j.date,j.description,j.serviceType==="cleaning"?"limpieza reinigung cleaning":j.serviceType==="repairs"?"reparaciones reparatur repairs":"jardineria garten gardening"))
+          .sort((a,b)=>String(b.date).localeCompare(String(a.date)))
+          .map(j=>({id:j.id,title:`${j.clientName} · ${fmtDate(j.date)}`,sub:`${j.employeeName||""} · ${j.timeStart||""}–${j.timeEnd||""}`,search:`${j.clientName} ${fmtDate(j.date)}`}))),
+      G("invoices","🧾",L("Rechnungen","Facturas","Invoices","Fatture"),"invoices",
+        (invoices||[]).filter(i=>matchSearch(q,i.invoiceNumber,i.clientName,i.date,i.dueDate,i.periodFrom,i.periodTo,String(i.total)))
+          .sort((a,b)=>String(b.date).localeCompare(String(a.date)))
+          .map(i=>({id:i.id,title:`${i.invoiceNumber} · ${i.clientName}`,sub:`${fmtDate(i.date)} · ${fm(i.total)} · ${i.status==="paid"?L("bezahlt","pagada","paid","pagata"):L("offen","pendiente","open","aperta")}`,search:i.invoiceNumber}))),
+      G("contracts","📝",L("Verträge","Contratos","Contracts","Contratti"),"contracts",
+        (contracts||[]).filter(c=>matchSearch(q,c.entityName,c.contractDate,c.startDate,c.endDate,c.type==="client"?"cliente client kunde":"empleado employee mitarbeiter"))
+          .map(c=>({id:c.id,title:c.entityName||"—",sub:`${c.type==="client"?L("Kundenvertrag","Contrato de cliente","Client contract","Contratto cliente"):L("Arbeitsvertrag","Contrato laboral","Employment contract","Contratto di lavoro")} · ${fmtDate(c.contractDate||c.startDate)}`,search:c.entityName}))),
+      G("documents","📁",L("Dokumente","Documentos","Documents","Documenti"),"documents",
+        docs.filter(d=>matchSearch(q,d.title,empName(d.employee_id),d.created_at,d.period?`${d.period}-01`:""))
+          .map(d=>({id:d.id,title:d.title,sub:`${empName(d.employee_id)} · ${fmtDate(d.created_at)}`,search:""}))),
+      G("orders","📦",L("Bestellungen","Pedidos","Orders","Ordini"),"inventory",
+        (orders||[]).filter(o=>matchSearch(q,o.supplierName,o.date,o.deliveryDate,(o.items||[]).map(i=>i.productName).join(" ")))
+          .map(o=>({id:o.id,title:`${o.supplierName} · ${fmtDate(o.date)}`,sub:fm(o.total),search:""}))),
+      G("products","🧴",L("Artikel","Productos","Products","Prodotti"),"inventory",
+        (products||[]).filter(p=>matchSearch(q,p.name,p.nameES,p.nameEN,p.nameIT,p.category))
+          .map(p=>({id:p.id,title:({DE:p.name,ES:p.nameES,EN:p.nameEN,IT:p.nameIT})[lang]||p.name,sub:`${L("Bestand","Stock","Stock","Scorta")}: ${p.stock??"—"}`,search:p.name}))),
+      G("suppliers","🏪",L("Lieferanten","Proveedores","Suppliers","Fornitori"),"inventory",
+        (suppliers||[]).filter(s=>matchSearch(q,s.name,s.contact,s.city,s.email,s.phone,s.category,s.website))
+          .map(s=>({id:s.id,title:s.name,sub:[s.category,s.phone].filter(Boolean).join(" · "),search:s.name}))),
+    ].filter(g=>g.count>0);
+  },[q,clients,employees,jobs,invoices,contracts,orders,products,suppliers,docs,lang]);
+  const total = groups.reduce((a,g)=>a+g.count,0);
+  const go = (g,it) => { if(it.search) pendingSectionSearch={app:g.app,q:it.search}; openApp(g.app); onClose(); };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",backdropFilter:"blur(10px)",zIndex:99990,display:"flex",justifyContent:"center",alignItems:"flex-start",padding:"16px"}} onClick={onClose}>
+      <div style={{width:"min(720px,100%)",maxHeight:"92vh",display:"flex",flexDirection:"column",fontFamily:CP.font,background:"rgba(10,14,26,.98)",border:`1px solid ${CP.border}`,borderRadius:18,overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"14px 14px 4px",display:"flex",gap:8,alignItems:"flex-start"}}>
+          <div style={{flex:1}}>
+            <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 ${L("Alles suchen: Name, Rechnung, Datum (z.B. 28 September 2026)…","Buscar todo: nombre, factura, fecha (ej. 28 septiembre 2026)…","Search everything: name, invoice, date (e.g. 28 September 2026)…","Cerca tutto: nome, fattura, data (es. 28 settembre 2026)…")}`}
+              style={{width:"100%",boxSizing:"border-box",padding:"14px 16px",borderRadius:12,border:`1px solid ${CP.border}`,background:"rgba(255,255,255,.08)",color:"#fff",fontSize:16,outline:"none",fontFamily:CP.font}}/>
+          </div>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,.1)",border:"none",borderRadius:10,color:"#fff",padding:"12px 14px",cursor:"pointer",fontSize:15}}>✕</button>
+        </div>
+        <div style={{padding:"4px 16px 8px",color:CP.textTertiary,fontSize:12}}>
+          {normTxt(q).trim().length<2 ? L("Mindestens 2 Zeichen eingeben. Beispiele: «Müller», «2026-014», «septiembre 2026», «28.09.2026».","Escribe al menos 2 letras. Ejemplos: «Müller», «2026-014», «septiembre 2026», «28.09.2026».","Type at least 2 characters. Examples: «Müller», «2026-014», «September 2026», «28.09.2026».","Scrivi almeno 2 caratteri. Esempi: «Müller», «2026-014», «settembre 2026», «28.09.2026».")
+            : `${total} ${L("Treffer","resultados","results","risultati")}`}
+        </div>
+        <div style={{overflowY:"auto",padding:"0 14px 14px"}}>
+          {normTxt(q).trim().length>=2&&!groups.length&&<div style={{color:CP.textSecondary,textAlign:"center",padding:30}}>😕 {L("Nichts gefunden","No se encontró nada","Nothing found","Nessun risultato")}</div>}
+          {groups.map(g=>(
+            <div key={g.key} style={{marginBottom:12}}>
+              <div style={{color:"#74C0FC",fontWeight:700,fontSize:13,margin:"6px 2px"}}>{g.icon} {g.title} ({g.count})</div>
+              {g.items.map(it=>(
+                <button key={it.id} onClick={()=>go(g,it)} style={{display:"block",width:"100%",textAlign:"left",background:"rgba(255,255,255,.04)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"9px 12px",marginBottom:5,cursor:"pointer",fontFamily:CP.font}}>
+                  <div style={{color:CP.textPrimary,fontWeight:600,fontSize:14}}>{it.title}</div>
+                  {it.sub&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{it.sub}</div>}
+                </button>
+              ))}
+              {g.count>g.items.length&&<div style={{color:CP.textTertiary,fontSize:12}}>+ {g.count-g.items.length} {L("weitere – Suche genauer eingeben","más – escribe algo más concreto","more – refine your search","altri – precisa la ricerca")}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SHARE THE APP (always the public app address, never GitHub/Vercel pages) ───
+function ShareAppModal({lang, onClose}){
+  const L = makeL(lang);
+  const url = APP_PUBLIC_URL;
+  const text = L("Patjac Reinigung Garten & Services – App","Patjac Reinigung Garten & Services – App","Patjac Reinigung Garten & Services – App","Patjac Reinigung Garten & Services – App");
+  const [copied,setCopied] = useState(false);
+  const btn = bg => ({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"12px 14px",cursor:"pointer",fontWeight:700,fontSize:14,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
+  return (
+    <CPModal title={`📲 ${L("App teilen","Compartir la app","Share the app","Condividi l'app")}`} onClose={onClose} width={460}>
+      <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10,lineHeight:1.5}}>
+        {L("Teilen Sie immer diesen Link. Er öffnet direkt die App (nicht GitHub oder Vercel).","Comparte siempre este enlace: abre directamente la app (no GitHub ni Vercel).","Always share this link – it opens the app directly (not GitHub or Vercel).","Condividi sempre questo link: apre direttamente l'app (non GitHub o Vercel).")}
+      </div>
+      <div style={{background:"rgba(0,0,0,.3)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 12px",color:"#74C0FC",fontWeight:700,fontSize:15,marginBottom:12,wordBreak:"break-all"}}>{url}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {typeof navigator!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"Patjac App",text,url}).catch(()=>{})} style={{...btn("#7048E8"),gridColumn:"span 2"}}>📱 {L("Teilen …","Compartir …","Share …","Condividi …")}</button>}
+        <a href={`https://wa.me/?text=${encodeURIComponent(text+"\n"+url)}`} target="_blank" rel="noopener noreferrer" style={btn("#25D366")}>💬 WhatsApp</a>
+        <a href={`mailto:?subject=${encodeURIComponent("Patjac App")}&body=${encodeURIComponent(text+"\n"+url)}`} style={btn("#1C7ED6")}>📧 E-mail</a>
+        <button onClick={()=>{ try{ navigator.clipboard.writeText(url); setCopied(true); setTimeout(()=>setCopied(false),2000); }catch(e){} }} style={{...btn("rgba(255,255,255,.12)"),gridColumn:"span 2"}}>{copied?"✅ "+L("Kopiert","Copiado","Copied","Copiato"):"📋 "+L("Link kopieren","Copiar enlace","Copy link","Copia link")}</button>
+      </div>
+      <div style={{color:CP.textTertiary,fontSize:12,marginTop:12,lineHeight:1.5}}>
+        💡 {L("Auf dem Handy: Link öffnen → «Zum Home-Bildschirm» – dann startet die App wie jede andere App.","En el móvil: abre el enlace → «Añadir a pantalla de inicio» y la app se abrirá como cualquier otra.","On the phone: open the link → «Add to Home Screen» – the app then starts like any other app.","Sul telefono: apri il link → «Aggiungi a Home» e l'app si avvia come le altre.")}
+      </div>
+    </CPModal>
   );
 }
 
@@ -4220,7 +4405,7 @@ const INV_SERVICES = [
 const invSvcId = st => st==="gardening"||st==="garden" ? "gardening" : st==="repairs" ? "repairs" : "cleaning";
 const invLangIdx = lang => ({DE:0,ES:1,EN:2,IT:3}[lang] ?? 1);
 const invSvcLabel = (id,lang) => { const s=INV_SERVICES.find(x=>x.id===id)||INV_SERVICES[0]; return s.L[invLangIdx(lang)]; };
-const invFmtDate = d => { if(!d) return ""; const [y,m,dd]=String(d).split("-"); return `${dd}.${m}.${y}`; };
+const invFmtDate = d => fmtDate(d);
 const invWeekRange = (dateStr) => { const d=new Date((dateStr||ymd(new Date()))+"T12:00:00"); const wd=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-wd); const sun=new Date(mon); sun.setDate(mon.getDate()+6); return [ymd(mon), ymd(sun)]; };
 const invMonthRange = (ym) => { const [y,m]=(ym||ymd(new Date()).slice(0,7)).split("-").map(Number); return [`${y}-${String(m).padStart(2,"0")}-01`, ymd(new Date(y,m,0))]; };
 const INV_BUCKET_URL = "https://rtviublrukagwxaypmit.supabase.co/storage/v1/object/";
@@ -4334,6 +4519,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
   const [deleteInvId,setDeleteInvId]=useState(null);
   const [sendState,setSendState]=useState({status:"idle",url:"",blob:null});
   const bulk=useBulkSelect();
+  const [invSearch,setInvSearch] = useState(()=>takePendingSearch("invoices"));
   const previewRef = useRef(null);
   const li = invLangIdx(lang);
 
@@ -4369,7 +4555,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
         detail:`${invFmtDate(g.date)} · ${g.start||""}–${g.end||""}${g.people>1?` · ${g.people} ${L("Personen","personas","people","persone")}`:""}`,
         qty:g.hours,price:rate,total:r2(g.hours*rate)}));
     }
-    const by={}; groups.filter(g=>!g.billed||selected.includes(g.key)).forEach(g=>{ (by[g.service]=by[g.service]||{h:0,n:0,dates:[]}); by[g.service].h+=g.hours; by[g.service].n+=1; by[g.service].dates.push(invFmtDate(g.date).slice(0,5)); });
+    const by={}; groups.filter(g=>!g.billed||selected.includes(g.key)).forEach(g=>{ (by[g.service]=by[g.service]||{h:0,n:0,dates:[]}); by[g.service].h+=g.hours; by[g.service].n+=1; by[g.service].dates.push(fmtDateShort(g.date)); });
     return Object.entries(by).map(([svc,v])=>({_k:gid(),service:svc,
       detail:`${v.n} ${v.n===1?L("Einsatz","servicio","visit","intervento"):L("Einsätze","servicios","visits","interventi")} (${v.dates.join(", ")}) · ${invFmtDate(form.periodFrom)}–${invFmtDate(form.periodTo)}`,
       qty:r2(v.h),price:rate,total:r2(v.h*rate)}));
@@ -4468,12 +4654,13 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
     <CPScreen title={t.invoices} icon="🧾" onBack={onBack} t={t}
       actions={<CPBtn onClick={newInvoice} size="sm">＋ {t.generateInvoice}</CPBtn>}>
       <BillingDuePanel due={due} lang={lang} onIssue={issueFromDue}/>
-      <BulkBar bulk={bulk} visibleIds={invoices.map(i=>i.id)} lang={lang}
+      <BulkBar bulk={bulk} visibleIds={invoices.filter(i=>matchSearch(invSearch,i.invoiceNumber,i.clientName,i.date,i.dueDate,String(i.total))).map(i=>i.id)} lang={lang}
         itemWord={{DE:"Rechnungen",ES:"facturas",EN:"invoices",IT:"fatture"}}
         onDelete={ids=>{setInvoices(p=>p.filter(i=>!ids.has(i.id)));notify(L("Rechnungen gelöscht","Facturas eliminadas","Invoices deleted","Fatture eliminate"),"success");}}/>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {invoices.length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>🧾</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine Rechnungen.","Todavía no hay facturas.","No invoices yet.","Ancora nessuna fattura.")}</div></CPCard>}
-        {[...invoices].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(inv=>(
+        {invoices.length>0&&<SearchBox value={invSearch} onChange={setInvSearch} lang={lang} placeholder={`🔍 ${L("Rechnung suchen (Nr., Kunde, Datum, Betrag …)","Buscar factura (n.º, cliente, fecha, importe …)","Search invoice (no., client, date, amount …)","Cerca fattura (n., cliente, data, importo …)")}`}/>}
+        {[...invoices].filter(i=>matchSearch(invSearch,i.invoiceNumber,i.clientName,i.date,i.dueDate,i.periodFrom,i.periodTo,String(i.total),i.status==="paid"?"pagada bezahlt paid":"pendiente offen open")).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(inv=>(
           <CPCard key={inv.id} onClick={bulk.selectMode?()=>bulk.toggle(inv.id):undefined} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,...(bulk.selected.has(inv.id)?{outline:"2px solid #4DABF7"}:{})}}>
             {bulk.selectMode&&<SelBox checked={bulk.selected.has(inv.id)} onChange={()=>bulk.toggle(inv.id)}/>}
             <div style={{flex:1,minWidth:180}}>
@@ -4696,7 +4883,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
 
   // ── INCOME ────────────────────────────────────────────────
   const income = invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+(i.total||0),0);
-  const pendingIncome = invoices.filter(i=>i.status==="pending").reduce((s,i)=>s+(i.total||0),0);
+  const pendingIncome = invoices.filter(i=>i.status==="pending"||i.status==="overdue").reduce((s,i)=>s+(Number(i.total)||0),0);
   const mwstCollected = invoices.filter(i=>i.status==="paid").reduce((s,i)=>s+(i.vatAmount||0),0);
 
   // ── PAYROLL COST (Swiss 2024 – employer total) ─────────────
@@ -4735,7 +4922,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
     const mIncome = invoices.filter(iv=>iv.status==="paid"&&iv.date?.startsWith(mStr)).reduce((s,iv)=>s+(iv.total||0),0);
     const mSalary = employees.reduce((s,emp)=>{
       const hrs=timeclock.filter(tc=>tc.employeeId===emp.id&&tc.date?.startsWith(mStr)&&tc.hours).reduce((h,tc)=>h+(tc.hours||0),0);
-      const gross=emp.type==="hourly"?hrs*(emp.hourlyRate||0):(emp.fixedSalary||0)/12;
+      const gross=emp.type==="hourly"?hrs*(emp.hourlyRate||0):(emp.fixedSalary||0);
       return s+gross*1.144;
     },0);
     const mWH = (orders||[]).filter(o=>o.status==="delivered"&&o.date?.startsWith(mStr)).reduce((s,o)=>s+(o.total||0),0);
@@ -4880,7 +5067,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
           <CPTable
             headers={[t.date, t.supplier||"Lieferant", t.orderItems||"Artikel", "CHF", t.status]}
             rows={(orders||[]).map(o=>[
-              o.date||"—",
+              fmtDate(o.date)||"—",
               o.supplierName||"—",
               <div style={{fontSize:11,color:CP.textSecondary}}>{(o.items||[]).map(i=>i.productName).join(", ")}</div>,
               <span style={{fontWeight:700,color:o.status==="delivered"?"#69DB7C":o.status==="pending"?"#FFD43B":"#FF8787"}}>CHF {(o.total||0).toFixed(2)}</span>,
@@ -4899,7 +5086,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
         <CPTable
           headers={[t.date, t.description, t.category||"Kategorie", t.amount, ""]}
           rows={expenses.map(ex=>[
-            ex.date||"—",
+            fmtDate(ex.date)||"—",
             ex.description||"—",
             <CPBadge text={ex.category||"—"} color="gray"/>,
             `CHF ${(ex.amount||0).toFixed(2)}`,
@@ -4999,7 +5186,7 @@ function ClockLocationsView({jobs,employees,isAdmin,selEmp,lang}){
           <CPCard key={j.id} style={{padding:"12px 16px"}}>
             <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:6,marginBottom:6}}>
               <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{j.clientName} {isAdmin&&<span style={{color:CP.textSecondary,fontWeight:500}}>· {j.employeeName}</span>}</div>
-              <div style={{color:CP.textSecondary,fontSize:12}}>{j.date}</div>
+              <div style={{color:CP.textSecondary,fontSize:12}}>{fmtDate(j.date)}</div>
             </div>
             {[["▶",L("Eingang","Entrada","In","Entrata"),j.actualStart,j.startLocation,j.startDistM,j.startLat,j.startLon],
               ["■",L("Ausgang","Salida","Out","Uscita"),j.actualEnd,j.endLocation,j.endDistM,j.endLat,j.endLon]].map(([ic,lbl,time,loc,dist,lat,lon])=>(
@@ -5031,7 +5218,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
     .filter(x=>x.employeeId===selEmp)
     .sort((a,b)=>b.date.localeCompare(a.date))
     .slice(0,30);
-  const totalHrsMonth = empHistory.reduce((s,x)=>s+(x.hours||0),0);
+  const totalHrsMonth = timeclock.filter(x=>x.employeeId===selEmp&&(x.date||"").startsWith(todayStr.slice(0,7))).reduce((s,x)=>s+(Number(x.hours)||0),0);
 
   // Today's jobs for selected employee, sorted by start time
   const todayJobs = (jobs||[])
@@ -5327,7 +5514,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
         <CPTable
           headers={[t.date, t.clockIn, t.clockOut, L("Std.","Horas","Hours","Ore"), L("Aufträge","Trabajos","Jobs","Lavori")]}
           rows={empHistory.map(x=>[
-            x.date,
+            fmtDate(x.date),
             x.clockIn||"—",
             x.clockOut||"—",
             x.hours?`${Number(x.hours).toFixed(1)}h`:"—",
@@ -5369,6 +5556,12 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
 
   useEffect(()=>{ if(!isAdmin&&!selConv) setSelConv("admin"); },[isAdmin]);
   useEffect(()=>{ if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight; },[selConv,messages]);
+  // Opening a conversation marks its incoming messages as read
+  useEffect(()=>{
+    if(!selConv) return;
+    if(messages.some(m=>m.from===selConv&&m.to===myId&&!m.read))
+      setMessages(p=>p.map(m=>m.from===selConv&&m.to===myId&&!m.read?{...m,read:true}:m));
+  },[selConv,messages]);
 
   const convMsgs=selConv?messages.filter(m=>(m.from===myId&&m.to===selConv)||(m.from===selConv&&m.to===myId)).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp)):[];
   const unread=(id)=>messages.filter(m=>m.from===id&&m.to===myId&&!m.read).length;
@@ -5392,7 +5585,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
     const d=new Date(ts),today=new Date();
     return d.toDateString()===today.toDateString()
       ?d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})
-      :d.toLocaleDateString([],{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+      :fmtDateShort(d)+" "+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
   };
 
   return (
@@ -5446,7 +5639,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
               <button onClick={()=>fileRef.current.click()} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🖼️</button>
               <button onClick={()=>cameraRef.current.click()} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>📷</button>
               <input value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
-                placeholder={t.newMessage+"..."} style={{flex:1,padding:"10px 14px",background:"rgba(255,255,255,.08)",border:`1px solid ${CP.border}`,borderRadius:22,color:"#fff",fontSize:14,outline:"none",fontFamily:CP.font}}/>
+                placeholder={makeL(lang)("Nachricht schreiben…","Escribe un mensaje…","Write a message…","Scrivi un messaggio…")} style={{flex:1,padding:"10px 14px",background:"rgba(255,255,255,.08)",border:`1px solid ${CP.border}`,borderRadius:22,color:"#fff",fontSize:14,outline:"none",fontFamily:CP.font}}/>
               <button onClick={send} disabled={!newMsg.trim()&&!imgPreview}
                 style={{width:38,height:38,borderRadius:"50%",background:(!newMsg.trim()&&!imgPreview)?"rgba(255,255,255,.1)":`linear-gradient(135deg,${CP.accent},#00bcf2)`,border:"none",color:"#fff",cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>➤</button>
             </div>
@@ -5756,7 +5949,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
     {l:t.payslip||L("Lohnabrechnung","Nómina","Payroll","Busta paga"),                             i:"💼", type:"payroll"},
     {l:L("Inventur","Inventario","Inventory","Inventario"),                                          i:"📦", type:"inventory"},
   ];
-  const today = now.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB");
+  const today = fmtDate(now,lang);
 
   // Download helper
   const downloadReport = (html, name) => {
@@ -6081,24 +6274,23 @@ function SecurityPasswordForm({companySettings,setCompanySettings,notify,L}){
   const [confirmPw,setConfirmPw] = useState("");
   const [busy,setBusy] = useState(false);
 
-  const submit = () => {
-    if(current !== companySettings.adminPassword){
-      notify(L("Contraseña actual incorrecta.","Contraseña actual incorrecta.","Current password is incorrect.","Password attuale errata."),"error");
-      return;
-    }
-    if(newPw.length < 6){
-      notify(L("La nueva contraseña debe tener al menos 6 caracteres.","La nueva contraseña debe tener al menos 6 caracteres.","New password must be at least 6 characters.","La nuova password deve avere almeno 6 caratteri."),"error");
+  const submit = async () => {
+    if(newPw.length < 8){
+      notify(L("Das neue Passwort muss mindestens 8 Zeichen haben.","La nueva contraseña debe tener al menos 8 caracteres.","New password must be at least 8 characters.","La nuova password deve avere almeno 8 caratteri."),"error");
       return;
     }
     if(newPw !== confirmPw){
-      notify(L("Las contraseñas nuevas no coinciden.","Las contraseñas nuevas no coinciden.","New passwords do not match.","Le nuove password non coincidono."),"error");
+      notify(L("Die neuen Passwörter stimmen nicht überein.","Las contraseñas nuevas no coinciden.","New passwords do not match.","Le nuove password non coincidono."),"error");
       return;
     }
     setBusy(true);
-    setCompanySettings(prev=>({...prev, adminEmail:newEmail.trim()||prev.adminEmail, adminPassword:newPw}));
-    notify(L("Datos de acceso actualizados ✓","Datos de acceso actualizados ✓","Access credentials updated ✓","Credenziali di accesso aggiornate ✓"),"success");
-    setCurrent(""); setNewPw(""); setConfirmPw("");
+    let ok=false;
+    try{ ok = await supaRpc("admin_change_credentials",{p_old:current,p_email:newEmail.trim(),p_new:newPw}); }catch(e){ ok=false; }
     setBusy(false);
+    if(ok!==true){ notify(L("Aktuelles Passwort falsch.","Contraseña actual incorrecta.","Current password is incorrect.","Password attuale errata."),"error"); return; }
+    setCompanySettings(prev=>({...prev, adminEmail:newEmail.trim()||prev.adminEmail}));
+    notify(L("Zugangsdaten aktualisiert ✓","Datos de acceso actualizados ✓","Access credentials updated ✓","Credenziali di accesso aggiornate ✓"),"success");
+    setCurrent(""); setNewPw(""); setConfirmPw("");
   };
 
   const label = {fontSize:12,color:CP.textTertiary,fontWeight:600,marginBottom:6,display:"block"};
@@ -6149,7 +6341,8 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
   ];
 
   const saveCompany = () => {
-    setCompanySettings({...form});
+    const {adminEmail,adminPassword,...companyFields} = form;
+    setCompanySettings(prev=>({...prev,...companyFields}));
     setEditing(false);
     setSaved(true);
     notify(t.success+" – "+t.companyInfo,"success");
@@ -8886,7 +9079,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
 
   const filtered = products.filter(p=>{
     const matchCat = catFilter==="all"||p.category===catFilter;
-    const matchSearch = !search || pName(p).toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || normTxt([p.name,p.nameES,p.nameEN,p.nameIT,p.category].join(" ")).includes(normTxt(search));
     return matchCat&&matchSearch;
   });
 
@@ -8935,7 +9128,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
     const newOrder = {
       id:gid(),supplierId:p.supplier,supplierName:sup?.name||"—",
       date:ymd(new Date()),
-      deliveryDate:new Date(Date.now()+7*86400000).toISOString().split("T")[0],
+      deliveryDate:ymd(new Date(Date.now()+7*86400000)),
       status:"pending",
       items:[{productId:p.id,productName:pName(p),qty,price:prPrice(p),total:qty*prPrice(p)}],
       total:qty*prPrice(p),notes:L("Automatische Nachbestellung","Reposición automática","Auto reorder","Riordino automatico"),
@@ -8949,7 +9142,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       actions={
         <div style={{display:"flex",gap:8}}>
           {view==="stock"&&<CPBtn onClick={()=>{setForm({name:"",category:"cleaning",unit:"Liter",stock:0,minStock:5,price:0,supplier:suppliers[0]?.id||"",description:"",location:"",icon:"🧴"});setSelId(null);setModal("product");}} size="sm">＋ {t.addProduct||"Add"}</CPBtn>}
-          {view==="orders"&&<CPBtn onClick={()=>{setForm({supplierId:"1f308250-7d3c-4765-8af0-35d1285255d0",date:ymd(new Date()),deliveryDate:new Date(Date.now()+7*86400000).toISOString().split("T")[0],items:[],notes:""});setModal("order");}} size="sm">＋ {t.addOrder||"Order"}</CPBtn>}
+          {view==="orders"&&<CPBtn onClick={()=>{setForm({supplierId:suppliers[0]?.id||"",date:ymd(new Date()),deliveryDate:ymd(new Date(Date.now()+7*86400000)),items:[{_k:gid(),productId:"",qty:1,price:0}],notes:""});setModal("order");}} size="sm">＋ {t.addOrder||"Order"}</CPBtn>}
           {view==="suppliers"&&<CPBtn onClick={()=>{setForm({name:"",contact:"",phone:"",email:"",address:"",category:"cleaning",paymentDays:30});setModal("supplier");}} size="sm">＋ {t.addSupplier||"Add"}</CPBtn>}
         </div>
       }
@@ -9086,7 +9279,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                       <CPBadge text={statusLabel(order.status)} color={statusColor(order.status)}/>
                     </div>
                     <div style={{color:CP.textSecondary,fontSize:12}}>
-                      {t.orderDate||"Order"}: {order.date} → {t.deliveryDate||"Delivery"}: {order.deliveryDate}
+                      {t.orderDate||"Order"}: {fmtDate(order.date)} → {t.deliveryDate||"Delivery"}: {fmtDate(order.deliveryDate)}
                     </div>
                     {order.notes&&<div style={{color:CP.textTertiary,fontSize:12,marginTop:2,fontStyle:"italic"}}>{order.notes}</div>}
                   </div>
@@ -9128,7 +9321,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     sendByEmail({
                       to: sup?.email||"",
                       subject: `${L("Bestellung","Pedido","Order","Ordine")} — Patjac Reinigung Garten & Services`,
-                      body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${order.supplierName||sup?.name||""},\n\n${L("Hiermit bestellen wir folgende Artikel:","Nos gustaría pedir los siguientes artículos:","We would like to order the following items:","Vorremmo ordinare i seguenti articoli:")}\n\n${(order.items||[]).map(it=>`- ${it.name||""}: ${it.qty||""} ${it.unit||""}`).join("\n")}\n\n${L("Gesamtbetrag","Total","Total","Totale")}: CHF ${(order.total||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
+                      body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${order.supplierName||sup?.name||""},\n\n${L("Hiermit bestellen wir folgende Artikel:","Nos gustaría pedir los siguientes artículos:","We would like to order the following items:","Vorremmo ordinare i seguenti articoli:")}\n\n${(order.items||[]).map(it=>`- ${it.productName||it.name||""}: ${it.qty||""} ${it.unit||"x"}`).join("\n")}\n\n${L("Gesamtbetrag","Total","Total","Totale")}: CHF ${(order.total||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\npatjacservices@outlook.com`
                     });
                   }} variant="secondary" size="sm">
                     📧 {L("PDF senden","Enviar PDF","Send PDF","Invia PDF")}
@@ -9200,6 +9393,47 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       )}
 
       {/* ── PRODUCT MODAL ── */}
+      {modal==="order"&&(()=>{
+        const items=form.items||[];
+        const setIt=(i,patch)=>setForm(f=>{const it=[...(f.items||[])]; it[i]={...it[i],...patch}; return {...f,items:it};});
+        const total=items.reduce((a,i)=>a+(Number(i.qty)||0)*(Number(i.price)||0),0);
+        const saveOrder=()=>{
+          const sup=suppliers.find(x=>x.id===form.supplierId);
+          const its=items.filter(i=>i.productId).map(i=>{const pr=products.find(x=>x.id===i.productId); const q=Number(i.qty)||0, pc=Number(i.price)||0; return {productId:i.productId,productName:pr?pName(pr):"",qty:q,price:pc,total:Math.round(q*pc*100)/100};});
+          if(!sup||!its.length){ notify(L("Lieferant und mindestens ein Artikel nötig","Elija proveedor y al menos un producto","Choose supplier and at least one item","Scegli fornitore e almeno un articolo"),"error"); return; }
+          setOrders(prev=>[{id:gid(),supplierId:sup.id,supplierName:sup.name,date:form.date,deliveryDate:form.deliveryDate||null,status:"pending",items:its,total:Math.round(total*100)/100,notes:form.notes||""},...prev]);
+          notify(t.success,"success"); setModal(null);
+        };
+        return (
+          <CPModal title={`📦 ${L("Neue Bestellung","Nuevo pedido","New order","Nuovo ordine")}`} onClose={()=>setModal(null)} width={600}>
+            <CPField label={L("Lieferant","Proveedor","Supplier","Fornitore")}>
+              <CPSelect value={form.supplierId} onChange={e=>setForm(f=>({...f,supplierId:e.target.value}))}>{suppliers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</CPSelect>
+            </CPField>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>
+              <CPField label={L("Datum","Fecha","Date","Data")}><CPInput type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
+              <CPField label={L("Lieferung","Entrega","Delivery","Consegna")}><CPInput type="date" value={form.deliveryDate} onChange={e=>setForm(f=>({...f,deliveryDate:e.target.value}))}/></CPField>
+            </div>
+            {items.map((it,i)=>(
+              <div key={it._k||i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr auto",gap:6,marginBottom:6}}>
+                <CPSelect value={it.productId} onChange={e=>{const pr=products.find(x=>x.id===e.target.value); setIt(i,{productId:e.target.value,price:pr?prPrice(pr):0});}}>
+                  <option value="">— {L("Artikel","Producto","Item","Articolo")} —</option>
+                  {products.map(pr=><option key={pr.id} value={pr.id}>{pName(pr)}</option>)}
+                </CPSelect>
+                <CPInput type="number" value={it.qty} onChange={e=>setIt(i,{qty:e.target.value})} placeholder={L("Menge","Cant.","Qty","Qtà")}/>
+                <CPInput type="number" value={it.price} onChange={e=>setIt(i,{price:e.target.value})} placeholder="CHF"/>
+                <CPBtn size="sm" variant="danger" onClick={()=>setForm(f=>({...f,items:f.items.filter((_,k)=>k!==i)}))}>✕</CPBtn>
+              </div>
+            ))}
+            <CPBtn size="sm" variant="secondary" onClick={()=>setForm(f=>({...f,items:[...(f.items||[]),{_k:gid(),productId:"",qty:1,price:0}]}))}>＋ {L("Artikel","Producto","Item","Articolo")}</CPBtn>
+            <CPField label={L("Notizen","Notas","Notes","Note")}><CPInput value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></CPField>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+              <div style={{color:"#FFD43B",fontWeight:700,fontSize:16}}>Total CHF {total.toFixed(2)}</div>
+              <div style={{display:"flex",gap:8}}><CPBtn variant="secondary" onClick={()=>setModal(null)}>{t.cancel}</CPBtn><CPBtn onClick={saveOrder}>💾 {t.save}</CPBtn></div>
+            </div>
+          </CPModal>
+        );
+      })()}
+
       {modal==="product"&&(
         <CPModal title={selId?t.editProduct:t.addProduct} onClose={()=>setModal(null)} width={500}>
           <CPField label={t.productName||"Name"}>
@@ -9375,7 +9609,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
                 <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>🚚 {item?.supplierName}</div>
-                <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{item?.date} · CHF {Number(item?.total||0).toFixed(2)} · {item?.items?.length} {L("Artikel","artículos","items","articoli")}</div>
+                <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{fmtDate(item?.date)} · CHF {Number(item?.total||0).toFixed(2)} · {item?.items?.length} {L("Artikel","artículos","items","articoli")}</div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
                 {L("Diese Bestellung wird permanent gelöscht.","Este pedido será eliminado permanentemente.","This order will be permanently deleted.","Questo ordine verrà eliminato definitivamente.")}
@@ -9522,6 +9756,12 @@ const docsFetch = async (path, method="GET", body=null) => {
   const tx = await res.text(); return tx ? JSON.parse(tx) : null;
 };
 const DOC_MAX_BYTES = 5*1024*1024;
+// Server-side checks (the admin password is only stored as a hash, never in the app)
+const supaRpc = async (fn, args) => {
+  const res = await fetch(DOCS_REST+"rpc/"+fn, {method:"POST", headers:{"Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`}, body:JSON.stringify(args)});
+  if(!res.ok) throw new Error(await res.text());
+  return res.json();
+};
 // Documents the administrator "sends" from the app (payslip, work sheet, contract) are stored as printable HTML
 const SENT_CATS = ["payslip","worksheet","contract_sent"];
 const utf8ToB64 = str => { const bytes=new TextEncoder().encode(str); let bin=""; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000)); return btoa(bin); };
@@ -9591,6 +9831,7 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
   const [busy,setBusy] = useState("");
   const [docs,setDocs] = useState(null);
   const [upload,setUpload] = useState(null); // admin upload form
+  const [docSearch,setDocSearch] = useState("");
   const monthNames = MONTHS[lang]||MONTHS.EN;
 
   // Months available: a month appears once it is over (on its last day it is already shown). Admin also sees the current month.
@@ -9693,18 +9934,19 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
         ))}
       </div>
 
+      <SearchBox value={docSearch} onChange={setDocSearch} lang={lang} placeholder={`🔍 ${L("Dokument suchen (Monat, Jahr, Titel, Datum …)","Buscar documento (mes, año, título, fecha …)","Search document (month, year, title, date …)","Cerca documento (mese, anno, titolo, data …)")}`}/>
       {tab==="payslips"&&(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div style={{color:CP.textSecondary,fontSize:12}}>ℹ️ {L("Am Ende jedes Monats erscheint hier die neue Lohnabrechnung mit dem Arbeitsrapport. Öffnen → «Herunterladen» → drucken oder als PDF speichern.","Al final de cada mes aparece aquí tu nueva nómina con la hoja mensual. Ábrela → «Descargar» → imprime o guarda como PDF.","At the end of each month your new payslip and work sheet appear here. Open → «Download» → print or save as PDF.","Alla fine di ogni mese qui compare la nuova busta paga con il rapporto. Apri → «Scarica» → stampa o salva in PDF.")}</div>
           {months.length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>🗓️</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine abgeschlossenen Monate.","Todavía no hay meses cerrados.","No completed months yet.","Ancora nessun mese chiuso.")}</div></CPCard>}
-          {months.map(({m,y,ms,current})=>{ const sp=sentDoc("payslip",ms), sw=sentDoc("worksheet",ms); return (
+          {months.filter(({ms})=>matchSearch(docSearch,`${ms}-01`,["DE","ES","EN","IT"].map(l=>MONTH_NAMES[l][Number(ms.slice(5,7))-1]).join(" "))).map(({m,y,ms,current})=>{ const sp=sentDoc("payslip",ms), sw=sentDoc("worksheet",ms); return (
             <CPCard key={`${y}-${m}`} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <div style={{fontSize:28}}>💵</div>
                 <div>
                   <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{monthNames[m-1]} {y}</div>
                   <div style={{color:CP.textTertiary,fontSize:12}}>{current?L("Laufender Monat (nur Admin)","Mes en curso (solo administrador)","Current month (admin only)","Mese in corso (solo admin)"):L("Abgeschlossen","Mes cerrado","Closed","Chiuso")}</div>
-                  {(sp||sw)&&<div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {isAdmin?L("An Mitarbeiter gesendet","Enviado al empleado","Sent to employee","Inviato al dipendente"):L("Offizielles Dokument der Firma","Documento oficial de la empresa","Official company document","Documento ufficiale dell'azienda")} {String((sp||sw).created_at||"").slice(0,10)}</div>}
+                  {(sp||sw)&&<div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {isAdmin?L("An Mitarbeiter gesendet","Enviado al empleado","Sent to employee","Inviato al dipendente"):L("Offizielles Dokument der Firma","Documento oficial de la empresa","Official company document","Documento ufficiale dell'azienda")} {fmtDate((sp||sw).created_at)}</div>}
                 </div>
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -9716,13 +9958,13 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
         </div>
       )}
 
-      {tab==="contracts"&&(docs||[]).filter(d=>d.category==="contract_sent"&&d.employee_id===emp.id).map(d=>(
+      {tab==="contracts"&&(docs||[]).filter(d=>d.category==="contract_sent"&&d.employee_id===emp.id&&matchSearch(docSearch,d.title,d.created_at)).map(d=>(
         <CPCard key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",marginBottom:10,border:"1px solid rgba(47,158,68,0.35)"}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{fontSize:28}}>📝</div>
             <div>
               <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{d.title}</div>
-              <div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {L("Von der Firma gesendet","Enviado por la empresa","Sent by the company","Inviato dall'azienda")} {String(d.created_at||"").slice(0,10)}</div>
+              <div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {L("Von der Firma gesendet","Enviado por la empresa","Sent by the company","Inviato dall'azienda")} {fmtDate(d.created_at)}</div>
             </div>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -9765,13 +10007,13 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
           )}
           {docs===null&&<div style={{color:CP.textSecondary}}>⏳ {L("Laden…","Cargando…","Loading…","Caricamento…")}</div>}
           {docs&&docs.filter(d=>!SENT_CATS.includes(d.category)).length===0&&<CPCard style={{textAlign:"center",padding:28}}><div style={{fontSize:40}}>📂</div><div style={{color:CP.textSecondary,marginTop:8}}>{L("Noch keine Dokumente.","Todavía no hay documentos.","No documents yet.","Ancora nessun documento.")}</div></CPCard>}
-          {(docs||[]).filter(d=>!SENT_CATS.includes(d.category)).map(d=>{ const c=catOf(d.category); return (
+          {(docs||[]).filter(d=>!SENT_CATS.includes(d.category)&&matchSearch(docSearch,d.title,d.file_name,d.created_at)).map(d=>{ const c=catOf(d.category); return (
             <CPCard key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
                 <div style={{fontSize:28}}>{c.icon}</div>
                 <div style={{minWidth:0}}>
                   <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15,wordBreak:"break-word"}}>{d.title}</div>
-                  <div style={{color:CP.textTertiary,fontSize:12}}>{c.L[langIdx]} · {String(d.created_at||"").slice(0,10)} · {fmtSize(d.size_bytes)}{!d.employee_id?` · ${L("Für alle","Para todos","For all","Per tutti")}`:""}</div>
+                  <div style={{color:CP.textTertiary,fontSize:12}}>{c.L[langIdx]} · {fmtDate(d.created_at)} · {fmtSize(d.size_bytes)}{!d.employee_id?` · ${L("Für alle","Para todos","For all","Per tutti")}`:""}</div>
                 </div>
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -9814,10 +10056,9 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
     notify(L("Vertrag gelöscht","Contrato eliminado","Contract deleted","Contratto eliminato"),"success");
   };
 
-  const [cSearch,setCSearch] = useState("");
+  const [cSearch,setCSearch] = useState(()=>takePendingSearch("contracts"));
   const filtered = contracts.filter(c=>filter==="all"?true:c.type===filter)
-    .filter(c=>{ const q=cSearch.trim().toLowerCase(); if(!q) return true;
-      return [c.entityName,c.startDate,c.contractDate,c.status,c.notes].some(v=>String(v||"").toLowerCase().includes(q)); });
+    .filter(c=>matchSearch(cSearch,c.entityName,c.startDate,c.contractDate,c.endDate,c.status,c.notes));
 
   const statusColor = (s) => s==="signed"?"green":s==="active"?"blue":s==="expired"?"red":s==="terminated"?"red":"gray";
   const statusLabel = (s) => s==="signed"?t.contractSigned:s==="active"?t.contractActive:s==="expired"?t.contractExpired:s==="terminated"?t.contractTerminated:t.contractDraft;
@@ -9867,7 +10108,7 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
   const buildContractHTML = (c) => {
     const entity = c.type==="client" ? clients.find(x=>x.id===c.clientId) : employees.find(x=>x.id===c.employeeId);
     const isEmp = c.type==="employee";
-    const today = new Date().toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB");
+    const today = fmtDate(new Date(),lang);
 
     const header = isEmp
       ? L("ARBEITSVERTRAG","CONTRATO LABORAL","EMPLOYMENT CONTRACT","CONTRATTO DI LAVORO")
@@ -9891,10 +10132,10 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
     const articles = isEmp ? [
       [L("Art. 2 – Beginn und Dauer","Art. 2 – Inicio y duración","Art. 2 – Start and Duration","Art. 2 – Inizio e durata"),
        L(
-        `Beginn: ${c.startDate}\nBefristung: ${c.termType==="indefinite"?"Unbefristet (Art. 334 OR)":"Befristet bis "+c.endDate}\nProbezeit: ${c.trialPeriod||"3 Monate (Art. 335b OR)"}\nKündigungsfrist nach Probezeit: ${c.noticePeriod}`,
-        `Inicio: ${c.startDate}\nDuración: ${c.termType==="indefinite"?"Indefinida (Art. 334 CO)":"Plazo fijo hasta "+c.endDate}\nPeríodo de prueba: ${c.trialPeriod||"3 meses (Art. 335b CO)"}\nPreaviso tras prueba: ${c.noticePeriod}`,
-        `Start: ${c.startDate}\nTerm: ${c.termType==="indefinite"?"Indefinite (Art. 334 CO)":"Fixed-term until "+c.endDate}\nTrial period: ${c.trialPeriod||"3 months (Art. 335b CO)"}\nNotice after trial: ${c.noticePeriod}`,
-        `Inizio: ${c.startDate}\nDurata: ${c.termType==="indefinite"?"Indeterminata (Art. 334 CO)":"Determinata fino al "+c.endDate}\nPeriodo di prova: ${c.trialPeriod||"3 mesi (Art. 335b CO)"}\nPreavviso dopo prova: ${c.noticePeriod}`
+        `Beginn: ${fmtDate(c.startDate)}\nBefristung: ${c.termType==="indefinite"?"Unbefristet (Art. 334 OR)":"Befristet bis "+fmtDate(c.endDate)}\nProbezeit: ${fmtDate(c.trialPeriod)||"3 Monate (Art. 335b OR)"}\nKündigungsfrist nach Probezeit: ${c.noticePeriod}`,
+        `Inicio: ${fmtDate(c.startDate)}\nDuración: ${c.termType==="indefinite"?"Indefinida (Art. 334 CO)":"Plazo fijo hasta "+fmtDate(c.endDate)}\nPeríodo de prueba: ${fmtDate(c.trialPeriod)||"3 meses (Art. 335b CO)"}\nPreaviso tras prueba: ${c.noticePeriod}`,
+        `Start: ${fmtDate(c.startDate)}\nTerm: ${c.termType==="indefinite"?"Indefinite (Art. 334 CO)":"Fixed-term until "+fmtDate(c.endDate)}\nTrial period: ${fmtDate(c.trialPeriod)||"3 months (Art. 335b CO)"}\nNotice after trial: ${c.noticePeriod}`,
+        `Inizio: ${fmtDate(c.startDate)}\nDurata: ${c.termType==="indefinite"?"Indeterminata (Art. 334 CO)":"Determinata fino al "+fmtDate(c.endDate)}\nPeriodo di prova: ${fmtDate(c.trialPeriod)||"3 mesi (Art. 335b CO)"}\nPreavviso dopo prova: ${c.noticePeriod}`
       )],
       [L("Art. 3 – Lohn und Arbeitszeit","Art. 3 – Salario y jornada","Art. 3 – Salary and Working Hours","Art. 3 – Salario e orario di lavoro"),
        L(
@@ -9934,10 +10175,10 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
     ] : [
       [L("Art. 2 – Leistungsbeschreibung","Art. 2 – Descripción del servicio","Art. 2 – Service Description","Art. 2 – Descrizione del servizio"),
        L(
-        `${L("Dienstleistungsart","Tipo de servicio","Service type","Tipo di servizio")}: ${c.serviceType==="cleaning"?L("Reinigungsarbeiten","Limpieza","Cleaning","Pulizie"):c.serviceType==="gardening"?L("Gartenarbeiten","Jardinería","Gardening","Giardinaggio"):L("Dienstleistungen","Servicios","Services","Servizi")}\n${L("Häufigkeit","Frecuencia","Frequency","Frequenza")}: ${c.frequency==="weekly"?L("Wöchentlich","Semanal","Weekly","Settimanale"):c.frequency==="monthly"?L("Monatlich","Mensual","Monthly","Mensile"):c.frequency==="daily"?L("Täglich","Diario","Daily","Quotidiano"):L("Nach Vereinbarung","A convenir","As agreed","Da concordare")}\n${L("Start","Inicio","Start","Inizio")}: ${c.startDate}${c.endDate?" | "+L("Ende","Fin","End","Fine")+": "+c.endDate:""}`,
-        `Tipo de servicio: ${c.serviceType==="cleaning"?"Limpieza":c.serviceType==="gardening"?"Jardinería":"Servicios"}\nFrecuencia: ${c.frequency==="weekly"?"Semanal":c.frequency==="monthly"?"Mensual":c.frequency==="daily"?"Diario":"Por acuerdo"}\nInicio: ${c.startDate}${c.endDate?" | Fin: "+c.endDate:""}`,
-        `Service type: ${c.serviceType==="cleaning"?"Cleaning":c.serviceType==="gardening"?"Gardening":"Services"}\nFrequency: ${c.frequency==="weekly"?"Weekly":c.frequency==="monthly"?"Monthly":c.frequency==="daily"?"Daily":"By agreement"}\nStart: ${c.startDate}${c.endDate?" | End: "+c.endDate:""}`,
-        `Tipo servizio: ${c.serviceType==="cleaning"?"Pulizie":c.serviceType==="gardening"?"Giardinaggio":"Servizi"}\nFrequenza: ${c.frequency==="weekly"?"Settimanale":c.frequency==="monthly"?"Mensile":c.frequency==="daily"?"Quotidiano":"Su accordo"}\nInizio: ${c.startDate}${c.endDate?" | Fine: "+c.endDate:""}`
+        `${L("Dienstleistungsart","Tipo de servicio","Service type","Tipo di servizio")}: ${c.serviceType==="cleaning"?L("Reinigungsarbeiten","Limpieza","Cleaning","Pulizie"):c.serviceType==="gardening"?L("Gartenarbeiten","Jardinería","Gardening","Giardinaggio"):L("Dienstleistungen","Servicios","Services","Servizi")}\n${L("Häufigkeit","Frecuencia","Frequency","Frequenza")}: ${c.frequency==="weekly"?L("Wöchentlich","Semanal","Weekly","Settimanale"):c.frequency==="monthly"?L("Monatlich","Mensual","Monthly","Mensile"):c.frequency==="daily"?L("Täglich","Diario","Daily","Quotidiano"):L("Nach Vereinbarung","A convenir","As agreed","Da concordare")}\n${L("Start","Inicio","Start","Inizio")}: ${fmtDate(c.startDate)}${c.endDate?" | "+L("Ende","Fin","End","Fine")+": "+fmtDate(c.endDate):""}`,
+        `Tipo de servicio: ${c.serviceType==="cleaning"?"Limpieza":c.serviceType==="gardening"?"Jardinería":"Servicios"}\nFrecuencia: ${c.frequency==="weekly"?"Semanal":c.frequency==="monthly"?"Mensual":c.frequency==="daily"?"Diario":"Por acuerdo"}\nInicio: ${fmtDate(c.startDate)}${c.endDate?" | Fin: "+fmtDate(c.endDate):""}`,
+        `Service type: ${c.serviceType==="cleaning"?"Cleaning":c.serviceType==="gardening"?"Gardening":"Services"}\nFrequency: ${c.frequency==="weekly"?"Weekly":c.frequency==="monthly"?"Monthly":c.frequency==="daily"?"Daily":"By agreement"}\nStart: ${fmtDate(c.startDate)}${c.endDate?" | End: "+fmtDate(c.endDate):""}`,
+        `Tipo servizio: ${c.serviceType==="cleaning"?"Pulizie":c.serviceType==="gardening"?"Giardinaggio":"Servizi"}\nFrequenza: ${c.frequency==="weekly"?"Settimanale":c.frequency==="monthly"?"Mensile":c.frequency==="daily"?"Quotidiano":"Su accordo"}\nInizio: ${fmtDate(c.startDate)}${c.endDate?" | Fine: "+fmtDate(c.endDate):""}`
       )],
       [L("Art. 3 – Vergütung","Art. 3 – Remuneración","Art. 3 – Remuneration","Art. 3 – Remunerazione"),
        L(
@@ -10013,7 +10254,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000;padding:4
   </div>
   <div>
     <div class="doc-title">${header}</div>
-    <div class="contract-ref">${L("Ref.","Ref.","Ref.","Rif.")} ${c.id?.toUpperCase()||""} | ${c.contractDate}</div>
+    <div class="contract-ref">${L("Ref.","Ref.","Ref.","Rif.")} ${c.id?.toUpperCase()||""} | ${fmtDate(c.contractDate)}</div>
     <span class="badge-ch">🇨🇭 ${L("Schweizer Recht · OR","Derecho suizo · CO","Swiss Law · CO","Diritto svizzero · CO")}</span>
   </div>
 </div>
@@ -10035,7 +10276,7 @@ ${c.notes?`<div class="notes-box"><strong>${L("Zusätzliche Vereinbarungen","Acu
 </div>
 ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?.name||"")}
 <div class="footer-bar">
-  <span>${cs.name} | ${cs.uid} | ${L("Erstellt am","Generado el","Generated on","Generato il")} ${new Date().toLocaleDateString()}</span>
+  <span>${cs.name} | ${cs.uid} | ${L("Erstellt am","Generado el","Generated on","Generato il")} ${fmtDate(new Date(),lang)}</span>
   <span>${L("inkl. Anhang Rechte und Pflichten","incl. anexo de derechos y obligaciones","incl. annex on rights and obligations","incl. allegato diritti e obblighi")}</span>
 </div>
 </body></html>`;
@@ -10096,10 +10337,10 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 20px",fontSize:12}}>
                       {[
-                        [L("Vertragsdatum","Fecha contrato","Contract date","Data contratto"), c.contractDate],
-                        [L("Beginn","Inicio","Start","Inizio"), c.startDate],
-                        [c.endDate?L("Ende","Fin","End","Fine"):null, c.endDate||null],
-                        [L("Probezeit","Período prueba","Trial period","Periodo prova"), c.trialPeriod||"—"],
+                        [L("Vertragsdatum","Fecha contrato","Contract date","Data contratto"), fmtDate(c.contractDate)],
+                        [L("Beginn","Inicio","Start","Inizio"), fmtDate(c.startDate)],
+                        [c.endDate?L("Ende","Fin","End","Fine"):null, c.endDate?fmtDate(c.endDate):null],
+                        [L("Probezeit","Período prueba","Trial period","Periodo prova"), fmtDate(c.trialPeriod)||"—"],
                         [L("Lohn","Salario","Salary","Stipendio"), `CHF ${Number(c.salary||0).toLocaleString("de-CH")}/${c.salaryType==="hourly"?L("Std.","h","h","h"):L("Monat","mes","month","mese")}`],
                         [L("Wochenstunden","Horas semanales","Weekly hours","Ore settimanali"), c.hours?`${c.hours}h`:"—"],
                         [L("Kündigungsfrist","Preaviso","Notice period","Preavviso"), c.noticePeriod||"—"],
@@ -10219,10 +10460,10 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                     </div>
                     <div>
                       <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{entity?.name||"—"}</div>
-                      <div style={{color:CP.textSecondary,fontSize:12,marginTop:1}}>{typeLabel(c.type)} · {c.contractDate}</div>
+                      <div style={{color:CP.textSecondary,fontSize:12,marginTop:1}}>{typeLabel(c.type)} · {fmtDate(c.contractDate)}</div>
                       <div style={{color:CP.textTertiary,fontSize:11,marginTop:2}}>
-                        {t.contractStart}: {c.startDate}
-                        {c.endDate?" · "+t.contractEnd+": "+c.endDate:" · "+t.indefinite}
+                        {t.contractStart}: {fmtDate(c.startDate)}
+                        {c.endDate?" · "+t.contractEnd+": "+fmtDate(c.endDate):" · "+t.indefinite}
                       </div>
                       {c.type==="employee"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.salary} {c.salaryType==="hourly"?"/h":"/M"}</div>}
                       {c.type==="client"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.price} {c.salaryType==="hourly"?"/h":"/M"}</div>}
@@ -10428,7 +10669,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                   {c?.type==="client"?"👥":"👤"} {entity?.name||"—"}
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>
-                  {typeLabel(c?.type)} · {statusLabel(c?.status)} · {c?.contractDate}
+                  {typeLabel(c?.type)} · {statusLabel(c?.status)} · {fmtDate(c?.contractDate)}
                 </div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
