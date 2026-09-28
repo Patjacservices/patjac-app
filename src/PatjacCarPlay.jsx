@@ -658,10 +658,12 @@ const gPinUnique = (existingEmployees, excludeId) => {
 // All e-mails leave from the company mailbox info@patjacservices.ch (Infomaniak).
 // "mailto" links open the default mail program; set Infomaniak Mail as default once (see InfomaniakSetupHint).
 const COMPANY_EMAIL = "info@patjacservices.ch";
-const INFOMANIAK_MAIL_URL = "https://mail.infomaniak.com";
+// Direct link to the company mailbox (Infomaniak kSuite webmail)
+const INFOMANIAK_MAIL_URL = "https://ksuite.infomaniak.com/mail";
 const INFOMANIAK_DEFAULT_HELP = "https://www.infomaniak.com/es/soporte/faq/2639";
 const mailtoUrl = ({to="",subject="",body=""}) => `mailto:${encodeURIComponent(to).replace(/%40/g,"@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-// E-mail buttons used everywhere a message is sent: opens the company mailbox with everything already written
+const openCompanyMailbox = () => { window.open(INFOMANIAK_MAIL_URL,"_blank","noopener"); };
+// E-mail buttons used everywhere a message is sent: opens the mail program (company account) with everything already written
 function CompanyEmailButtons({to, subject, body, lang, disabled}){
   const L = makeL(lang||appLang);
   const [copied,setCopied] = useState(false);
@@ -670,30 +672,116 @@ function CompanyEmailButtons({to, subject, body, lang, disabled}){
     const txt = `${L("An","Para","To","A")}: ${to}\n${L("Betreff","Asunto","Subject","Oggetto")}: ${subject}\n\n${body}`;
     try{ navigator.clipboard.writeText(txt); }catch(e){}
     setCopied(true); setTimeout(()=>setCopied(false),4000);
-    window.open(INFOMANIAK_MAIL_URL,"_blank","noopener");
+    openCompanyMailbox();
   };
   return (
     <div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-        <a href={disabled?undefined:mailtoUrl({to,subject,body})} onClick={e=>{if(disabled)e.preventDefault();}} style={b("#E0115F")}>📧 E-mail · {COMPANY_EMAIL}</a>
-        <button disabled={disabled} onClick={copyAndOpen} style={b("rgba(255,255,255,.14)")}>{copied?`✅ ${L("Kopiert – im Mail einfügen","Copiado: pégalo en el correo","Copied – paste it in the mail","Copiato – incollalo nella mail")}`:`📋 ${L("Kopieren + Infomaniak Mail öffnen","Copiar y abrir Infomaniak Mail","Copy + open Infomaniak Mail","Copia + apri Infomaniak Mail")}`}</button>
+        <a href={disabled?undefined:mailtoUrl({to,subject,body})} onClick={e=>{if(disabled)e.preventDefault();}} style={b("#E0115F")}>📧 {L("Senden","Enviar","Send","Invia")} · {COMPANY_EMAIL}</a>
+        <button disabled={disabled} onClick={copyAndOpen} style={b("rgba(255,255,255,.14)")}>{copied?`✅ ${L("Kopiert – im Mail einfügen","Copiado: pégalo en el correo","Copied – paste it in the mail","Copiato – incollalo nella mail")}`:`📬 ${L("Kopieren + Webmail öffnen","Copiar y abrir mi correo web","Copy + open webmail","Copia + apri webmail")}`}</button>
       </div>
       <div style={{color:CP.textTertiary,fontSize:11,marginTop:5,lineHeight:1.45}}>
-        ℹ️ {L("Öffnet sich nicht Infomaniak Mail? Einmal als Standard-Mailprogramm einrichten:","¿No se abre Infomaniak Mail? Configúralo una vez como correo predeterminado:","Infomaniak Mail doesn't open? Set it once as default mail program:","Non si apre Infomaniak Mail? Impostalo una volta come posta predefinita:")} <a href={INFOMANIAK_DEFAULT_HELP} target="_blank" rel="noopener noreferrer" style={{color:"#74C0FC"}}>{L("Anleitung","instrucciones","instructions","istruzioni")}</a>
+        ℹ️ {L("Der Knopf «Senden» öffnet Ihr Mailprogramm (Outlook) mit dem Firmenkonto. Alternativ: Webmail.","El botón «Enviar» abre tu programa de correo (Outlook) con la cuenta de empresa. Alternativa: correo web.","«Send» opens your mail program (Outlook) with the company account. Alternative: webmail.","«Invia» apre il programma di posta (Outlook) con l'account aziendale. Alternativa: webmail.")}
       </div>
     </div>
   );
 }
 
-// ─── SEND BY EMAIL (opens the company mailbox with prefilled content) ───
-const sendByEmail = ({to="", subject="", body=""}) => {
-  const from = COMPANY_EMAIL;
-  const mailto = `mailto:${encodeURIComponent(to).replace(/%40/g,"@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  // A link click (not window.open) is what phones and browsers reliably hand over to the mail app
-  const a = document.createElement("a"); a.href = mailto; a.rel = "noopener"; a.style.display = "none";
-  document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(), 500);
-  void from;
+// ─── DOCUMENT → PDF LINK (used when a document is sent by e-mail) ───
+const scopeCss = (css, root) => {
+  let out = "", i = 0; const src = String(css||"").replace(/\/\*[\s\S]*?\*\//g,"");
+  while(i < src.length){
+    const open = src.indexOf("{", i); if(open<0) break;
+    const sel = src.slice(i, open).trim();
+    let depth = 1, j = open+1; while(j<src.length && depth>0){ if(src[j]==="{") depth++; else if(src[j]==="}") depth--; j++; }
+    const body = src.slice(open+1, j-1);
+    if(sel.startsWith("@")){ /* drop @media / @page / @font-face: print-only rules */ }
+    else out += sel.split(",").map(x=>{ x=x.trim(); if(!x) return ""; if(/^(html|body)$/i.test(x)) return root; if(x==="*") return `${root}, ${root} *`; return `${root} ${x.replace(/^(html|body)\s+/i,"")}`; }).filter(Boolean).join(", ") + `{${body}}`;
+    i = j;
+  }
+  return out;
 };
+const docPdfFromHtml = async (html, landscape=false) => {
+  const h2p = await loadHtml2Pdf();
+  const wrap = document.createElement("div");      // off-screen holder (html2pdf copies only the inner document)
+  wrap.style.cssText = "position:fixed;left:-12000px;top:0;";
+  const box = document.createElement("div");
+  box.className = "pj-pdf-doc";
+  box.style.cssText = `width:${landscape?1040:720}px;background:#fff;color:#000;padding:18px;box-sizing:border-box`;
+  wrap.appendChild(box);
+  // keep the document's own styles, but scoped so they never touch the app itself
+  box.innerHTML = String(html||"").replace(/<!DOCTYPE[^>]*>/i,"").replace(/<style[^>]*>([\s\S]*?)<\/style>/gi,(m,css)=>`<style>${scopeCss(css,".pj-pdf-doc")}</style>`);
+  box.querySelectorAll(".hint,.print-hint,.no-print,script,button").forEach(n=>n.remove());
+  document.body.appendChild(wrap);
+  try{
+    return await h2p().set({margin:[8,8,10,8], image:{type:"jpeg",quality:0.95}, html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"}, jsPDF:{unit:"mm",format:"a4",orientation:landscape?"landscape":"portrait"}, pagebreak:{mode:["avoid-all","css"]}}).from(box).outputPdf("blob");
+  } finally { wrap.remove(); }
+};
+const safeFileName = s => String(s||"Dokument").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w.-]+/g,"_").replace(/_+/g,"_").slice(0,80);
+
+// Global e-mail window: every "send by e-mail" button in the app goes through it
+let _openEmailHost = null;
+const sendByEmail = ({to="", subject="", body="", getHtml=null, fileName="", landscape=false}) => {
+  let html = null;
+  try{ html = typeof getHtml==="function" ? getHtml() : null; }catch(e){ html = null; }
+  if(_openEmailHost){ _openEmailHost({to, subject, body, html, fileName, landscape}); return; }
+  const a = document.createElement("a"); a.href = mailtoUrl({to,subject,body}); a.rel = "noopener"; a.style.display = "none";
+  document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(), 500);
+};
+function EmailHost({lang}){
+  const L = makeL(lang||appLang);
+  const [job,setJob] = useState(null);           // {to,subject,body,html,fileName}
+  const [pdf,setPdf] = useState({status:"none",url:"",blob:null});
+  useEffect(()=>{ _openEmailHost = (o)=>{ setJob({...o}); setPdf({status:o.html?"working":"none",url:"",blob:null}); }; return ()=>{ _openEmailHost=null; }; },[]);
+  useEffect(()=>{
+    if(!job?.html || pdf.status!=="working") return;
+    let alive = true;
+    (async()=>{
+      try{
+        const blob = await docPdfFromHtml(job.html, !!job.landscape);
+        let url = "";
+        try{ url = await uploadInvoicePdf(blob, `docs/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeFileName(job.fileName||job.subject)}.pdf`); }catch(e){ console.error("upload",e); }
+        if(!alive) return;
+        setPdf({status:"ready",url,blob});
+        if(url) setJob(j=>j?{...j, body:`${j.body}\n\n📄 ${L("Dokument (PDF)","Documento (PDF)","Document (PDF)","Documento (PDF)")}: ${url}`}:j);
+      }catch(e){ console.error(e); if(alive) setPdf({status:"error",url:"",blob:null}); }
+    })();
+    return ()=>{ alive=false; };
+  },[job?.html, pdf.status]);
+  if(!job) return null;
+  const close = () => setJob(null);
+  const dl = () => { if(!pdf.blob) return; const u=URL.createObjectURL(pdf.blob); const a=document.createElement("a"); a.href=u; a.download=`${safeFileName(job.fileName||job.subject)}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),30000); };
+  const inp = {width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,.07)",border:`1px solid ${CP.border}`,borderRadius:10,color:"#fff",padding:"9px 11px",fontSize:14,fontFamily:CP.font};
+  const lab = {color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"10px 0 4px"};
+  const validTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((job.to||"").trim());
+  return (
+    <div onClick={close} style={{position:"fixed",inset:0,zIndex:100000,background:"rgba(0,0,0,.8)",backdropFilter:"blur(10px)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,overflowY:"auto"}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"min(560px,96vw)",background:CP.surface,border:`1px solid ${CP.border}`,borderRadius:18,padding:18,marginTop:20,fontFamily:CP.font}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <div style={{color:"#fff",fontWeight:800,fontSize:16}}>📧 {L("Per E-Mail senden","Enviar por email","Send by e-mail","Invia per e-mail")}</div>
+          <button onClick={close} style={{background:"rgba(255,255,255,.1)",border:"none",borderRadius:10,color:"#fff",padding:"6px 11px",cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{color:"#8CE99A",fontSize:12,fontWeight:700}}>{L("Von","De","From","Da")}: {COMPANY_EMAIL}</div>
+        <div style={lab}>{L("An","Para","To","A")}</div>
+        <input value={job.to} onChange={e=>setJob({...job,to:e.target.value})} placeholder="cliente@email.ch" style={inp} type="email"/>
+        <div style={lab}>{L("Betreff","Asunto","Subject","Oggetto")}</div>
+        <input value={job.subject} onChange={e=>setJob({...job,subject:e.target.value})} style={inp}/>
+        <div style={lab}>{L("Nachricht","Mensaje","Message","Messaggio")}</div>
+        <textarea value={job.body} onChange={e=>setJob({...job,body:e.target.value})} rows={8} style={{...inp,resize:"vertical",lineHeight:1.45}}/>
+        {job.html&&<div style={{margin:"10px 0",padding:"9px 11px",borderRadius:10,background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.35)",color:CP.textSecondary,fontSize:12.5,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+          <span>{pdf.status==="working"?`⏳ ${L("PDF wird erstellt…","Creando el PDF del documento…","Creating the PDF…","Creazione del PDF…")}`
+            :pdf.status==="ready"?(pdf.url?`✅ ${L("PDF bereit – der Link ist in der Nachricht","PDF listo: el enlace ya está en el mensaje","PDF ready – the link is in the message","PDF pronto – il link è nel messaggio")}`:`⚠️ ${L("PDF erstellt, Link nicht möglich – herunterladen und anhängen","PDF creado, sin enlace: descárgalo y adjúntalo","PDF created, no link – download and attach it","PDF creato, senza link – scaricalo e allegalo")}`)
+            :`⚠️ ${L("PDF konnte nicht erstellt werden","No se pudo crear el PDF","Could not create the PDF","Impossibile creare il PDF")}`}</span>
+          {pdf.blob&&<button onClick={dl} style={{background:"rgba(255,255,255,.14)",border:"none",borderRadius:9,color:"#fff",padding:"6px 10px",cursor:"pointer",fontWeight:700,fontSize:12}}>⬇️ PDF</button>}
+        </div>}
+        {!validTo&&<div style={{color:"#FFD43B",fontSize:12,margin:"8px 0"}}>⚠️ {L("Bitte eine gültige E-Mail-Adresse eingeben","Escribe un email válido del destinatario","Please enter a valid e-mail address","Inserisci un indirizzo e-mail valido")}</div>}
+        <div style={{marginTop:10}}>
+          <CompanyEmailButtons to={job.to.trim()} subject={job.subject} body={job.body} lang={lang} disabled={!validTo||pdf.status==="working"}/>
+        </div>
+      </div>
+    </div>
+  );
+}
 // SMS link: iPhone uses "&body=", Android uses "?body="
 const isIOS = () => /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent||"") && ("ontouchend" in document || /iPhone|iPad|iPod/.test(navigator.userAgent||""));
 const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||"") || isIOS();
@@ -1728,6 +1816,7 @@ export default function PatjacCarPlay(){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:16}}>
           {currentUser?.role==="admin"&&<button onClick={()=>setShowSearch(true)} title={L("Alles suchen","Buscar en toda la app","Search everything","Cerca ovunque")} style={{background:"rgba(28,126,214,0.25)",border:"1px solid rgba(28,126,214,0.5)",borderRadius:10,color:"#fff",padding:"4px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>🔍 {L("Suchen","Buscar","Search","Cerca")}</button>}
+          {currentUser?.role==="admin"&&<button onClick={openCompanyMailbox} title={L("Firmen-Postfach öffnen","Abrir mi correo de empresa","Open company mailbox","Apri la posta aziendale")+" · "+COMPANY_EMAIL} style={{background:"rgba(224,17,95,0.25)",border:"1px solid rgba(224,17,95,0.5)",borderRadius:10,color:"#fff",padding:"4px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>📬 {L("Post","Correo","Mail","Posta")}</button>}
           <button onClick={()=>setShowShare(true)} title={L("App teilen","Compartir la app","Share the app","Condividi l'app")} style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:10,color:"#fff",padding:"4px 9px",cursor:"pointer",fontSize:14}}>📲</button>
           {/* Lang */}
           <div style={{display:"flex",gap:4}}>
@@ -1756,6 +1845,7 @@ export default function PatjacCarPlay(){
       {showSearch&&<GlobalSearch lang={lang} onClose={()=>setShowSearch(false)} openApp={(id)=>{ setActiveApp(null); setTimeout(()=>openApp(id),0); }}
         clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} orders={orders} products={products} suppliers={suppliers}/>}
       {showShare&&<ShareAppModal lang={lang} onClose={()=>setShowShare(false)}/>}
+      <EmailHost lang={lang}/>
       {/* ── CONTENT ── */}
       <div style={{flex:1,overflow:"hidden",position:"relative"}}>
         {activeApp ? (
@@ -2439,6 +2529,11 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
             </label>
             {canSend&&rows&&<SendToDocsButton lang={lang} employeeId={emp.id} category="worksheet" period={monthStr} style={{padding:"7px 14px"}}
               title={`${L("Arbeitsrapport","Hoja mensual","Work sheet","Rapporto")} ${monthName} ${year}`} getHtml={()=>download(true)}/>}
+            {canSend&&rows&&<button onClick={()=>sendByEmail({to:emp.email||"",landscape:true,
+              subject:`${L("Arbeitsrapport","Hoja de trabajo","Work sheet","Rapporto di lavoro")} — ${emp.name} — ${monthName} ${year}`,
+              body:`${L("Guten Tag","Hola","Hello","Buongiorno")} ${emp.name},\n\n${L("Anbei Ihr Arbeitsrapport","Te enviamos tu hoja de trabajo de","Please find your work sheet for","In allegato il rapporto di lavoro di")} ${monthName} ${year}.\n\n${L("Freundliche Grüsse","Saludos cordiales","Kind regards","Cordiali saluti")}\nPatjac Reinigung Garten & Services\n${COMPANY_EMAIL}`,
+              fileName:`${L("Arbeitsrapport","Hoja_de_trabajo","Work_sheet","Rapporto")}_${emp.name}_${monthName}_${year}`, getHtml:()=>download(true)})}
+              style={{background:"#E0115F",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontWeight:700,fontFamily:CP.font}}>📧 E-mail</button>}
             <button onClick={()=>download()} disabled={!rows} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontWeight:700}}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</button>
             <button onClick={onClose} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer"}}>✕</button>
           </div>
@@ -2538,7 +2633,8 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
 }
 
 // ─── PAYSLIP MODAL – On-Screen Preview + PDF Download ────────
-function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings, canSend}){
+function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings, canSend, autoEmail}){
+  useEffect(()=>{ if(!autoEmail) return; const tm=setTimeout(()=>document.getElementById("pj-payslip-email")?.click(),350); return ()=>clearTimeout(tm); },[autoEmail]);
   const cs = companySettings || {
     name:"Patjac Reinigung Garten & Services",logo:"🌿",
     street:"Industriestrasse",number:"14",postalCode:"8004",city:"Zürich",
@@ -2693,6 +2789,11 @@ td:last-child{text-align:right;font-weight:600}
           <div style={{display:"flex",gap:8}}>
             {canSend&&<SendToDocsButton lang={lang} employeeId={emp.id} category="payslip" period={`${year}-${String(month).padStart(2,"0")}`}
               title={`${L("Lohnabrechnung","Nómina","Payslip","Busta paga")} ${monthName} ${year}`} getHtml={()=>generatePDF(true)}/>}
+            {canSend&&<button id="pj-payslip-email" onClick={()=>sendByEmail({to:emp.email||"",
+              subject:`${L("Lohnabrechnung","Nómina","Payslip","Busta paga")} — ${emp.name} — ${monthName} ${year}`,
+              body:`${L("Guten Tag","Hola","Hello","Buongiorno")} ${emp.name},\n\n${L("Anbei Ihre Lohnabrechnung für","Te enviamos tu nómina de","Please find your payslip for","In allegato la busta paga di")} ${monthName} ${year}.\n\n${L("Freundliche Grüsse","Saludos cordiales","Kind regards","Cordiali saluti")}\nPatjac Reinigung Garten & Services\n${COMPANY_EMAIL}`,
+              fileName:`${L("Lohnabrechnung","Nomina","Payslip","Busta_paga")}_${emp.name}_${monthName}_${year}`, getHtml:()=>generatePDF(true)})}
+              style={{background:"#E0115F",border:"none",borderRadius:10,color:"#fff",padding:"8px 16px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>📧 E-mail</button>}
             <button onClick={()=>generatePDF()} style={{
               background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",
               borderRadius:10,color:"#fff",padding:"8px 16px",cursor:"pointer",
@@ -3206,11 +3307,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                     </CPBtn>
                     <CPBtn onClick={()=>{
                       const pay = calcSwissPayroll(emp, timeclock, selMonth, selYear, jobs, {spesen:getSavedSpesen(emp.id,selYear,selMonth)});
-                      sendByEmail({
-                        to: emp.email||"",
-                        subject: `Lohnabrechnung / Nómina — ${emp.name} — ${selMonth}/${selYear}`,
-                        body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${emp.name},\n\n${L("Anbei Ihre Lohnabrechnung","Adjunto su nómina","Please find your payslip","In allegato la sua busta paga")} ${selMonth}/${selYear}:\n\n${L("Bruttolohn","Salario bruto","Gross salary","Salario lordo")}: CHF ${Number(pay.grossTotal||0).toFixed(2)}\n${L("Nettolohn","Salario neto","Net salary","Salario netto")}: CHF ${Number(pay.net||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
-                      });
+                      setPayslipData({emp, pay, month:selMonth, year:selYear, autoEmail:true});
                     }} variant="secondary" size="sm">
                       📧 {t.payrollSend||"Senden"}
                     </CPBtn>
@@ -3451,7 +3548,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
       })()}
 
       {payslipData&&(
-        <PayslipModal canSend={isAdmin}
+        <PayslipModal canSend={isAdmin} autoEmail={!!payslipData.autoEmail}
           emp={payslipData.emp} pay={payslipData.pay}
           month={payslipData.month} year={payslipData.year}
           lang={lang} t={t} onClose={()=>setPayslipData(null)}
@@ -3584,7 +3681,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
       </div>
 
       {payslipData&&(
-        <PayslipModal canSend={isAdmin}
+        <PayslipModal canSend={isAdmin} autoEmail={!!payslipData.autoEmail}
           emp={payslipData.emp} pay={payslipData.pay}
           month={payslipData.month} year={payslipData.year}
           lang={lang} t={t} onClose={()=>setPayslipData(null)}
@@ -6203,11 +6300,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
               <CPBtn onClick={()=>setPreview(r.type)} variant="secondary" size="sm">
                 👁️ {L("Anzeigen","Ver","View","Vedi")}
               </CPBtn>
-              <CPBtn onClick={()=>sendByEmail({
-                to: cs.email||"info@patjacservices.ch",
-                subject: `${r.l} — Patjac Reinigung Garten & Services`,
-                body: `${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Bericht","Adjunto el informe","Please find the report","In allegato il rapporto")}: ${r.l}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
-              })} size="sm">📧</CPBtn>
+              <CPBtn onClick={()=>{ setPreview(r.type); setTimeout(()=>document.getElementById("pj-report-email")?.click(),400); }} size="sm">📧</CPBtn>
             </div>
           </CPCard>
         ))}
@@ -6249,6 +6342,13 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
                 📊 {reps.find(r=>r.type===preview)?.l}
               </div>
               <div style={{display:"flex",gap:8}}>
+                <button id="pj-report-email" onClick={()=>{
+                  const title = reps.find(r=>r.type===preview)?.l||"Report";
+                  sendByEmail({to:"", subject:`${title} — Patjac Reinigung Garten & Services`,
+                    body:`${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Bericht","Adjunto el informe","Please find the report","In allegato il rapporto")}: ${title}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\n${COMPANY_EMAIL}`,
+                    fileName:title,
+                    getHtml:()=>{ const c=document.getElementById("report-preview-content"); return c?`<style>body{font-family:Arial,sans-serif;font-size:12px;color:#000}*{color:#000 !important;background:transparent !important;border-color:#ccc !important}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd}</style><h2>${title}</h2>${c.innerHTML}`:null; }});
+                }} style={{background:"#E0115F",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>📧 E-mail</button>
                 <button onClick={()=>{
                   const content = document.getElementById("report-preview-content");
                   if(!content) return;
@@ -9343,7 +9443,17 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     sendByEmail({
                       to: sup?.email||"",
                       subject: `${L("Bestellung","Pedido","Order","Ordine")} — Patjac Reinigung Garten & Services`,
-                      body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${order.supplierName||sup?.name||""},\n\n${L("Hiermit bestellen wir folgende Artikel:","Nos gustaría pedir los siguientes artículos:","We would like to order the following items:","Vorremmo ordinare i seguenti articoli:")}\n\n${(order.items||[]).map(it=>`- ${it.productName||it.name||""}: ${it.qty||""} ${it.unit||"x"}`).join("\n")}\n\n${L("Gesamtbetrag","Total","Total","Totale")}: CHF ${(order.total||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
+                      body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${order.supplierName||sup?.name||""},\n\n${L("Hiermit bestellen wir folgende Artikel:","Nos gustaría pedir los siguientes artículos:","We would like to order the following items:","Vorremmo ordinare i seguenti articoli:")}\n\n${(order.items||[]).map(it=>`- ${it.productName||it.name||""}: ${it.qty||""} ${it.unit||"x"}`).join("\n")}\n\n${L("Gesamtbetrag","Total","Total","Totale")}: CHF ${(order.total||0).toFixed(2)}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`,
+                      fileName: `${L("Bestellung","Pedido","Order","Ordine")}_${order.supplierName||sup?.name||""}_${order.date||""}`,
+                      getHtml: ()=>{
+                        const esc = v => String(v??"").replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+                        const rows = (order.items||[]).map(it=>`<tr><td>${esc(it.productName||it.name)}</td><td style="text-align:right">${esc(it.qty)} ${esc(it.unit||"")}</td><td style="text-align:right">${Number(it.unitPrice||0).toFixed(2)}</td><td style="text-align:right">${Number(it.total||(it.qty||0)*(it.unitPrice||0)).toFixed(2)}</td></tr>`).join("");
+                        return `<style>body{font-family:Arial,sans-serif;color:#000;font-size:12px}h2{color:#1C7ED6;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:14px}th{background:#1C7ED6;color:#fff;padding:7px;text-align:left}td{padding:7px;border-bottom:1px solid #ddd}</style>
+<h2>${L("Bestellung","Pedido","Order","Ordine")}</h2><div><b>Patjac Reinigung Garten &amp; Services</b> · Zürich · ${COMPANY_EMAIL}</div>
+<div style="margin-top:10px">${L("Lieferant","Proveedor","Supplier","Fornitore")}: <b>${esc(order.supplierName||sup?.name||"")}</b><br/>${L("Datum","Fecha","Date","Data")}: ${esc(fmtDate(order.date))}${order.deliveryDate?`<br/>${L("Lieferung","Entrega","Delivery","Consegna")}: ${esc(fmtDate(order.deliveryDate))}`:""}</div>
+<table><thead><tr><th>${L("Artikel","Artículo","Item","Articolo")}</th><th style="text-align:right">${L("Menge","Cantidad","Qty","Quantità")}</th><th style="text-align:right">CHF</th><th style="text-align:right">Total CHF</th></tr></thead><tbody>${rows}</tbody></table>
+<div style="text-align:right;margin-top:12px;font-size:15px"><b>Total: CHF ${Number(order.total||0).toFixed(2)}</b></div>${order.notes?`<p>${esc(order.notes)}</p>`:""}`;
+                      },
                     });
                   }} variant="secondary" size="sm">
                     📧 {L("PDF senden","Enviar PDF","Send PDF","Invia PDF")}
@@ -10127,6 +10237,22 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
   };
 
   // ── BUILD CONTRACT HTML ─────────────────────────────────────
+  const emailContract = (c) => {
+                        const entity = c.type==="client"
+                          ? clients.find(x=>x.id===c.clientId)
+                          : employees.find(x=>x.id===c.employeeId);
+                        const isEmp = c.type==="employee";
+                        sendByEmail({
+                          to: entity?.email||"",
+                          subject: `${isEmp ? L("Arbeitsvertrag","Contrato laboral","Employment Contract","Contratto di lavoro") : L("Dienstleistungsvertrag","Contrato de servicios","Service Contract","Contratto di servizi")} — Patjac Reinigung Garten & Services`,
+                          body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${c.entityName||entity?.name||""},\n\n${isEmp
+                            ? L("Anbei Ihr Arbeitsvertrag ab","Adjunto su contrato laboral desde","Please find your employment contract from","In allegato il suo contratto di lavoro dal")
+                            : L("Anbei Ihr Dienstleistungsvertrag ab","Adjunto su contrato de servicios desde","Please find your service contract from","In allegato il suo contratto di servizi dal")
+                          } ${c.startDate||""}.\n\n${L("Bitte unterschreiben Sie und senden Sie uns eine Kopie zurück.","Por favor firme y envíenos una copia de vuelta.","Please sign and return a copy to us.","Si prega di firmare e restituirci una copia.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`,
+                          getHtml: ()=>buildContractHTML(c),
+                          fileName: `${isEmp?L("Arbeitsvertrag","Contrato_laboral","Employment_contract","Contratto_lavoro"):L("Dienstleistungsvertrag","Contrato_servicios","Service_contract","Contratto_servizi")}_${c.entityName||entity?.name||""}`,
+                        });
+  };
   const buildContractHTML = (c) => {
     const entity = c.type==="client" ? clients.find(x=>x.id===c.clientId) : employees.find(x=>x.id===c.employeeId);
     const isEmp = c.type==="employee";
@@ -10499,20 +10625,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                       {c.type==="employee"&&c.employeeId&&<SendToDocsButton compact lang={lang} employeeId={c.employeeId} category="contract_sent" refId={c.id}
                         title={`${L("Arbeitsvertrag","Contrato laboral","Employment contract","Contratto di lavoro")} ${c.startDate||c.contractDate||""}`} getHtml={()=>buildContractHTML(c)}
                         style={{background:"rgba(47,158,68,0.35)",padding:"5px 10px",fontSize:12}}/>}
-                      <CPBtn onClick={()=>{
-                        const entity = c.type==="client"
-                          ? clients.find(x=>x.id===c.clientId)
-                          : employees.find(x=>x.id===c.employeeId);
-                        const isEmp = c.type==="employee";
-                        sendByEmail({
-                          to: entity?.email||"",
-                          subject: `${isEmp ? L("Arbeitsvertrag","Contrato laboral","Employment Contract","Contratto di lavoro") : L("Dienstleistungsvertrag","Contrato de servicios","Service Contract","Contratto di servizi")} — Patjac Reinigung Garten & Services`,
-                          body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${c.entityName||entity?.name||""},\n\n${isEmp
-                            ? L("Anbei Ihr Arbeitsvertrag ab","Adjunto su contrato laboral desde","Please find your employment contract from","In allegato il suo contratto di lavoro dal")
-                            : L("Anbei Ihr Dienstleistungsvertrag ab","Adjunto su contrato de servicios desde","Please find your service contract from","In allegato il suo contratto di servizi dal")
-                          } ${c.startDate||""}.\n\n${L("Bitte unterschreiben Sie und senden Sie uns eine Kopie zurück.","Por favor firme y envíenos una copia de vuelta.","Please sign and return a copy to us.","Si prega di firmare e restituirci una copia.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
-                        });
-                      }} variant="primary" size="sm">📧</CPBtn>
+                      <CPBtn onClick={()=>emailContract(c)} variant="primary" size="sm">📧</CPBtn>
                       {c.status==="draft"&&<CPBtn onClick={()=>{setContracts(p=>p.map(x=>x.id===c.id?{...x,status:"signed"}:x));notify(t.contractSigned,"success");}} variant="success" size="sm">✍️</CPBtn>}
                       <CPBtn onClick={()=>{setForm({...c});setSelContract(c);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
                       <CPBtn onClick={()=>setDeleteContractId(c.id)} variant="danger" size="sm">🗑️</CPBtn>
@@ -10661,6 +10774,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                 <div style={{display:"flex",gap:8}}>
                   {selContract.type==="employee"&&selContract.employeeId&&<SendToDocsButton lang={lang} employeeId={selContract.employeeId} category="contract_sent" refId={selContract.id}
                     title={`${L("Arbeitsvertrag","Contrato laboral","Employment contract","Contratto di lavoro")} ${selContract.startDate||selContract.contractDate||""}`} getHtml={()=>buildContractHTML(selContract)} style={{padding:"7px 14px"}}/>}
+                  <button onClick={()=>emailContract(selContract)} style={{background:"#E0115F",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>📧 E-mail</button>
                   <button onClick={()=>downloadContract(selContract)} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.35)",borderRadius:10,color:"#fff",padding:"7px 15px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>⬇️ {t.contractDownload}</button>
                   <button onClick={()=>setModal(null)} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer",fontSize:13}}>✕</button>
                 </div>
