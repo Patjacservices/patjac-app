@@ -657,6 +657,20 @@ const gPinUnique = (existingEmployees, excludeId) => {
 // ─── COMPANY E-MAIL ─────────────────────────────────────────
 // All e-mails leave from the company mailbox info@patjacservices.ch (Infomaniak).
 // "mailto" links open the default mail program; set Infomaniak Mail as default once (see InfomaniakSetupHint).
+// ─── SESSION (server-side): the token proves who is logged in; the database only answers with a valid one ───
+let APP_TOKEN = null;          // kept only in memory: closing the app logs out
+let APP_HEADER_OK = true;      // false only if the browser could not send the header (fallback, keeps the app usable)
+const tokenHeaders = () => (APP_TOKEN && APP_HEADER_OK ? {"x-app-token": APP_TOKEN} : {});
+// Removes anything executable from generated/stored HTML before it is shown, printed or turned into a PDF
+const safeHtml = (html) => {
+  try{
+    const doc = new DOMParser().parseFromString(String(html||""), "text/html");
+    doc.querySelectorAll("script,iframe,object,embed,link[rel=import],base,form,meta[http-equiv]").forEach(n=>n.remove());
+    doc.querySelectorAll("*").forEach(el=>{ [...el.attributes].forEach(a=>{ const n=a.name.toLowerCase(), v=String(a.value||"").trim().toLowerCase();
+      if(n.startsWith("on") || ((n==="href"||n==="src"||n==="xlink:href"||n==="action"||n==="formaction") && (v.startsWith("javascript:")||v.startsWith("vbscript:")||(v.startsWith("data:")&&!v.startsWith("data:image/")))) ) el.removeAttribute(a.name); }); });
+    return "<!DOCTYPE html>"+doc.documentElement.outerHTML;
+  }catch(e){ return String(html||"").replace(/<script[\s\S]*?<\/script>/gi,"").replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,""); }
+};
 const COMPANY_EMAIL = "info@patjacservices.ch";
 // Direct link to the company mailbox (Infomaniak kSuite webmail)
 const INFOMANIAK_MAIL_URL = "https://ksuite.infomaniak.com/mail";
@@ -710,7 +724,7 @@ const docPdfFromHtml = async (html, landscape=false) => {
   box.style.cssText = `width:${landscape?1040:720}px;background:#fff;color:#000;padding:18px;box-sizing:border-box`;
   wrap.appendChild(box);
   // keep the document's own styles, but scoped so they never touch the app itself
-  box.innerHTML = String(html||"").replace(/<!DOCTYPE[^>]*>/i,"").replace(/<style[^>]*>([\s\S]*?)<\/style>/gi,(m,css)=>`<style>${scopeCss(css,".pj-pdf-doc")}</style>`);
+  box.innerHTML = safeHtml(html).replace(/<!DOCTYPE[^>]*>/i,"").replace(/<style[^>]*>([\s\S]*?)<\/style>/gi,(m,css)=>`<style>${scopeCss(css,".pj-pdf-doc")}</style>`);
   box.querySelectorAll(".hint,.print-hint,.no-print,script,button").forEach(n=>n.remove());
   document.body.appendChild(wrap);
   try{
@@ -1245,6 +1259,7 @@ export default function PatjacCarPlay(){
         "Content-Type": "application/json",
         "apikey": SUPA_KEY,
         "Authorization": `Bearer ${SUPA_KEY}`,
+        ...tokenHeaders(),
         "Prefer": method==="POST" ? "resolution=merge-duplicates,return=representation" : method==="PATCH" ? "return=minimal" : "return=representation",
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -1369,8 +1384,9 @@ export default function PatjacCarPlay(){
     });
   };
 
-  // Load all data from Supabase on mount
+  // Load data from Supabase only after a successful login (the database refuses requests without a session)
   useEffect(()=>{
+    if(authState!=="app") return;
     const load = async () => {
       try {
         console.log("Loading from Supabase...");
@@ -1458,7 +1474,7 @@ export default function PatjacCarPlay(){
     let msgPollRef;
 
     const pollMessages = async () => {
-      if(document.hidden) return; // skip if tab is hidden
+      if(document.hidden || !APP_TOKEN) return; // skip if tab is hidden or logged out
       try {
         const fresh = await supaFetch("messages?order=created_at");
         if(fresh) setMessages(prev=>{
@@ -1477,13 +1493,19 @@ export default function PatjacCarPlay(){
     const onFocus = () => { pollMessages(); };
     window.addEventListener("focus", onFocus);
 
-    return ()=>{ clearInterval(msgPollRef); window.removeEventListener("focus", onFocus); };
-  },[]);
+    // Session watchdog: every 5 min the session is renewed; if it expired, back to the login screen
+    const watch = setInterval(async()=>{
+      if(!APP_TOKEN || !APP_HEADER_OK) return;
+      try{ const r = await supaRpc("app_session_check",{}); if(!r){ sessionExpiredRef.current?.(); } }catch(e){}
+    }, 5*60*1000);
+
+    return ()=>{ clearInterval(msgPollRef); clearInterval(watch); window.removeEventListener("focus", onFocus); };
+  },[authState]);
 
   // Tops up weekly/monthly recurring job series once they start running low,
   // so they keep generating automatically every time the app is opened.
   useEffect(()=>{
-    if(!dbReady) return;
+    if(!dbReady || currentUser?.role!=="admin") return;   // only the administrator extends series (avoids duplicates)
     const groups = {};
     jobs.forEach(j=>{ if(j.recurringId){ (groups[j.recurringId] = groups[j.recurringId]||[]).push(j); } });
     const toAdd = [];
@@ -1571,27 +1593,46 @@ export default function PatjacCarPlay(){
   // ─── LOGIN ──────────────────────────────────────────────
   const L = makeL(lang);
   const [loginBusy,setLoginBusy] = useState(false);
+  // After login: prove the session header reaches the database (fallback keeps the app usable if a browser blocks it)
+  const startSession = async (token) => {
+    APP_TOKEN = token; APP_HEADER_OK = true;
+    try{ const r = await supaRpc("app_session_check",{}); if(!r) console.warn("session check: no role"); }
+    catch(e){ console.warn("session header blocked, fallback", e); APP_HEADER_OK = false; }
+  };
   const handleLogin = async () => {
     setLoginErr("");
-    if(authType==="admin"){
-      if(loginBusy) return;
-      setLoginBusy(true);
-      let ok=false;
-      try{ ok = await supaRpc("admin_login",{p_email:loginEmail.trim(),p_password:loginPw}); }
-      catch(e){ setLoginErr(L("Keine Verbindung – bitte erneut versuchen","Sin conexión – inténtelo de nuevo","No connection – please try again","Nessuna connessione – riprova")); setLoginBusy(false); return; }
-      setLoginBusy(false);
-      if(ok===true){
-        setCurrentUser({id:"admin",name:"Administrator",role:"admin"});
-        setAuthState("app"); setLoginPw("");
-      } else setLoginErr(L("Ungültige E-Mail oder Passwort (nach 5 Fehlversuchen 15 Min. gesperrt)","Correo o contraseña incorrectos (tras 5 intentos fallidos se bloquea 15 min)","Invalid email or password (locked 15 min after 5 failed attempts)","Email o password non corretti (bloccato 15 min dopo 5 tentativi)"));
-    } else {
-      const emp = employees.find(e=>e.pin===loginPin.trim());
-      if(emp){ setCurrentUser({id:emp.id,name:emp.name,role:"employee",code:emp.code||emp.userCode}); setAuthState("app"); }
-      else setLoginErr(L("Ungültiger Code oder PIN","Código o PIN incorrectos","Invalid code or PIN","Codice o PIN non corretti"));
-    }
+    if(loginBusy) return;
+    const noConn = L("Keine Verbindung – bitte erneut versuchen","Sin conexión – inténtelo de nuevo","No connection – please try again","Nessuna connessione – riprova");
+    setLoginBusy(true);
+    try{
+      if(authType==="admin"){
+        let tok=null;
+        try{ tok = await supaRpc("app_login_admin",{p_email:loginEmail.trim(),p_password:loginPw},false); }
+        catch(e){ setLoginErr(noConn); return; }
+        if(tok){
+          await startSession(tok);
+          setDbReady(false);
+          setCurrentUser({id:"admin",name:"Administrator",role:"admin"});
+          setAuthState("app"); setLoginPw("");
+        } else setLoginErr(L("Ungültige E-Mail oder Passwort (nach 5 Fehlversuchen 15 Min. gesperrt)","Correo o contraseña incorrectos (tras 5 intentos fallidos se bloquea 15 min)","Invalid email or password (locked 15 min after 5 failed attempts)","E-mail o password errati (bloccato 15 min dopo 5 tentativi)"));
+      } else {
+        let r=null;
+        try{ r = await supaRpc("app_login_employee",{p_pin:loginPin.trim()},false); }
+        catch(e){ setLoginErr(noConn); return; }
+        if(r?.token){
+          await startSession(r.token);
+          setDbReady(false);
+          setCurrentUser({id:r.id,name:r.name,role:"employee",code:r.code||""});
+          setAuthState("app"); setLoginPin("");
+        } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte 15 Min. warten","Demasiados intentos: espera 15 minutos","Too many attempts – wait 15 minutes","Troppi tentativi – attendi 15 minuti"));
+        else setLoginErr(L("Ungültiger Code oder PIN","Código o PIN incorrectos","Invalid code or PIN","Codice o PIN non corretti"));
+      }
+    } finally { setLoginBusy(false); }
   };
 
-  const handleLogout = () => {
+  const handleLogout = (expired) => {
+    if(APP_TOKEN) supaRpc("app_logout",{}).catch(()=>{});   // header is taken now, before the token is cleared
+    APP_TOKEN = null;
     setAuthState("login");
     setCurrentUser(null);
     setActiveApp(null);
@@ -1599,9 +1640,16 @@ export default function PatjacCarPlay(){
     setLoginPw("");
     setLoginCode("");
     setLoginPin("");
-    setLoginErr("");
+    setLoginErr(expired===true?L("Sitzung abgelaufen – bitte erneut anmelden","La sesión ha caducado: vuelve a entrar","Session expired – please log in again","Sessione scaduta – accedi di nuovo"):"");
     setAuthType("admin");
+    // nothing from the previous user stays in memory on this device
+    setDbReady(false);
+    setClients([]); setEmployees([]); setJobs([]); setInvoices([]); setTimeclock([]); setMessages([]);
+    setExpenses([]); setOrders([]); setContracts([]); setProducts([]); setSuppliers([]);
+    ["clients","employees","jobs","invoices","timeclock","messages","expenses","orders","contracts","products","suppliers"].forEach(k=>{ try{ localStorage.removeItem("patjac_"+k); }catch(e){} });
   };
+  const sessionExpiredRef = useRef(null);
+  sessionExpiredRef.current = () => handleLogout(true);
 
   const openApp = (id) => {
     if(currentUser?.role==="employee"){
@@ -1656,7 +1704,7 @@ export default function PatjacCarPlay(){
   };
 
   // ─── LOADING SCREEN ──────────────────────────────────────
-  if(!dbReady) return (
+  if(authState==="app" && !dbReady) return (
     <div style={{
       width:"100vw",height:"100vh",background:"#0a0e18",
       display:"flex",flexDirection:"column",
@@ -2514,7 +2562,7 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
     try{ const b=new Blob([html],{type:"text/html;charset=utf-8"}); const u=URL.createObjectURL(b); const a=document.createElement("a");
       a.href=u; a.download=`${title}_${emp.name.replace(/\s+/g,"_")}_${monthName}_${year}.html`; document.body.appendChild(a); a.click();
       setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(u);},3000);
-    }catch(e){ const w=window.open("about:blank","_blank"); if(w){w.document.write(html);w.document.close();} }
+    }catch(e){ const w=window.open("about:blank","_blank"); if(w){w.document.write(safeHtml(html));w.document.close();} }
   };
 
   return (
@@ -2753,7 +2801,7 @@ td:last-child{text-align:right;font-weight:600}
     // Method 3: Open in new tab (last resort)
     const w = window.open("about:blank", "_blank");
     if(w) {
-      w.document.write(html);
+      w.document.write(safeHtml(html));
       w.document.close();
     } else {
       alert(printHint);
@@ -4959,7 +5007,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
               <div ref={previewRef}><InvoiceDocument inv={inv} client={c} cs={cs} lang={lang}/></div>
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14,flexWrap:"wrap"}}>
-              <CPBtn onClick={()=>{ const el=previewRef.current; const w=window.open("","_blank"); if(w&&el){ w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${subj}</title><style>body{margin:0}@page{size:A4;margin:10mm}</style></head><body>${el.innerHTML}</body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},500);} }} variant="secondary">🖨️ {L("Drucken","Imprimir","Print","Stampa")}</CPBtn>
+              <CPBtn onClick={()=>{ const el=previewRef.current; const w=window.open("","_blank"); if(w&&el){ w.document.write(safeHtml(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${subj}</title><style>body{margin:0}@page{size:A4;margin:10mm}</style></head><body>${el.innerHTML}</body></html>`)); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},500);} }} variant="secondary">🖨️ {L("Drucken","Imprimir","Print","Stampa")}</CPBtn>
               <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.close}</CPBtn>
             </div>
           </CPModal>
@@ -5737,7 +5785,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
                   <div key={msg.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start",alignItems:"flex-end",gap:6}}>
                     {!isMe&&<div style={{width:26,height:26,borderRadius:"50%",background:`linear-gradient(135deg,${CP.accent},#00bcf2)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{(convs.find(c=>c.id===selConv)?.name||"?").charAt(0).toUpperCase()}</div>}
                     <div style={{maxWidth:"78%",background:isMe?"linear-gradient(135deg,rgba(28,126,214,.9),rgba(0,100,200,.85))":"rgba(255,255,255,.1)",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"9px 13px",boxShadow:"0 2px 6px rgba(0,0,0,.2)"}}>
-                      {msg.image&&<img src={msg.image} alt="img" style={{maxWidth:"100%",borderRadius:10,marginBottom:msg.content?6:0,display:"block",cursor:"pointer"}} onClick={()=>window.open(msg.image,"_blank")}/>}
+                      {msg.image&&<img src={msg.image} alt="img" style={{maxWidth:"100%",borderRadius:10,marginBottom:msg.content?6:0,display:"block",cursor:"pointer"}} onClick={()=>{ const src=String(msg.image||""); if(/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(src)){ try{ const [h,b]=src.split(","); const bin=atob(b); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); const u=URL.createObjectURL(new Blob([a],{type:h.slice(5).split(";")[0]})); window.open(u,"_blank","noopener"); setTimeout(()=>URL.revokeObjectURL(u),60000);}catch(e){} } else if(/^https:\/\//i.test(src)) window.open(src,"_blank","noopener"); }}/>}
                       {msg.content&&<div style={{color:"#fff",fontSize:14,lineHeight:1.4}}>{msg.content}</div>}
                       <div style={{color:"rgba(255,255,255,.4)",fontSize:10,marginTop:3,textAlign:"right"}}>{formatTime(msg.timestamp)}</div>
                     </div>
@@ -9502,7 +9550,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     subject: `${L("Bestellung","Pedido","Order","Ordine")} — Patjac Reinigung Garten & Services`,
                     body: `${L("Guten Tag","Buenos días","Dear","Gentile")} ${sup.name},\n\n${L("Wir möchten eine Bestellung aufgeben.","Nos gustaría realizar un pedido.","We would like to place an order.","Vorremmo effettuare un ordine.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
                   })} variant="secondary" size="sm">📧</CPBtn>
-                  {sup.website&&<CPBtn onClick={()=>window.open(sup.website.startsWith("http")?sup.website:`https://${sup.website}`,"_blank")} variant="secondary" size="sm">🌐</CPBtn>}
+                  {sup.website&&<CPBtn onClick={()=>window.open(/^https?:\/\//i.test(sup.website)?sup.website:`https://${sup.website}`,"_blank","noopener")} variant="secondary" size="sm">🌐</CPBtn>}
                   {sup.phone&&<CPBtn onClick={()=>window.open(`tel:${sup.phone}`,"_self")} variant="secondary" size="sm">📞</CPBtn>}
                   <CPBtn onClick={()=>{setForm({...sup});setSelId(sup.id);setModal("supplier");}} variant="secondary" size="sm">✏️</CPBtn>
                   <CPBtn onClick={()=>setDeleteSupplierId(sup.id)} variant="danger" size="sm">🗑️</CPBtn>
@@ -9883,21 +9931,22 @@ function buildRightsAnnexHTML(annex, lang, signLeft, signRight){
 const DOCS_REST = "https://rtviublrukagwxaypmit.supabase.co/rest/v1/";
 const DOCS_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0dml1YmxydWthZ3d4YXlwbWl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MjkwMjEsImV4cCI6MjEwNTUwNTAyMX0.Ykj1dz8elWC12GP-m88IBiDc_Hscrw1AjPY9Tw7p-G8";
 const docsFetch = async (path, method="GET", body=null) => {
-  const res = await fetch(DOCS_REST+path, { method, headers:{ "Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, Prefer:"return=representation" }, body: body?JSON.stringify(body):undefined });
+  const res = await fetch(DOCS_REST+path, { method, headers:{ "Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, Prefer:"return=representation", ...tokenHeaders() }, body: body?JSON.stringify(body):undefined });
   if(!res.ok) throw new Error(await res.text());
   const tx = await res.text(); return tx ? JSON.parse(tx) : null;
 };
 const DOC_MAX_BYTES = 5*1024*1024;
 // Server-side checks (the admin password is only stored as a hash, never in the app)
-const supaRpc = async (fn, args) => {
-  const res = await fetch(DOCS_REST+"rpc/"+fn, {method:"POST", headers:{"Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`}, body:JSON.stringify(args)});
+const supaRpc = async (fn, args, withToken=true) => {
+  const res = await fetch(DOCS_REST+"rpc/"+fn, {method:"POST", headers:{"Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, ...(withToken?tokenHeaders():{})}, body:JSON.stringify(args||{})});
   if(!res.ok) throw new Error(await res.text());
-  return res.json();
+  const tx = await res.text(); return tx ? JSON.parse(tx) : null;
 };
 // Documents the administrator "sends" from the app (payslip, work sheet, contract) are stored as printable HTML
 const SENT_CATS = ["payslip","worksheet","contract_sent"];
 const utf8ToB64 = str => { const bytes=new TextEncoder().encode(str); let bin=""; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000)); return btoa(bin); };
 const publishEmployeeDoc = async ({employeeId,title,category,period=null,refId=null,html}) => {
+  html = safeHtml(html);
   // Replace an earlier copy of the same document (same month / same contract)
   const q=[`employee_id=eq.${employeeId}`,`category=eq.${category}`,period?`period=eq.${encodeURIComponent(period)}`:null,refId?`ref_id=eq.${encodeURIComponent(refId)}`:null].filter(Boolean).join("&");
   if(period||refId) await docsFetch(`employee_documents?${q}`,"DELETE");
@@ -10012,7 +10061,12 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
       const rows = await docsFetch(`employee_documents?select=data,mime,file_name&id=eq.${d.id}`);
       const r = rows?.[0]; if(!r?.data) throw new Error("empty");
       const bin = atob(r.data); const arr = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-      const url = URL.createObjectURL(new Blob([arr],{type:r.mime||"application/octet-stream"}));
+      // Only safe types are opened inside the app; HTML is cleaned first; anything else is just downloaded
+      const SAFE_OPEN = ["application/pdf","image/jpeg","image/png","image/gif","image/webp","text/plain"];
+      let mime = String(r.mime||"").toLowerCase(); let blobData = arr;
+      if(mime==="text/html"){ blobData = safeHtml(new TextDecoder().decode(arr)); }
+      else if(!SAFE_OPEN.includes(mime)){ mime = "application/octet-stream"; if(mode==="open") mode = "download"; }
+      const url = URL.createObjectURL(new Blob([blobData],{type:mime||"application/octet-stream"}));
       if(mode==="open"){ const w=window.open(url,"_blank"); if(!w){ const a=document.createElement("a"); a.href=url; a.target="_blank"; document.body.appendChild(a); a.click(); a.remove(); } }
       else { const a=document.createElement("a"); a.href=url; a.download=r.file_name||d.title; document.body.appendChild(a); a.click(); a.remove(); }
       setTimeout(()=>URL.revokeObjectURL(url),60000);
@@ -10530,7 +10584,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                   <div style={{color:"#4ECDC4",fontWeight:700,fontSize:13}}>
                     👁️ {L("Vertragsvorschau","Vista previa del contrato","Contract preview","Anteprima contratto")}
                   </div>
-                  <button onClick={()=>{ const w=window.open("","_blank"); if(w){ w.document.write(html); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400);} }} style={{
+                  <button onClick={()=>{ const w=window.open("","_blank"); if(w){ w.document.write(safeHtml(html)); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400);} }} style={{
                     background:"rgba(47,158,68,0.3)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:8,color:"#fff",padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:CP.font,marginLeft:"auto",marginRight:8,
                   }}>🖨️ {L("Drucken","Imprimir","Print","Stampa")}</button>
                   <button onClick={()=>downloadContract(c)} style={{
@@ -10542,7 +10596,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                   </button>
                 </div>
                 <iframe
-                  srcDoc={html}
+                  srcDoc={safeHtml(html)} sandbox="allow-same-origin allow-modals"
                   style={{width:"100%",height:"65vh",border:"none",background:"#fff"}}
                   title="my-contract-preview"
                 />
@@ -10784,7 +10838,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                   👁️ {L("Vorschau — Herunterladen für druckbereites Vertragsexemplar","Vista previa — Descarga para copia imprimible del contrato","Preview — Download for print-ready contract copy","Anteprima — Scarica per copia del contratto pronta per la stampa")}
                 </div>
               </div>
-              <iframe srcDoc={html} style={{width:"100%",height:"70vh",border:"none",borderRadius:"0 0 22px 22px"}} title="contract-preview"/>
+              <iframe srcDoc={safeHtml(html)} sandbox="allow-same-origin allow-modals" style={{width:"100%",height:"70vh",border:"none",borderRadius:"0 0 22px 22px"}} title="contract-preview"/>
             </div>
           </div>
         );
