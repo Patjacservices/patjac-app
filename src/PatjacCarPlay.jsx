@@ -4599,10 +4599,15 @@ const invoicePdfBlob = async (el) => {
   const h2p = await loadHtml2Pdf();
   return h2p().set({margin:[10,10,12,10], image:{type:"jpeg",quality:0.95}, html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"}, jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}, pagebreak:{mode:["avoid-all","css"]}}).from(el).outputPdf("blob");
 };
+// PDFs are uploaded through a server function that only accepts a logged-in app session;
+// the returned public link keeps working for the recipient (no login needed to open it)
+const UPLOAD_PDF_URL = "https://rtviublrukagwxaypmit.supabase.co/functions/v1/upload-pdf";
 const uploadInvoicePdf = async (blob, path) => {
-  const res = await fetch(INV_BUCKET_URL+"invoices/"+path, {method:"POST", headers:{apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, "Content-Type":"application/pdf", "x-upsert":"true"}, body:blob});
-  if(!res.ok) throw new Error(await res.text());
-  return INV_BUCKET_URL+"public/invoices/"+path;
+  if(!APP_TOKEN) throw new Error("no session");
+  const res = await fetch(UPLOAD_PDF_URL, {method:"POST", headers:{apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, "Content-Type":"application/pdf", "x-app-token":APP_TOKEN, "x-file-name":encodeURIComponent(path)}, body:blob});
+  const out = await res.json().catch(()=>({}));
+  if(!res.ok || !out.url) throw new Error(out.error||("upload "+res.status));
+  return out.url;
 };
 
 // The printable invoice (used for preview, print and PDF)
