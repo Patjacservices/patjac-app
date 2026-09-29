@@ -1440,6 +1440,7 @@ export default function PatjacCarPlay(){
             bic:sett.bic||prev.bic,
             adminEmail:sett.admin_email||prev.adminEmail,
             logo:sett.logo||prev.logo,
+            lastBackupAt:sett.last_backup_at||prev.lastBackupAt||null,
           }));
         }
         setDbReady(true);
@@ -1651,6 +1652,21 @@ export default function PatjacCarPlay(){
   const sessionExpiredRef = useRef(null);
   sessionExpiredRef.current = () => handleLogout(true);
 
+  // Full backup (admin): all data + employee documents, remembers the date for the monthly reminder
+  const [backupBusy,setBackupBusy] = useState(false);
+  const doBackup = async () => {
+    if(backupBusy) return;
+    setBackupBusy(true);
+    try{
+      const r = await downloadFullBackup({ company: companySettings,
+        data:{ clients, employees, jobs, invoices, timeclock, contracts, expenses, orders, products, suppliers, messages } });
+      setCompanySettings(p=>({...p, lastBackupAt:r.at}));
+      notify(r.docsOk ? L("Backup heruntergeladen ✓ – sicher aufbewahren","Copia descargada ✓ Guárdala en un lugar seguro","Backup downloaded ✓ – keep it safe","Backup scaricato ✓ – conservalo al sicuro")
+                      : L("Backup heruntergeladen (ohne Dokumente)","Copia descargada (sin documentos: sin conexión)","Backup downloaded (without documents)","Backup scaricato (senza documenti)"), r.docsOk?"success":"warning", 6000);
+    }catch(e){ notify(L("Backup fehlgeschlagen","No se pudo crear la copia","Backup failed","Backup non riuscito"),"error"); }
+    finally{ setBackupBusy(false); }
+  };
+
   const openApp = (id) => {
     if(currentUser?.role==="employee"){
       // Payslips are no longer a separate icon for employees: they are in "Documents"
@@ -1693,7 +1709,7 @@ export default function PatjacCarPlay(){
       case "messaging":  return <MessagingApp {...props} lang={lang}/>;
       case "routes":     return <RoutesApp {...props} lang={lang}/>;
       case "reports":    return <ReportsApp {...props} lang={lang}/>;
-      case "settings":   return <SettingsApp {...props} lang={lang} setLang={setLang} companySettings={companySettings} currentUser={currentUser} clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} expenses={expenses} orders={orders} products={products} suppliers={suppliers} messages={messages}/>;
+      case "settings":   return <SettingsApp {...props} lang={lang} setLang={setLang} companySettings={companySettings} currentUser={currentUser} clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} expenses={expenses} orders={orders} products={products} suppliers={suppliers} messages={messages} timeclock={timeclock} onBackup={doBackup} backupBusy={backupBusy}/>;
       case "academy":    return <AcademyApp {...props} lang={lang} setLang={setLang}/>;
       case "payroll":    return <PayrollApp {...props} lang={lang}/>;
       case "inventory":  return <InventoryApp {...props} lang={lang}/>;
@@ -1905,7 +1921,8 @@ export default function PatjacCarPlay(){
         ) : (
           <HomeScreen t={t} openApp={openApp} clock={clock} lang={lang} currentUser={currentUser}
             jobs={jobs} invoices={invoices} clients={clients} employees={employees}
-            notify={notify} messages={messages} onIssueInvoice={g=>{setInvoicePrefill(g); openApp("invoices");}}/>
+            notify={notify} messages={messages} onIssueInvoice={g=>{setInvoicePrefill(g); openApp("invoices");}}
+            lastBackupAt={companySettings.lastBackupAt} onBackup={doBackup} backupBusy={backupBusy}/>
         )}
       </div>
 
@@ -1991,7 +2008,7 @@ function DockIcon({app,label,onOpen}){
 }
 
 // ─── HOME SCREEN (Admin) ─────────────────────────────────────
-function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,employees,notify,messages,onIssueInvoice}){
+function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,employees,notify,messages,onIssueInvoice,lastBackupAt,onBackup,backupBusy}){
   const L = makeL(lang);
   const billingDue = useMemo(()=>computeBillingDue(clients,jobs,invoices),[clients,jobs,invoices]);
   // Alarm: a phone/browser notification once per reminder
@@ -2031,6 +2048,17 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
         ))}
       </div>
       <BillingDuePanel due={billingDue} lang={lang} compact onIssue={g=>onIssueInvoice&&onIssueInvoice(g)}/>
+      {onBackup&&backupIsDue(lastBackupAt)&&(
+        <CPCard style={{marginBottom:14,border:"1px solid rgba(28,126,214,.45)",background:"rgba(28,126,214,.08)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+            <div>
+              <div style={{color:"#74C0FC",fontWeight:700,fontSize:14}}>💾 {L("Monatliche Sicherung fällig","Toca hacer la copia de seguridad del mes","Monthly backup due","Backup mensile da fare")}</div>
+              <div style={{color:CP.textSecondary,fontSize:12}}>{L("Letzte Kopie","Última copia","Last backup","Ultimo backup")}: {lastBackupAt?fmtDate(String(lastBackupAt).slice(0,10)):L("noch nie","nunca","never","mai")}</div>
+            </div>
+            <CPBtn size="sm" onClick={onBackup}>{backupBusy?"⏳":"💾"} {L("Jetzt sichern","Crear copia ahora","Back up now","Crea backup ora")}</CPBtn>
+          </div>
+        </CPCard>
+      )}
       {todayJobs.length>0&&(
         <CPCard style={{marginBottom:14}}>
           <div style={{color:CP.textSecondary,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:12}}>📋 {t.todayJobs}</div>
@@ -6499,7 +6527,7 @@ function SecurityPasswordForm({companySettings,setCompanySettings,notify,L}){
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────
-function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySettings,currentUser,clients,employees,jobs,invoices,contracts,expenses,orders,products,suppliers,messages}){
+function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySettings,currentUser,clients,employees,jobs,invoices,contracts,expenses,orders,products,suppliers,messages,timeclock,onBackup,backupBusy}){
   const L = makeL(lang);
   const [tab,setTab] = useState("company");
   const [form,setForm] = useState({...companySettings});
@@ -6697,7 +6725,7 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
             </div>
           )}
           {[
-            "🔑 Login: Code + PIN ("+L("Mitarbeiter","Empleado","Employee","Dipendente")+")",
+            "🔑 Login: PIN ("+L("Mitarbeiter","Empleado","Employee","Dipendente")+") · "+L("5 Fehlversuche = 15 Min. Sperre","varios intentos fallidos = bloqueo 15 min","failed attempts = 15 min lock","tentativi falliti = blocco 15 min"),
           ].map((item,i)=>(
             <div key={i} style={{padding:"10px 0",borderTop:`1px solid ${CP.border}`,marginTop:14,color:CP.textSecondary,fontSize:14}}>{item}</div>
           ))}
@@ -6707,29 +6735,42 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
       {/* ── SYSTEM TAB ── */}
       {tab==="system"&&(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <CPCard>
+            <div style={{color:CP.textSecondary,fontSize:13,lineHeight:1.6}}>
+              💾 {L("Letzte Sicherung","Última copia de seguridad","Last backup","Ultimo backup")}: <b style={{color:backupIsDue(companySettings.lastBackupAt)?"#FFD43B":"#8CE99A"}}>{companySettings.lastBackupAt?fmtDate(String(companySettings.lastBackupAt).slice(0,10)):L("noch nie","nunca","never","mai")}</b><br/>
+              {L("Enthält Kunden, Mitarbeiter, Aufträge, Stempelungen, Rechnungen, Verträge, Ausgaben, Bestellungen, Produkte, Lieferanten, Nachrichten und Mitarbeiter-Dokumente. Sicher aufbewahren (enthält PIN, AHV, Löhne).","Incluye clientes, empleados, trabajos, fichajes, facturas, contratos, gastos, pedidos, productos, proveedores, mensajes y documentos de empleados. Guárdala en un lugar seguro (contiene PIN, AVS y sueldos).","Includes clients, employees, jobs, clock-ins, invoices, contracts, expenses, orders, products, suppliers, messages and employee documents. Keep it safe (contains PINs, AHV, salaries).","Include clienti, dipendenti, lavori, timbrature, fatture, contratti, spese, ordini, prodotti, fornitori, messaggi e documenti. Conservalo al sicuro (contiene PIN, AVS, stipendi).")}
+            </div>
+          </CPCard>
           {[
             {l:"ℹ️ "+L("App-Version 2.0","Versión App 2.0","App Version 2.0","Versione App 2.0"), v:()=>notify("Patjac Business Suite v2.0","info"), variant:"secondary"},
-            {l:"💾 "+L("Backup erstellen","Crear copia de seguridad","Create backup","Crea backup"), v:()=>{
-              const backup = {
-                version:"2.0",
-                date: new Date().toISOString(),
-                company: companySettings,
-                data: { clients, employees, jobs, invoices, contracts, expenses, orders, products, suppliers, messages }
-              };
-              const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json"});
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `patjac-backup-${new Date().toISOString().slice(0,10)}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-              notify(L("Backup heruntergeladen ✓","Copia descargada ✓","Backup downloaded ✓","Backup scaricato ✓"),"success");
+            {l:(backupBusy?"⏳ ":"💾 ")+L("Backup erstellen","Crear copia de seguridad","Create backup","Crea backup"), v:()=>onBackup&&onBackup(), variant:"secondary"},
+            {l:"📧 "+L("Systembericht senden","Enviar informe del sistema","Send system report","Invia rapporto sistema"), v:()=>{
+              const today = ymd(new Date()); const ym = today.slice(0,7);
+              const fm = n => Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
+              const open = (invoices||[]).filter(i=>i.status!=="paid");
+              const overdue = open.filter(i=>i.status==="overdue"||(i.dueDate&&i.dueDate<today));
+              const sum = arr => arr.reduce((a,i)=>a+(parseFloat(i.total||i.amount)||0),0);
+              const monthJobs = (jobs||[]).filter(j=>(j.date||"").startsWith(ym));
+              const paidMonth = (invoices||[]).filter(i=>i.status==="paid"&&(i.date||"").startsWith(ym));
+              const lb = companySettings.lastBackupAt;
+              const lines = [
+                `${L("Stand","Fecha del informe","Date","Data")}: ${fmtDate(today)}`,
+                "",
+                `👥 ${L("Kunden","Clientes","Clients","Clienti")}: ${(clients||[]).length}`,
+                `👷 ${L("Aktive Mitarbeiter","Empleados activos","Active employees","Dipendenti attivi")}: ${(employees||[]).filter(e=>e.active!==false).length}`,
+                `📋 ${L("Aufträge diesen Monat","Trabajos este mes","Jobs this month","Lavori questo mese")}: ${monthJobs.length} (${L("erledigt","completados","completed","completati")}: ${monthJobs.filter(j=>j.status==="completed").length})`,
+                `⏱️ ${L("Stempelungen diesen Monat","Fichajes este mes","Clock-ins this month","Timbrature questo mese")}: ${(timeclock||[]).filter(r=>(r.date||"").startsWith(ym)).length}`,
+                "",
+                `🧾 ${L("Offene Rechnungen","Facturas pendientes","Open invoices","Fatture aperte")}: ${open.length} · CHF ${fm(sum(open))}`,
+                `⚠️ ${L("Überfällig","Vencidas","Overdue","Scadute")}: ${overdue.length} · CHF ${fm(sum(overdue))}`,
+                `💰 ${L("Bezahlt diesen Monat","Cobrado este mes","Paid this month","Incassato questo mese")}: CHF ${fm(sum(paidMonth))}`,
+                "",
+                `💾 ${L("Letzte Sicherung","Última copia de seguridad","Last backup","Ultimo backup")}: ${lb?fmtDate(String(lb).slice(0,10)):L("noch nie","nunca","never","mai")}${backupIsDue(lb)?" – "+L("fällig!","¡toca hacerla!","due!","da fare!"):""}`,
+              ];
+              sendByEmail({ to: companySettings.email||COMPANY_EMAIL,
+                subject: `Patjac Business Suite — ${L("Systembericht","Informe del sistema","System report","Rapporto di sistema")} ${fmtDate(today)}`,
+                body: `${L("Systembericht","Informe del sistema","System report","Rapporto di sistema")} — Patjac Business Suite\n\n${lines.join("\n")}\n\n${companySettings.name||""}\n${COMPANY_EMAIL}` });
             }, variant:"secondary"},
-            {l:"📧 "+L("Systembericht senden","Enviar informe sistema","Send system report","Invia rapporto sistema"), v:()=>sendByEmail({
-              to: companySettings.email||"info@patjacservices.ch",
-              subject: `Patjac Business Suite — ${L("Systembericht","Informe del sistema","System Report","Rapporto di sistema")}`,
-              body: `${L("Guten Tag","Buenos días","Dear","Gentile")},\n\n${L("Anbei der Systembericht von Patjac Business Suite.","Adjunto el informe del sistema de Patjac Business Suite.","Please find the system report from Patjac Business Suite.","In allegato il rapporto di sistema di Patjac Business Suite.")}\n\n${L("Mit freundlichen Grüssen","Saludos cordiales","Kind regards","Cordiali saluti")},\nPatjac Reinigung Garten & Services\ninfo@patjacservices.ch`
-            }), variant:"secondary"},
             {l:"🔄 "+t.reset, v:()=>window.location.reload(), variant:"danger"},
           ].map(btn=>(
             <CPBtn key={btn.l} onClick={btn.v} variant={btn.variant} full>{btn.l}</CPBtn>
@@ -9941,6 +9982,25 @@ const docsFetch = async (path, method="GET", body=null) => {
   const tx = await res.text(); return tx ? JSON.parse(tx) : null;
 };
 const DOC_MAX_BYTES = 5*1024*1024;
+// ─── BACKUP (full copy of the business data as one file) ───
+const BACKUP_EVERY_DAYS = 30;
+const backupIsDue = (lastAt) => !lastAt || (Date.now() - new Date(lastAt).getTime()) > BACKUP_EVERY_DAYS*86400000;
+async function downloadFullBackup({company, data}){
+  let docs = null;
+  try{ docs = await docsFetch("employee_documents?select=*&order=created_at"); }catch(e){ docs = null; }
+  const {adminPassword, ...companySafe} = company||{};
+  const all = {...data, employeeDocuments: docs||[]};
+  const counts = Object.fromEntries(Object.entries(all).map(([k,v])=>[k, Array.isArray(v)?v.length:0]));
+  const now = new Date();
+  const backup = { app:"Patjac Business Suite", version:"2.1", date: now.toISOString(), company: companySafe, counts, data: all,
+    note: docs===null ? "employee documents could not be included" : undefined };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = `patjac-backup-${ymd(now)}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 30000);
+  try{ await docsFetch("settings?id=eq.company","PATCH",{last_backup_at: now.toISOString()}); }catch(e){}
+  return { at: now.toISOString(), counts, docsOk: docs!==null };
+}
 // Server-side checks (the admin password is only stored as a hash, never in the app)
 const supaRpc = async (fn, args, withToken=true) => {
   const res = await fetch(DOCS_REST+"rpc/"+fn, {method:"POST", headers:{"Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, ...(withToken?tokenHeaders():{})}, body:JSON.stringify(args||{})});
