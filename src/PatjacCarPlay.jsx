@@ -671,6 +671,62 @@ const safeHtml = (html) => {
     return "<!DOCTYPE html>"+doc.documentElement.outerHTML;
   }catch(e){ return String(html||"").replace(/<script[\s\S]*?<\/script>/gi,"").replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,""); }
 };
+// ─── SMALL IMAGES (employee photos, product pictures) ───
+// Pictures are shrunk on the phone before saving: a square WebP of ~10–25 KB, sharp enough for any screen size used here.
+const safeImg = v => (typeof v==="string" && /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(v)) ? v : null;
+const compressImage = (file, size=256) => new Promise((resolve,reject)=>{
+  if(!file || !/^image\//.test(file.type||"")) { reject(new Error("not an image")); return; }
+  const url = URL.createObjectURL(file); const img = new Image();
+  img.onload = () => {
+    try{
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth-side)/2, sy = (img.naturalHeight-side)/2;
+      const c = document.createElement("canvas"); c.width = size; c.height = size;
+      const ctx = c.getContext("2d"); ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,size,size);
+      ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      let out = c.toDataURL("image/webp", 0.72);
+      if(!out.startsWith("data:image/webp")) out = c.toDataURL("image/jpeg", 0.78);
+      resolve(out);
+    }catch(e){ reject(e); } finally { URL.revokeObjectURL(url); }
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("load")); };
+  img.src = url;
+});
+function Avatar({photo, size=52, fallback="👤", round=true, style}){
+  const src = safeImg(photo);
+  const base = {width:size,height:size,borderRadius:round?"50%":Math.round(size*0.22),flexShrink:0,overflow:"hidden",...style};
+  return src
+    ? <img src={src} alt="" style={{...base,objectFit:"cover",display:"block",background:"#fff"}}/>
+    : <div style={{...base,background:"linear-gradient(135deg,#1C7ED6,#0CA678)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(size*0.46)}}>{fallback}</div>;
+}
+function ImagePicker({value, onChange, lang, round=true, fallback="📷", size=256, capture="user"}){
+  const L = makeL(lang||appLang);
+  const fileRef = useRef(null), camRef = useRef(null);
+  const [busy,setBusy] = useState(false);
+  const pick = async (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if(!f) return;
+    setBusy(true);
+    try{ onChange(await compressImage(f, size)); }catch(err){ alert(L("Bild konnte nicht gelesen werden","No se pudo leer la imagen","Could not read the image","Impossibile leggere l'immagine")); }
+    finally{ setBusy(false); }
+  };
+  const btn = {background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,color:"#fff",padding:"7px 11px",cursor:"pointer",fontSize:12.5,fontWeight:700,fontFamily:CP.font};
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:14,margin:"4px 0 14px"}}>
+      <Avatar photo={value} size={76} round={round} fallback={busy?"⏳":fallback}/>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <button type="button" style={btn} onClick={()=>camRef.current?.click()}>📷 {L("Foto aufnehmen","Hacer foto","Take photo","Scatta foto")}</button>
+          <button type="button" style={btn} onClick={()=>fileRef.current?.click()}>🖼️ {L("Bild wählen","Elegir imagen","Choose image","Scegli immagine")}</button>
+          {safeImg(value)&&<button type="button" style={{...btn,color:"#FF8787"}} onClick={()=>onChange(null)}>🗑️</button>}
+        </div>
+        <div style={{color:CP.textTertiary,fontSize:11}}>{L("Wird automatisch verkleinert (~20 KB)","Se reduce automáticamente (~20 KB)","Automatically reduced (~20 KB)","Ridotta automaticamente (~20 KB)")}</div>
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={pick}/>
+      <input ref={camRef} type="file" accept="image/*" capture={capture} style={{display:"none"}} onChange={pick}/>
+    </div>
+  );
+}
 const COMPANY_EMAIL = "info@patjacservices.ch";
 // Direct link to the company mailbox (Infomaniak kSuite webmail)
 const INFOMANIAK_MAIL_URL = "https://ksuite.infomaniak.com/mail";
@@ -2157,7 +2213,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
       <NotifyPermissionBanner lang={lang}/>
       {/* Hero */}
       <div style={{textAlign:"center",padding:"28px 24px 20px",background:"linear-gradient(180deg,rgba(16,152,173,0.12),transparent)",borderBottom:`1px solid rgba(255,255,255,0.05)`}}>
-        <div style={{width:72,height:72,borderRadius:"50%",background:"linear-gradient(135deg,#1098AD,#0CA678)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:32,boxShadow:"0 0 28px rgba(16,152,173,0.5)",border:"3px solid rgba(255,255,255,0.15)"}}>👤</div>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><Avatar photo={emp?.photo} size={safeImg(emp?.photo)?110:72} style={{boxShadow:"0 0 28px rgba(16,152,173,0.5)",border:"3px solid rgba(255,255,255,0.25)"}}/></div>
         <div style={{color:CP.textSecondary,fontSize:14,marginBottom:4}}>{greet()},</div>
         <div style={{color:"#fff",fontSize:24,fontWeight:700,letterSpacing:-.3}}>{emp?.firstName||currentUser?.name}</div>
         <div style={{color:CP.textTertiary,fontSize:13,marginTop:4}}>{dayStr}</div>
@@ -3282,7 +3338,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
               {/* Header */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
                 <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                  <div style={{width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,#1C7ED6,#0CA678)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>👤</div>
+                  <Avatar photo={emp.photo} size={52}/>
                   <div>
                     <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16}}>{emp.name}</div>
                     <div style={{color:CP.textSecondary,fontSize:12,marginTop:1}}>{emp.phone} · {emp.email}</div>
@@ -3401,6 +3457,9 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
       {/* Add / Edit form (admin only) */}
       {modal==="form"&&isAdmin&&(
         <CPModal title={selId?t.edit:t.add} onClose={()=>setModal(null)} width={560}>
+          <CPField label={L("Foto (Gesicht)","Foto (rostro)","Photo (face)","Foto (volto)")}>
+            <ImagePicker value={form.photo} onChange={v=>setForm(f=>({...f,photo:v||""}))} lang={lang} fallback="👤"/>
+          </CPField>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.firstName}><CPInput value={form.firstName||""} onChange={e=>setForm(f=>({...f,firstName:e.target.value}))}/></CPField>
             <CPField label={t.lastName}><CPInput value={form.lastName||""} onChange={e=>setForm(f=>({...f,lastName:e.target.value}))}/></CPField>
@@ -9381,7 +9440,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {lowStockProducts.map(p=>(
               <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(240,140,0,0.15)",borderRadius:20,padding:"4px 12px"}}>
-                <span>{p.icon}</span>
+                {safeImg(p.image)?<Avatar photo={p.image} size={24} round={false}/>:<span>{p.icon}</span>}
                 <span style={{color:"#FFD43B",fontSize:12,fontWeight:600}}>{pName(p)}: {p.stock} {p.unit}</span>
                 <button onClick={()=>quickOrder(p)} style={{background:"rgba(240,140,0,0.4)",border:"none",borderRadius:10,color:"#fff",padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:CP.font}}>
                   🚚 {t.quickOrder||"Order"}
@@ -9435,7 +9494,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                 <CPCard key={p.id} style={{background:bgColor,border:`1px solid ${borderColor}`,padding:"14px 16px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                     <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                      <div style={{fontSize:28,flexShrink:0}}>{p.icon}</div>
+                      {safeImg(p.image)?<Avatar photo={p.image} size={64} round={false}/>:<div style={{fontSize:28,flexShrink:0}}>{p.icon}</div>}
                       <div>
                         <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14,lineHeight:1.3}}>{pName(p)}</div>
                         <div style={{color:CP.textTertiary,fontSize:11,marginTop:2}}>{p.location}</div>
@@ -9662,6 +9721,9 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
 
       {modal==="product"&&(
         <CPModal title={selId?t.editProduct:t.addProduct} onClose={()=>setModal(null)} width={500}>
+          <CPField label={L("Produktbild","Imagen del producto","Product image","Immagine prodotto")}>
+            <ImagePicker value={form.image} onChange={v=>setForm(f=>({...f,image:v||""}))} lang={lang} round={false} capture="environment" fallback={form.icon||"📦"}/>
+          </CPField>
           <CPField label={t.productName||"Name"}>
             <CPInput value={form.name||""} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>
           </CPField>
