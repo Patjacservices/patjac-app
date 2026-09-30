@@ -638,7 +638,8 @@ const withNameParts = (o) => {
   return {...o, firstName:o.firstName||w.slice(0,k).join(" "), lastName:o.lastName??w.slice(k).join(" ")};
 };
 const gCode = () => "PJ-"+Math.random().toString(36).substr(2,6).toUpperCase();
-const gPin = () => Math.floor(1000+Math.random()*9000).toString();
+// 6-digit PIN (1 million combinations) from the secure random generator
+const gPin = () => { const a=new Uint32Array(1); crypto.getRandomValues(a); return String(100000 + (a[0] % 900000)); };
 // Keeps generating a code until it finds one not already used by another employee
 const gCodeUnique = (existingEmployees, excludeId) => {
   let code;
@@ -657,6 +658,48 @@ const gPinUnique = (existingEmployees, excludeId) => {
 // ─── COMPANY E-MAIL ─────────────────────────────────────────
 // All e-mails leave from the company mailbox info@patjacservices.ch (Infomaniak).
 // "mailto" links open the default mail program; set Infomaniak Mail as default once (see InfomaniakSetupHint).
+// ─── PUSH NOTIFICATIONS (arrive even when the app is closed) ───
+const VAPID_PUBLIC = "BBEnBP0apQKHema5MNBW7h6qkKRg0qCX7OGBZzrHZrPMLmgGUjBpAB_GnKsaQUF_VfByWMFVUf-iTvRnzQ8yvKI";
+const pushSupported = () => typeof window!=="undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const isStandaloneApp = () => { try{ return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone===true; }catch(e){ return false; } };
+const isAppleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent||"") || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const b64uToU8 = (s) => { const p = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from(b, c=>c.charCodeAt(0)); };
+const rpcWithToken = async (fn, args, token) => {
+  const res = await fetch(DOCS_REST+"rpc/"+fn, {method:"POST", headers:{"Content-Type":"application/json", apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, ...(token?{"x-app-token":token}:{})}, body:JSON.stringify(args||{})});
+  if(!res.ok) throw new Error(await res.text());
+  const tx = await res.text(); return tx ? JSON.parse(tx) : null;
+};
+async function enablePush(){
+  if(!pushSupported()) return "unsupported";
+  if(!APP_TOKEN) return "nosession";
+  if(Notification.permission!=="granted") return "noperm";
+  const reg = await navigator.serviceWorker.register("/sw.js");
+  await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: b64uToU8(VAPID_PUBLIC) });
+  const j = sub.toJSON();
+  const ok = await rpcWithToken("push_subscribe", {p_endpoint:j.endpoint, p_p256dh:j.keys?.p256dh, p_auth:j.keys?.auth}, APP_TOKEN);
+  return ok ? "ok" : "error";
+}
+// On ⏻ logout this device stops receiving the user's alerts (another person may use it next)
+async function detachPush(token){
+  try{
+    if(!pushSupported() || !token) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if(sub) await rpcWithToken("push_unsubscribe", {p_endpoint:sub.endpoint}, token);
+  }catch(e){}
+}
+// Shows a notification from inside the app (works on Android too, where "new Notification" is not allowed)
+async function localNotify(title, opts){
+  try{
+    if(!("Notification" in window) || Notification.permission!=="granted") return;
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : null;
+    if(reg) await reg.showNotification(title, {icon:"/icon-192.png", badge:"/icon-192.png", ...opts});
+    else new Notification(title, {icon:"/icon-192.png", ...opts});
+  }catch(e){}
+}
+
 // ─── SESSION (server-side): the token proves who is logged in; the database only answers with a valid one ───
 let APP_TOKEN = null;          // kept only in memory: closing the app logs out
 let APP_HEADER_OK = true;      // false only if the browser could not send the header (fallback, keeps the app usable)
@@ -1378,7 +1421,6 @@ export default function PatjacCarPlay(){
       Object.keys(row).forEach(k => row[k]===null && delete row[k]);
       // Remove first_name/last_name — DB uses name column only
       // first_name / last_name are stored too (needed so edit forms show the names)
-      console.log("📤 dbSave:", table, JSON.stringify(row).slice(0,100));
       // Debounce: cancel previous pending save for same record
       const saveKey = `${table}_${data.id}`;
       if(window._savePending) clearTimeout(window._savePending[saveKey]);
@@ -1390,11 +1432,11 @@ export default function PatjacCarPlay(){
       try {
         await supaFetch(`${table}`, "POST", row);
       } catch(e) {
-        if(e.message && (e.message.includes("duplicate")||e.message.includes("23505"))) {
+        // existing row: update it (also the path employees use, they may update but not create these rows)
+        if(e.message && (e.message.includes("duplicate")||e.message.includes("23505")||e.message.includes("42501")||e.message.includes("row-level security"))) {
           await supaFetch(`${table}?id=eq.${encodeURIComponent(data.id)}`, "PATCH", row);
         } else { throw e; }
       }
-      console.log("✅ dbSave OK:", table, data.id||"");
     }
     catch(e) { console.error("❌ dbSave error:", table, e.message); }
   };
@@ -1633,7 +1675,7 @@ export default function PatjacCarPlay(){
       const isReminder = (m.content||"").startsWith("🔔");
       notify((m.content||"📷").split("\n")[0].slice(0,160), isReminder?"warning":"info", isReminder?12000:5000);
       try{ navigator.vibrate && navigator.vibrate(isReminder?[300,150,300,150,300]:[200]); }catch(e){}
-      try{ if("Notification" in window && Notification.permission==="granted") new Notification(isReminder?"🔔 Patjac":(m.fromName||"Patjac"), {body:m.content||"", icon:PATJAC_LOGO, tag:m.id}); }catch(e){}
+      if(document.hidden) localNotify(isReminder?"🔔 Patjac":(m.fromName||"Patjac"), {body:m.content||"", tag:"msg-"+m.id});
     });
   },[messages, currentUser?.id]);
 
@@ -1655,6 +1697,7 @@ export default function PatjacCarPlay(){
     APP_TOKEN = token; APP_HEADER_OK = true;
     try{ const r = await supaRpc("app_session_check",{}); if(!r) console.warn("session check: no role"); }
     catch(e){ console.warn("session header blocked, fallback", e); APP_HEADER_OK = false; }
+    enablePush().catch(()=>{});
   };
   const handleLogin = async () => {
     setLoginErr("");
@@ -1681,14 +1724,14 @@ export default function PatjacCarPlay(){
           setDbReady(false);
           setCurrentUser({id:r.id,name:r.name,role:"employee",code:r.code||""});
           setAuthState("app"); setLoginPin("");
-        } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte 15 Min. warten","Demasiados intentos: espera 15 minutos","Too many attempts – wait 15 minutes","Troppi tentativi – attendi 15 minuti"));
+        } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte 30 Min. warten","Demasiados intentos: espera 30 minutos","Too many attempts – wait 30 minutes","Troppi tentativi – attendi 30 minuti"));
         else setLoginErr(L("Ungültiger Code oder PIN","Código o PIN incorrectos","Invalid code or PIN","Codice o PIN non corretti"));
       }
     } finally { setLoginBusy(false); }
   };
 
   const handleLogout = (expired) => {
-    if(APP_TOKEN) supaRpc("app_logout",{}).catch(()=>{});   // header is taken now, before the token is cleared
+    if(APP_TOKEN){ const tk = APP_TOKEN; detachPush(tk).finally(()=>rpcWithToken("app_logout",{},tk).catch(()=>{})); }
     APP_TOKEN = null;
     setAuthState("login");
     setCurrentUser(null);
@@ -1874,7 +1917,7 @@ export default function PatjacCarPlay(){
           ):(
             <>
               <CPField label={`${t.pin} (4 dígitos)`}>
-                <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••" type="password" maxLength={6} style={{textAlign:"center",fontSize:28,letterSpacing:10}}/>
+                <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••••" type="password" inputMode="numeric" autoComplete="off" maxLength={6} style={{textAlign:"center",fontSize:28,letterSpacing:10}}/>
               </CPField>
             </>
           )}
@@ -2074,7 +2117,7 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
     const fresh = billingDue.filter(g=>!seen[g.key]);
     if(!fresh.length) return;
     notify(`🔔 ${L("Rechnungen zu erstellen","Facturas por emitir","Invoices to issue","Fatture da emettere")}: ${fresh.map(g=>g.clientName).join(", ")}`,"info");
-    try{ if("Notification" in window && Notification.permission==="granted") new Notification("🧾 Patjac – "+L("Rechnung erstellen","Emitir factura","Issue invoice","Emetti fattura"),{body:fresh.map(g=>`${g.clientName}: CHF ${g.amount.toFixed(2)}`).join("\n")}); }catch(e){}
+    localNotify("🧾 Patjac – "+L("Rechnung erstellen","Emitir factura","Issue invoice","Emetti fattura"),{body:fresh.map(g=>`${g.clientName}: CHF ${g.amount.toFixed(2)}`).join("\n")});
     fresh.forEach(g=>seen[g.key]=1); try{ localStorage.setItem("patjac_billing_notified",JSON.stringify(seen)); }catch(e){}
   },[billingDue.map(g=>g.key).join("|")]);
   const dayStr = clock.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"long",day:"numeric",month:"long"});
@@ -2084,6 +2127,7 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
   const allApps = APPS;
   return (
     <div style={{height:"100%",overflow:"auto",padding:"20px 28px 10px"}}>
+      <div style={{margin:"-12px -16px 10px"}}><NotifyPermissionBanner lang={lang} admin/></div>
       <div style={{textAlign:"center",marginBottom:24}}>
         <div style={{color:CP.textPrimary,fontSize:42,fontWeight:700,letterSpacing:-1,lineHeight:1}}>
           {clock.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
@@ -2171,16 +2215,27 @@ const EMPLOYEE_APPS = [
 ];
 
 // Asks the employee (once) to allow phone/browser notifications so job reminders pop up even with the app in the background.
-function NotifyPermissionBanner({lang}){
+function NotifyPermissionBanner({lang, admin}){
   const L = makeL(lang);
-  const supported = typeof window!=="undefined" && "Notification" in window;
+  const supported = pushSupported();
   const [perm,setPerm] = useState(supported ? Notification.permission : "unsupported");
+  const [busy,setBusy] = useState(false);
+  const box = {margin:"12px 16px 0",padding:"10px 14px",borderRadius:12,background:"rgba(250,176,5,.12)",border:"1px solid rgba(250,176,5,.35)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"};
+  if(!supported){
+    if(isAppleMobile() && !isStandaloneApp()) return (
+      <div style={box}><span style={{fontSize:20}}>📲</span>
+        <span style={{color:"#FFD43B",fontSize:13,flex:1,minWidth:180}}>{L("Für Benachrichtigungen auf dem iPhone: Teilen ⬆️ → «Zum Home-Bildschirm», dann Patjac von dort öffnen.","Para recibir avisos en iPhone: pulsa Compartir ⬆️ → «Añadir a pantalla de inicio» y abre Patjac desde ese icono.","For alerts on iPhone: Share ⬆️ → “Add to Home Screen”, then open Patjac from that icon.","Per gli avvisi su iPhone: Condividi ⬆️ → «Aggiungi a Home», poi apri Patjac da lì.")}</span></div>);
+    return null;
+  }
   if(perm!=="default") return null;
+  const txt = admin
+    ? L("Benachrichtigungen aktivieren (Nachrichten, Rechnungen) – auch wenn die App geschlossen ist?","¿Activar avisos (mensajes y facturas por emitir) aunque la app esté cerrada?","Enable alerts (messages, invoices to issue) even when the app is closed?","Attivare avvisi (messaggi, fatture) anche con l'app chiusa?")
+    : L("Erinnerungen 1 Stunde vor jedem Einsatz – auch wenn die App geschlossen ist?","¿Quieres un aviso 1 hora antes de cada trabajo, aunque la app esté cerrada?","Get a reminder 1 hour before each job, even when the app is closed?","Promemoria 1 ora prima di ogni lavoro, anche con l'app chiusa?");
   return (
-    <div style={{margin:"12px 16px 0",padding:"10px 14px",borderRadius:12,background:"rgba(250,176,5,.12)",border:"1px solid rgba(250,176,5,.35)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+    <div style={box}>
       <span style={{fontSize:20}}>🔔</span>
-      <span style={{color:"#FFD43B",fontSize:13,flex:1,minWidth:180}}>{L("Erinnerungen 1 Stunde vor jedem Einsatz erhalten?","¿Quieres recibir un aviso 1 hora antes de cada trabajo?","Get a reminder 1 hour before each job?","Ricevere un promemoria 1 ora prima di ogni lavoro?")}</span>
-      <CPBtn size="sm" onClick={async()=>{ try{ setPerm(await Notification.requestPermission()); }catch(e){ setPerm("denied"); } }}>{L("Aktivieren","Activar avisos","Enable","Attiva")}</CPBtn>
+      <span style={{color:"#FFD43B",fontSize:13,flex:1,minWidth:180}}>{txt}</span>
+      <CPBtn size="sm" onClick={async()=>{ if(busy) return; setBusy(true); try{ const p = await Notification.requestPermission(); setPerm(p); if(p==="granted"){ await enablePush(); localNotify("✅ Patjac",{body:L("Benachrichtigungen aktiviert","Avisos activados","Alerts enabled","Avvisi attivati"), tag:"patjac-enabled"}); } }catch(e){ setPerm("denied"); } finally{ setBusy(false); } }}>{busy?"⏳":L("Aktivieren","Activar avisos","Enable","Attiva")}</CPBtn>
     </div>
   );
 }
@@ -4316,7 +4371,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         <CPModal title={form.id?t.edit:t.newJob||"Neu"} onClose={()=>setModal(null)} width={540}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.clients}>
-              <CPSelect value={form.clientId} onChange={e=>setForm(f=>withAutoAmount({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</CPSelect>
+              <CPSelect value={form.clientId} onChange={e=>setForm(f=>withAutoAmount({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}{clientAddr(c)?` — ${clientAddr(c)}`:""}</option>)}</CPSelect>
               {(()=>{const c=clients.find(x=>x.id===form.clientId);const addr=c?`${c.street||""} ${c.number||""}, ${c.postalCode||""} ${c.city||""}`.trim().replace(/^,\s*/,""):"";return addr?(<div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📍 {addr}</div>):null;})()}
             </CPField>
             <CPField label={`${t.employees} (${(form.employeeIds||[]).length})`}>
@@ -4662,6 +4717,7 @@ const invSvcId = st => st==="gardening"||st==="garden" ? "gardening" : st==="rep
 const invLangIdx = lang => ({DE:0,ES:1,EN:2,IT:3}[lang] ?? 1);
 const invSvcLabel = (id,lang) => { const s=INV_SERVICES.find(x=>x.id===id)||INV_SERVICES[0]; return s.L[invLangIdx(lang)]; };
 const invFmtDate = d => fmtDate(d);
+const clientAddr = c => c ? [`${c.street||""} ${c.number||""}`.trim(), `${c.postalCode||""} ${c.city||""}`.trim()].filter(Boolean).join(", ") : "";
 const invWeekRange = (dateStr) => { const d=new Date((dateStr||ymd(new Date()))+"T12:00:00"); const wd=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-wd); const sun=new Date(mon); sun.setDate(mon.getDate()+6); return [ymd(mon), ymd(sun)]; };
 const invMonthRange = (ym) => { const [y,m]=(ym||ymd(new Date()).slice(0,7)).split("-").map(Number); return [`${y}-${String(m).padStart(2,"0")}-01`, ymd(new Date(y,m,0))]; };
 const INV_BUCKET_URL = "https://rtviublrukagwxaypmit.supabase.co/storage/v1/object/";
@@ -4879,7 +4935,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
   const setItem = (idx, patch) => setForm(f=>{ const it=[...(f.items||[])]; const n={...it[idx],...patch}; n.total=r2((Number(n.qty)||0)*(Number(n.price)||0)); it[idx]=n; return {...f,items:it,_manual:true}; });
 
   // ── Send: build the PDF, store it and give WhatsApp / e-mail links ──
-  const clientOf = inv => clients.find(c=>c.id===inv?.clientId||c.name===inv?.clientName);
+  const clientOf = inv => clients.find(c=>c.id===inv?.clientId) || clients.find(c=>!inv?.clientId && c.name===inv?.clientName);
   const pdfName = inv => `${L("Rechnung","Factura","Invoice","Fattura")}_${inv.invoiceNumber}_${(inv.clientName||"").replace(/[^\w]+/g,"_")}.pdf`;
   const preparePdf = async (inv) => {
     if(!previewRef.current) return;
@@ -4931,6 +4987,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
                 {inv.pdfUrl&&<span style={{fontSize:11,color:"#69DB7C"}}>📄 PDF</span>}
               </div>
               <div style={{color:CP.textPrimary,fontWeight:600,fontSize:14}}>{inv.clientName}</div>
+              {(()=>{ const a=clientAddr(clientOf(inv)); return a?<div style={{color:"#8CE99A",fontSize:12}}>📍 {a}</div>:<div style={{color:"#FF8787",fontSize:12}}>📍 {L("Adresse fehlt – im Kunden ergänzen","Falta la dirección: complétala en Clientes","Address missing – add it in Clients","Indirizzo mancante – aggiungilo nei Clienti")}</div>; })()}
               <div style={{color:CP.textSecondary,fontSize:12}}>{invFmtDate(inv.date)} → {invFmtDate(inv.dueDate)}{inv.periodFrom?` · ${L("Zeitraum","Periodo","Period","Periodo")} ${invFmtDate(inv.periodFrom)}–${invFmtDate(inv.periodTo)}`:""}</div>
               <div style={{color:"#FFD43B",fontWeight:700,fontSize:14,marginTop:4}}>CHF {(Number(inv.total)||0).toFixed(2)}</div>
             </div>
@@ -4951,10 +5008,11 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
           <CPField label={`1. ${L("Kunde","Cliente","Client","Cliente")}`}>
             <CPSelect value={form.clientId} onChange={e=>{ const id=e.target.value; const c=clients.find(x=>x.id===id); if(c) pickMode(clientBillingMode(c), id); else setForm(f=>({...f,clientId:id,billingMode:"",_sel:[],_manual:false})); }}>
               <option value="">— {L("Kunde wählen","Elija un cliente","Choose a client","Scegli un cliente")} —</option>
-              {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              {clients.map(c=><option key={c.id} value={c.id}>{c.name}{clientAddr(c)?` — ${clientAddr(c)}`:""}</option>)}
             </CPSelect>
           </CPField>
-          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"-4px 0 4px"}}>🧾 {L("Abrechnung des Kunden","Facturación del cliente","Client billing","Fatturazione del cliente")}: <strong style={{color:"#74C0FC"}}>{clientBillingMode(client)==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):clientBillingMode(client)==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile")}</strong></div>}
+          {client&&<div style={{color:clientAddr(client)?CP.textSecondary:"#FF8787",fontSize:12,margin:"-4px 0 4px"}}>📍 {L("Adresse","Dirección","Address","Indirizzo")}: <strong style={{color:clientAddr(client)?"#8CE99A":"#FF8787"}}>{clientAddr(client)||L("fehlt – im Kunden ergänzen","falta: complétala en Clientes","missing – add it in Clients","mancante – aggiungilo nei Clienti")}</strong></div>}
+          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 4px"}}>🧾 {L("Abrechnung des Kunden","Facturación del cliente","Client billing","Fatturazione del cliente")}: <strong style={{color:"#74C0FC"}}>{clientBillingMode(client)==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):clientBillingMode(client)==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile")}</strong></div>}
           {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 10px"}}>💶 {L("Preis pro Stunde","Precio por hora","Price per hour","Prezzo orario")}: <strong style={{color:rate?"#69DB7C":"#FF8787"}}>CHF {rate.toFixed(2)}</strong>{!rate&&` — ${L("im Kunden erfassen","añádalo en la ficha del cliente","set it on the client","impostalo nel cliente")}`}</div>}
 
           {/* 2. Billing mode */}
