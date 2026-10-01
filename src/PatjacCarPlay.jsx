@@ -700,6 +700,19 @@ async function localNotify(title, opts){
   }catch(e){}
 }
 
+// ─── EMPLOYEE PHONE + WORKING TIME RULES ───
+// Each employee's app works only on the phone the administrator activated (secret key kept on that phone)
+const DEVICE_KEY_LS = "patjac_device_key";
+const getDeviceKey = () => { try{ const v=localStorage.getItem(DEVICE_KEY_LS); return /^[a-f0-9]{64}$/.test(v||"")?v:""; }catch(e){ return ""; } };
+const newDeviceKey = () => { const a=new Uint8Array(32); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); };
+const deviceLabel = () => { const u=navigator.userAgent||""; return (/iPhone/.test(u)?"iPhone":/iPad/.test(u)?"iPad":/Android/.test(u)?"Android":/Mac/.test(u)?"Mac":/Windows/.test(u)?"Windows":"Gerät")+" · "+new Date().toLocaleDateString("de-CH"); };
+// Zürich public holidays (same rule as the server)
+const easterSunday = (y) => { const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),dy=((h+l-7*m+114)%31)+1; return new Date(y,mo-1,dy); };
+const zhHoliday = (dt) => { const y=dt.getFullYear(), e=easterSunday(y), add=(n)=>{const x=new Date(e);x.setDate(x.getDate()+n);return ymd(x);};
+  return [`${y}-01-01`,`${y}-01-02`,add(-2),add(1),`${y}-05-01`,add(39),add(50),`${y}-08-01`,`${y}-12-25`,`${y}-12-26`].includes(ymd(dt)); };
+const employeeTimeOk = (now=new Date()) => { const z=new Date(now.toLocaleString("en-US",{timeZone:"Europe/Zurich"})); const d=z.getDay();
+  if(zhHoliday(z) || d===0) return false; if(d===6 && z.getHours()>=12) return false; return true; };
+
 // ─── SESSION (server-side): the token proves who is logged in; the database only answers with a valid one ───
 let APP_TOKEN = null;          // kept only in memory: closing the app logs out
 let APP_HEADER_OK = true;      // false only if the browser could not send the header (fallback, keeps the app usable)
@@ -769,6 +782,61 @@ function ImagePicker({value, onChange, lang, round=true, fallback="📷", size=2
       <input ref={camRef} type="file" accept="image/*" capture={capture} style={{display:"none"}} onChange={pick}/>
     </div>
   );
+}
+// Chat photos: keep the shape, longest side 1280 px, WebP ~80–200 KB (sharp on any phone screen)
+const compressPhoto = (file, maxSide=1280) => new Promise((resolve,reject)=>{
+  if(!file || !/^image\//.test(file.type||"")) { reject(new Error("not an image")); return; }
+  const url = URL.createObjectURL(file); const img = new Image();
+  img.onload = () => {
+    try{
+      const k = Math.min(1, maxSide/Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1,Math.round(img.naturalWidth*k)), h = Math.max(1,Math.round(img.naturalHeight*k));
+      const c = document.createElement("canvas"); c.width=w; c.height=h;
+      const ctx = c.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h); ctx.imageSmoothingQuality="high"; ctx.drawImage(img,0,0,w,h);
+      let out = c.toDataURL("image/webp", 0.72);
+      if(!out.startsWith("data:image/webp")) out = c.toDataURL("image/jpeg", 0.75);
+      resolve(out);
+    }catch(e){ reject(e); } finally { URL.revokeObjectURL(url); }
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("load")); };
+  img.src = url;
+});
+// Chat videos: re-recorded in the phone at max 640 px and ~600 kbit/s (a 1-minute video ≈ 5 MB instead of 100+ MB)
+const VIDEO_MAX_SEC = 120;
+async function compressVideo(file, onProgress){
+  const pick = ["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm","video/mp4;codecs=avc1,mp4a","video/mp4"].find(m=>window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m));
+  if(!pick) return file;   // old browser: send as it is (size limit still applies)
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video"); v.src = url; v.playsInline = true; v.muted = false; v.preload = "auto";
+  try{
+    await new Promise((res,rej)=>{ v.onloadedmetadata=res; v.onerror=()=>rej(new Error("video")); });
+    if(v.duration && v.duration > VIDEO_MAX_SEC) throw new Error("toolong");
+    const k = Math.min(1, 640/Math.max(v.videoWidth||640, v.videoHeight||640));
+    const w = Math.max(2, Math.round((v.videoWidth||640)*k/2)*2), h = Math.max(2, Math.round((v.videoHeight||360)*k/2)*2);
+    const c = document.createElement("canvas"); c.width=w; c.height=h; const ctx = c.getContext("2d");
+    const stream = c.captureStream(24);
+    let ac = null;
+    try{ ac = new (window.AudioContext||window.webkitAudioContext)(); const src = ac.createMediaElementSource(v); const dst = ac.createMediaStreamDestination(); src.connect(dst); dst.stream.getAudioTracks().forEach(t=>stream.addTrack(t)); }catch(e){}
+    const rec = new MediaRecorder(stream, {mimeType:pick, videoBitsPerSecond:600000, audioBitsPerSecond:64000});
+    const chunks=[]; rec.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const done = new Promise(res=>{ rec.onstop = res; });
+    let raf; const draw = () => { ctx.drawImage(v,0,0,w,h); if(v.duration) onProgress && onProgress(Math.min(99,Math.round(v.currentTime/v.duration*100))); raf = requestAnimationFrame(draw); };
+    rec.start(1000); await v.play(); draw();
+    await new Promise(res=>{ v.onended = res; });
+    cancelAnimationFrame(raf); rec.stop(); await done;
+    try{ ac && ac.close(); }catch(e){}
+    const out = new Blob(chunks, {type: pick.split(";")[0]});
+    return out.size>0 && out.size < file.size ? out : file;
+  } finally { URL.revokeObjectURL(url); }
+}
+const UPLOAD_MEDIA_URL = "https://rtviublrukagwxaypmit.supabase.co/functions/v1/upload-media";
+const CHAT_MEDIA_PREFIX = "https://rtviublrukagwxaypmit.supabase.co/storage/v1/object/public/chat-media/";
+async function uploadChatVideo(blob){
+  if(!APP_TOKEN) throw new Error("no session");
+  const res = await fetch(UPLOAD_MEDIA_URL, {method:"POST", headers:{apikey:DOCS_KEY, Authorization:`Bearer ${DOCS_KEY}`, "Content-Type": blob.type||"application/octet-stream", "x-app-token":APP_TOKEN}, body:blob});
+  const out = await res.json().catch(()=>({}));
+  if(!res.ok || !out.url) throw new Error(out.error||("upload "+res.status));
+  return out.url;
 }
 const COMPANY_EMAIL = "info@patjacservices.ch";
 // Direct link to the company mailbox (Infomaniak kSuite webmail)
@@ -1245,7 +1313,7 @@ function SelBox({checked,onChange}){
   );
 }
 // Toolbar: "Seleccionar" button, then "Todos / N seleccionados / Eliminar / Cancelar", with a confirm dialog.
-function BulkBar({bulk,visibleIds,onDelete,lang,itemWord}){
+function BulkBar({bulk,visibleIds,onDelete,lang,itemWord,extra}){
   const L = makeL(lang);
   const [confirm,setConfirm] = useState(false);
   const count = visibleIds.filter(id=>bulk.selected.has(id)).length;
@@ -1265,6 +1333,7 @@ function BulkBar({bulk,visibleIds,onDelete,lang,itemWord}){
         <span style={{color:CP.textPrimary,fontSize:13,fontWeight:700,flex:1}}>
           {allSel?L("Alle","Todos","All","Tutti"):""} {count} {L("ausgewählt","seleccionados","selected","selezionati")}
         </span>
+        {extra&&count>0&&extra(new Set(visibleIds.filter(id=>bulk.selected.has(id))))}
         <CPBtn onClick={()=>count&&setConfirm(true)} variant="danger" size="sm">🗑️ {L("Löschen","Eliminar","Delete","Elimina")} ({count})</CPBtn>
         <CPBtn onClick={bulk.exit} variant="secondary" size="sm">✕</CPBtn>
       </div>
@@ -1736,6 +1805,22 @@ export default function PatjacCarPlay(){
     catch(e){ console.warn("session header blocked, fallback", e); APP_HEADER_OK = false; }
     enablePush().catch(()=>{});
   };
+  const [needActivation,setNeedActivation] = useState(()=>{ try{ return !!new URLSearchParams(location.search).get("activar"); }catch(e){ return false; } });
+  const [actCode,setActCode] = useState(()=>{ try{ return (new URLSearchParams(location.search).get("activar")||"").toUpperCase().slice(0,12); }catch(e){ return ""; } });
+  const [actMsg,setActMsg] = useState("");
+  useEffect(()=>{ try{ if(new URLSearchParams(location.search).get("activar")){ setAuthType("employee"); history.replaceState(null,"",location.pathname); } }catch(e){} },[]);
+  const activateDevice = async () => {
+    setLoginErr(""); setActMsg("");
+    const code = actCode.replace(/[^A-Za-z0-9]/g,"").toUpperCase();
+    if(code.length<8){ setLoginErr(L("Code mit 8 Zeichen eingeben","Escribe el código de 8 caracteres","Enter the 8-character code","Inserisci il codice di 8 caratteri")); return; }
+    const key = newDeviceKey(); let r=null;
+    try{ r = await supaRpc("app_activate_device",{p_code:code,p_secret:key,p_label:deviceLabel()},false); }catch(e){ setLoginErr(L("Keine Verbindung","Sin conexión","No connection","Nessuna connessione")); return; }
+    if(r?.ok){ try{ localStorage.setItem(DEVICE_KEY_LS,key); }catch(e){}
+      setNeedActivation(false); setActCode("");
+      setActMsg(`✅ ${L("Telefon freigeschaltet für","Teléfono activado para","Phone activated for","Telefono attivato per")} ${r.name||""}. ${L("Jetzt PIN eingeben.","Ahora escribe tu PIN.","Now enter your PIN.","Ora inserisci il PIN.")}`);
+    } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte in 1 Std. erneut","Demasiados intentos: inténtalo en 1 hora","Too many attempts – try again in 1 hour","Troppi tentativi – riprova tra 1 ora"));
+    else setLoginErr(L("Code ungültig, schon benutzt oder abgelaufen (7 Tage)","Código incorrecto, ya usado o caducado (7 días)","Code invalid, already used or expired (7 days)","Codice non valido, già usato o scaduto (7 giorni)"));
+  };
   const handleLogin = async () => {
     setLoginErr("");
     if(loginBusy) return;
@@ -1754,14 +1839,17 @@ export default function PatjacCarPlay(){
         } else setLoginErr(L("Ungültige E-Mail oder Passwort (nach 5 Fehlversuchen 15 Min. gesperrt)","Correo o contraseña incorrectos (tras 5 intentos fallidos se bloquea 15 min)","Invalid email or password (locked 15 min after 5 failed attempts)","E-mail o password errati (bloccato 15 min dopo 5 tentativi)"));
       } else {
         let r=null;
-        try{ r = await supaRpc("app_login_employee",{p_pin:loginPin.trim()},false); }
+        if(!getDeviceKey()){ setNeedActivation(true); setLoginErr(L("Dieses Telefon ist noch nicht freigeschaltet. Geben Sie den Aktivierungscode ein.","Este teléfono aún no está activado. Escribe el código de activación que te envió el administrador.","This phone is not activated yet. Enter the activation code from the administrator.","Questo telefono non è ancora attivato. Inserisci il codice di attivazione.")); return; }
+        try{ r = await supaRpc("app_login_employee",{p_pin:loginPin.trim(),p_device:getDeviceKey()},false); }
         catch(e){ setLoginErr(noConn); return; }
         if(r?.token){
           await startSession(r.token);
           setDbReady(false);
           setCurrentUser({id:r.id,name:r.name,role:"employee",code:r.code||""});
           setAuthState("app"); setLoginPin("");
-        } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte später erneut (max. 1 Std.)","Demasiados intentos: inténtalo más tarde (máx. 1 hora)","Too many attempts – try again later (max. 1 hour)","Troppi tentativi – riprova più tardi (max. 1 ora)"));
+        } else if(r?.error==="closed") setLoginErr(L("Die App ist für Mitarbeiter nur Mo–Fr und Sa bis 12:00 verfügbar (nicht an Sonntagen und Zürcher Feiertagen).","La app de empleados solo funciona de lunes a viernes y el sábado hasta las 12:00 (no domingos ni festivos de Zúrich).","The employee app works Mon–Fri and Sat until 12:00 only (not on Sundays or Zurich holidays).","L'app dipendenti funziona lun–ven e sab fino alle 12:00 (non domenica né festivi di Zurigo)."));
+        else if(r?.error==="device"){ setNeedActivation(true); setLoginErr(L("Dieses Telefon ist nicht freigeschaltet. Bitten Sie den Administrator um einen Aktivierungscode.","Este teléfono no está autorizado. Pide al administrador un código de activación.","This phone is not authorised. Ask the administrator for an activation code.","Questo telefono non è autorizzato. Chiedi all'amministratore un codice di attivazione.")); }
+        else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte später erneut (max. 1 Std.)","Demasiados intentos: inténtalo más tarde (máx. 1 hora)","Too many attempts – try again later (max. 1 hour)","Troppi tentativi – riprova più tardi (max. 1 ora)"));
         else setLoginErr(L("Ungültiger Code oder PIN","Código o PIN incorrectos","Invalid code or PIN","Codice o PIN non corretti"));
       }
     } finally { setLoginBusy(false); }
@@ -1786,7 +1874,8 @@ export default function PatjacCarPlay(){
     ["clients","employees","jobs","invoices","timeclock","messages","expenses","orders","contracts","products","suppliers"].forEach(k=>{ try{ localStorage.removeItem("patjac_"+k); }catch(e){} });
   };
   const sessionExpiredRef = useRef(null);
-  sessionExpiredRef.current = () => handleLogout(true);
+  sessionExpiredRef.current = () => { const emp = currentUser?.role==="employee"; handleLogout(true);
+    if(emp && !employeeTimeOk()) setLoginErr(L("Arbeitszeit vorbei: Die App ist für Mitarbeiter nur Mo–Fr und Sa bis 12:00 offen.","Fuera del horario laboral: la app de empleados solo funciona de lunes a viernes y el sábado hasta las 12:00.","Outside working time: the employee app is open Mon–Fri and Sat until 12:00.","Fuori orario: l'app dipendenti è aperta lun–ven e sab fino alle 12:00.")); };
 
   // Full backup (admin): all data + employee documents, remembers the date for the monthly reminder
   const [backupBusy,setBackupBusy] = useState(false);
@@ -1953,6 +2042,17 @@ export default function PatjacCarPlay(){
             </>
           ):(
             <>
+              {(needActivation||!getDeviceKey())&&(
+                <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.35)",borderRadius:12,padding:"10px 12px",marginBottom:12}}>
+                  <div style={{color:"#74C0FC",fontWeight:700,fontSize:13,marginBottom:6}}>📲 {L("Dieses Telefon freischalten","Activar este teléfono","Activate this phone","Attiva questo telefono")}</div>
+                  <div style={{display:"flex",gap:6}}>
+                    <CPInput value={actCode} onChange={e=>setActCode(e.target.value.toUpperCase().slice(0,12))} placeholder="ABCD2345" autoComplete="off" style={{textAlign:"center",letterSpacing:3,fontWeight:700}}/>
+                    <CPBtn onClick={activateDevice} size="sm">✓</CPBtn>
+                  </div>
+                  <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:6}}>{L("Den Code sendet Ihnen der Administrator. Er gilt nur einmal und nur für dieses Telefon.","El código te lo envía el administrador. Sirve una sola vez y solo para este teléfono.","The administrator sends you the code. It works once and only for this phone.","Il codice te lo invia l'amministratore. Vale una volta e solo per questo telefono.")}</div>
+                </div>
+              )}
+              {actMsg&&<div style={{color:"#69DB7C",fontSize:13,marginBottom:10}}>{actMsg}</div>}
               <CPField label={`${t.pin} (4 dígitos)`}>
                 <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••" type="password" inputMode="numeric" autoComplete="off" maxLength={6} style={{textAlign:"center",fontSize:28,letterSpacing:10}}/>
               </CPField>
@@ -2017,7 +2117,7 @@ export default function PatjacCarPlay(){
         <div style={{display:"flex",alignItems:"center",gap:16}}>
           {currentUser?.role==="admin"&&<button onClick={()=>setShowSearch(true)} title={L("Alles suchen","Buscar en toda la app","Search everything","Cerca ovunque")} style={{background:"rgba(28,126,214,0.25)",border:"1px solid rgba(28,126,214,0.5)",borderRadius:10,color:"#fff",padding:"4px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>🔍 {L("Suchen","Buscar","Search","Cerca")}</button>}
           {currentUser?.role==="admin"&&<button onClick={openCompanyMailbox} title={L("Firmen-Postfach öffnen","Abrir mi correo de empresa","Open company mailbox","Apri la posta aziendale")+" · "+COMPANY_EMAIL} style={{background:"rgba(224,17,95,0.25)",border:"1px solid rgba(224,17,95,0.5)",borderRadius:10,color:"#fff",padding:"4px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>📬 {L("Post","Correo","Mail","Posta")}</button>}
-          <button onClick={()=>setShowShare(true)} title={L("App teilen","Compartir la app","Share the app","Condividi l'app")} style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:10,color:"#fff",padding:"4px 9px",cursor:"pointer",fontSize:14}}>📲</button>
+          {currentUser?.role==="admin"&&          <button onClick={()=>setShowShare(true)} title={L("App teilen","Compartir la app","Share the app","Condividi l'app")} style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:10,color:"#fff",padding:"4px 9px",cursor:"pointer",fontSize:14}}>📲</button>}
           {/* Lang */}
           <div style={{display:"flex",gap:4}}>
             {["DE","ES","EN","IT"].map(l=>(
@@ -2044,7 +2144,7 @@ export default function PatjacCarPlay(){
 
       {showSearch&&<GlobalSearch lang={lang} onClose={()=>setShowSearch(false)} openApp={(id)=>{ setActiveApp(null); setTimeout(()=>openApp(id),0); }}
         clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} orders={orders} products={products} suppliers={suppliers}/>}
-      {showShare&&<ShareAppModal lang={lang} onClose={()=>setShowShare(false)}/>}
+      {showShare&&currentUser?.role==="admin"&&<ShareAppModal lang={lang} onClose={()=>setShowShare(false)}/>}
       <EmailHost lang={lang}/>
       {/* ── CONTENT ── */}
       <div style={{flex:1,overflow:"hidden",position:"relative"}}>
@@ -3249,9 +3349,9 @@ td:last-child{text-align:right;font-weight:600}
 // are protected by Vercel and send visitors to the Vercel login page, so the invitation always uses this one.
 const APP_PUBLIC_URL = "https://patjac-app.vercel.app";
 const swissWa = (phone) => { let d=String(phone||"").replace(/[^\d+]/g,""); if(d.startsWith("+")) d=d.slice(1); else if(d.startsWith("00")) d=d.slice(2); else if(d.startsWith("0")) d="41"+d.slice(1); return d; };
-const accessMessage = (emp, lang) => {
+const accessMessage = (emp, lang, code) => {
   const L = makeL(lang);
-  const link = APP_PUBLIC_URL;
+  const link = code ? `${APP_PUBLIC_URL}/?activar=${code}` : APP_PUBLIC_URL;
   return {
     subject: L("Ihr Zugang zur Patjac-App","Tu acceso a la app de Patjac","Your access to the Patjac app","Il tuo accesso all'app Patjac"),
     body: L(
@@ -3261,8 +3361,9 @@ willkommen bei Patjac Reinigung Garten & Services!
 
 📲 App: ${link}
 🔑 Ihr persönlicher PIN: ${emp.pin}
+📲 Aktivierungscode (nur 1× und nur für Ihr Telefon, 7 Tage gültig): ${code||"—"}
 
-So melden Sie sich an: Link öffnen → «Mitarbeiter» wählen → PIN eingeben.
+So melden Sie sich an: Link AUF IHREM TELEFON öffnen (iPhone: zuerst «Zum Home-Bildschirm» und von dort öffnen) → «Mitarbeiter» → Aktivierungscode eingeben → PIN eingeben. Die App funktioniert Mo–Fr und Sa bis 12:00.
 
 ⚠️ WICHTIG: Ihr PIN ist persönlich und vertraulich. Geben Sie ihn an niemanden weiter. Die Zugangsdaten sind Eigentum der Firma; eine Weitergabe oder Nutzung durch Dritte ist verboten und kann arbeitsrechtliche Konsequenzen haben (Treue- und Schweigepflicht, Art. 321a OR). Bei Verlust sofort die Firma informieren.
 
@@ -3273,8 +3374,9 @@ Patjac Reinigung Garten & Services`,
 
 📲 App: ${link}
 🔑 Tu PIN personal: ${emp.pin}
+📲 Código de activación (sirve 1 sola vez, solo para tu teléfono, válido 7 días): ${code||"—"}
 
-Cómo entrar: abre el enlace → elige «Empleado» → escribe tu PIN.
+Cómo entrar: abre el enlace EN TU TELÉFONO (iPhone: primero «Añadir a pantalla de inicio» y ábrela desde ese icono) → «Empleado» → escribe el código de activación → escribe tu PIN. La app funciona de lunes a viernes y el sábado hasta las 12:00.
 
 ⚠️ IMPORTANTE: tu PIN es personal y confidencial. No lo compartas con nadie. Las credenciales son propiedad de la empresa; está prohibido darlas a otra persona o que otra persona las use, y hacerlo puede tener consecuencias laborales (deber de lealtad y confidencialidad, Art. 321a del Código de Obligaciones). Si lo pierdes, avisa a la empresa de inmediato.
 
@@ -3285,8 +3387,9 @@ welcome to Patjac Reinigung Garten & Services!
 
 📲 App: ${link}
 🔑 Your personal PIN: ${emp.pin}
+📲 Activation code (works once, only for your phone, valid 7 days): ${code||"—"}
 
-How to log in: open the link → choose «Employee» → enter your PIN.
+How to log in: open the link ON YOUR PHONE (iPhone: first “Add to Home Screen” and open it from there) → «Employee» → enter the activation code → enter your PIN. The app works Mon–Fri and Sat until 12:00.
 
 ⚠️ IMPORTANT: your PIN is personal and confidential. Do not share it with anyone. The credentials are company property; passing them on or letting anyone else use them is forbidden and may have employment consequences (duty of loyalty and confidentiality, Art. 321a CO). If you lose it, inform the company immediately.
 
@@ -3297,8 +3400,9 @@ benvenuto/a in Patjac Reinigung Garten & Services!
 
 📲 App: ${link}
 🔑 Il tuo PIN personale: ${emp.pin}
+📲 Codice di attivazione (vale 1 volta, solo per il tuo telefono, 7 giorni): ${code||"—"}
 
-Come accedere: apri il link → scegli «Dipendente» → inserisci il PIN.
+Come accedere: apri il link SUL TUO TELEFONO (iPhone: prima «Aggiungi a Home» e aprila da lì) → «Dipendente» → codice di attivazione → PIN. L'app funziona lun–ven e sab fino alle 12:00.
 
 ⚠️ IMPORTANTE: il PIN è personale e riservato. Non condividerlo con nessuno. Le credenziali sono proprietà dell'azienda; cederle o farle usare ad altri è vietato e può avere conseguenze disciplinari (dovere di fedeltà e riservatezza, Art. 321a CO). In caso di smarrimento avvisa subito l'azienda.
 
@@ -3307,11 +3411,22 @@ Patjac Reinigung Garten & Services`)
 };
 function AccessInviteModal({emp, lang, onClose}){
   const L = makeL(lang);
-  const msg = accessMessage(emp, lang);
+  const [code,setCode] = useState(null);
+  const [codeErr,setCodeErr] = useState(false);
+  useEffect(()=>{ let alive=true; supaRpc("admin_create_device_code",{p_employee:emp.id}).then(c=>{ if(alive) setCode(typeof c==="string"?c:null); }).catch(()=>{ if(alive) setCodeErr(true); }); return ()=>{ alive=false; }; },[emp.id]);
+  const msg = accessMessage(emp, lang, code);
+  if(!code) return (
+    <CPModal title={`🔑 ${L("Zugang senden","Enviar acceso","Send access","Invia accesso")} – ${emp.name}`} onClose={onClose} width={420}>
+      <div style={{color:codeErr?"#FF8787":CP.textSecondary,fontSize:14,padding:"10px 0"}}>{codeErr?L("Code konnte nicht erstellt werden","No se pudo crear el código de activación","Could not create the code","Impossibile creare il codice"):`⏳ ${L("Aktivierungscode wird erstellt…","Creando código de activación…","Creating activation code…","Creazione codice…")}`}</div>
+    </CPModal>);
   const btn = (bg)=>({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"12px 14px",cursor:"pointer",fontWeight:700,fontSize:14,textAlign:"left",width:"100%"});
   const wa = swissWa(emp.phone);
   return (
     <CPModal title={`🔑 ${L("Zugang senden","Enviar acceso","Send access","Invia accesso")} – ${emp.name}`} onClose={onClose} width={520}>
+      <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.35)",borderRadius:12,padding:"10px 12px",marginBottom:10,color:"#74C0FC",fontSize:13}}>
+        📲 {L("Aktivierungscode","Código de activación","Activation code","Codice di attivazione")}: <b style={{fontSize:18,letterSpacing:2,color:"#fff"}}>{code}</b>
+        <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:4}}>{L("Gilt 1× für 7 Tage. Das Telefon, das ihn eingibt, wird das einzige mit Zugang (ein früheres Telefon verliert den Zugang).","Sirve 1 vez durante 7 días. El teléfono donde se escriba será el único con acceso (si había otro, pierde el acceso).","Works once for 7 days. The phone that enters it becomes the only one with access.","Vale 1 volta per 7 giorni. Il telefono che lo inserisce sarà l'unico con accesso.")}</div>
+      </div>
       <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10}}>{L("Wählen Sie, wie die Zugangsdaten gesendet werden sollen:","Elija cómo enviar los datos de acceso:","Choose how to send the access details:","Scegli come inviare i dati di accesso:")}</div>
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
         <button disabled={!wa} onClick={()=>window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg.body)}`,"_blank")} style={{...btn("#25D366"),opacity:wa?1:.4}}>💬 WhatsApp {emp.phone?`→ ${emp.phone}`:`(${L("keine Nummer","sin teléfono","no number","nessun numero")})`}</button>
@@ -3337,6 +3452,9 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
   const [worksheetEmp,setWorksheetEmp] = useState(null);
   const [inviteEmp,setInviteEmp] = useState(null);
   const [,setSpesenTick] = useState(0);
+  const [devices,setDevices] = useState(null);   // {employeeId: {label, activatedAt, lastSeen}}
+  const loadDevices = () => supaRpc("admin_list_devices",{}).then(rows=>{ const m={}; (rows||[]).forEach(r=>{ m[r.employee_id]={label:r.label,activatedAt:r.activated_at,lastSeen:r.last_seen,active:true}; }); setDevices(m); }).catch(()=>{});
+  useEffect(()=>{ if(currentUser?.role==="admin") loadDevices(); },[inviteEmp]);
   useQstTariffs(employees);
   const now = new Date();
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
@@ -3526,6 +3644,9 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                 </CPBtn>
                 {isAdmin&&(
                   <>
+                    {devices&&(devices[emp.id]?.label
+                      ? <CPBtn onClick={async()=>{ if(!window.confirm(L("Telefon-Zugang entfernen?","¿Quitar el acceso de este teléfono?","Remove this phone's access?","Rimuovere l'accesso di questo telefono?"))) return; try{ await supaRpc("admin_revoke_device",{p_employee:emp.id}); notify(L("Telefon entfernt","Teléfono quitado","Phone removed","Telefono rimosso"),"success"); loadDevices(); }catch(e){ notify(t.error,"error"); } }} variant="secondary" size="sm" title={devices[emp.id].label}>📱✅ {devices[emp.id].label.split(" · ")[0]} ✕</CPBtn>
+                      : <span style={{fontSize:11.5,color:"#FFA94D",alignSelf:"center"}}>📵 {L("Kein Telefon freigeschaltet","Sin teléfono activado","No phone activated","Nessun telefono attivato")}</span>)}
                     <CPBtn onClick={()=>setInviteEmp(emp)} variant="secondary" size="sm">🔑 {L("Zugang senden","Enviar acceso","Send access","Invia accesso")}</CPBtn>
                     <CPBtn onClick={()=>{setForm(withNameParts({...emp}));setSelId(emp.id);setModal("form");}} variant="secondary" size="sm">
                       ✏️ {t.edit}
@@ -5969,6 +6090,9 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
   const [selConv,setSelConv]=useState(null);
   const [newMsg,setNewMsg]=useState("");
   const [imgPreview,setImgPreview]=useState(null);
+  const [vidPreview,setVidPreview]=useState(null);   // {url, blob}
+  const [mediaBusy,setMediaBusy]=useState(null);     // null | {label, pct}
+  const videoRef=useRef();
   const [search,setSearch]=useState("");
   const fileRef=useRef();
   const cameraRef=useRef();
@@ -6003,18 +6127,41 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
   const unread=(id)=>messages.filter(m=>m.from===id&&m.to===myId&&!m.read).length;
   const lastMsg=(id)=>{ const msgs=messages.filter(m=>(m.from===myId&&m.to===id)||(m.from===id&&m.to===myId)).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp)); return msgs.length>0?msgs[msgs.length-1]:null; };
 
-  const send=()=>{
-    if((!newMsg.trim()&&!imgPreview)||!selConv)return;
-    setMessages(p=>[...p,{id:gid(),from:myId,to:selConv,fromName:currentUser?.name||"Admin",toName:selConv,content:newMsg.trim(),image:imgPreview||null,timestamp:new Date().toISOString(),read:false}]);
-    setNewMsg("");setImgPreview(null);
+  const send=async()=>{
+    if((!newMsg.trim()&&!imgPreview&&!vidPreview)||!selConv||mediaBusy)return;
+    let video=null;
+    if(vidPreview){
+      setMediaBusy({label:L("Video wird gesendet…","Enviando vídeo…","Sending video…","Invio video…"),pct:null});
+      try{ video = await uploadChatVideo(vidPreview.blob); }
+      catch(e){ setMediaBusy(null); notify(L("Video konnte nicht gesendet werden","No se pudo enviar el vídeo","Could not send the video","Impossibile inviare il video"),"error"); return; }
+      setMediaBusy(null);
+    }
+    setMessages(p=>[...p,{id:gid(),from:myId,to:selConv,fromName:currentUser?.name||"Admin",toName:selConv,content:newMsg.trim().slice(0,5000),image:imgPreview||null,video,timestamp:new Date().toISOString(),read:false}]);
+    if(vidPreview) URL.revokeObjectURL(vidPreview.url);
+    setNewMsg("");setImgPreview(null);setVidPreview(null);
   };
 
-  const handleImage=(e)=>{
-    const file=e.target.files[0];if(!file)return;
-    if(file.size>2*1024*1024){notify(L("Bild max. 2MB","Imagen máx. 2MB","Image max. 2MB","Immagine max. 2MB"),"error");return;}
-    const reader=new FileReader();
-    reader.onload=ev=>setImgPreview(ev.target.result);
-    reader.readAsDataURL(file);e.target.value="";
+  // Photos (gallery or camera) and videos are shrunk automatically before sending
+  const handleImage=async(e)=>{
+    const file=e.target.files[0]; e.target.value=""; if(!file)return;
+    if(/^video\//.test(file.type||"")) return handleVideo(file);
+    if(file.size>40*1024*1024){notify(L("Datei zu gross","Archivo demasiado grande","File too large","File troppo grande"),"error");return;}
+    setMediaBusy({label:L("Bild wird verkleinert…","Reduciendo imagen…","Shrinking image…","Riduzione immagine…"),pct:null});
+    try{ setImgPreview(await compressPhoto(file)); setVidPreview(null); }
+    catch(err){ notify(L("Bild konnte nicht gelesen werden","No se pudo leer la imagen","Could not read the image","Impossibile leggere l'immagine"),"error"); }
+    finally{ setMediaBusy(null); }
+  };
+  const handleVideo=async(file)=>{
+    if(file.size>500*1024*1024){notify(L("Video zu gross","Vídeo demasiado grande","Video too large","Video troppo grande"),"error");return;}
+    setMediaBusy({label:L("Video wird verkleinert…","Reduciendo vídeo…","Shrinking video…","Riduzione video…"),pct:0});
+    try{
+      const blob = await compressVideo(file, pct=>setMediaBusy(b=>b?{...b,pct}:b));
+      if(blob.size>30*1024*1024) throw new Error("big");
+      setVidPreview({url:URL.createObjectURL(blob), blob}); setImgPreview(null);
+    }catch(err){
+      notify(err?.message==="toolong" ? L(`Video max. ${VIDEO_MAX_SEC/60} Minuten`,`Vídeo de máx. ${VIDEO_MAX_SEC/60} minutos`,`Video max. ${VIDEO_MAX_SEC/60} minutes`,`Video max. ${VIDEO_MAX_SEC/60} minuti`)
+        : L("Video konnte nicht verarbeitet werden","No se pudo preparar el vídeo","Could not process the video","Impossibile elaborare il video"),"error");
+    } finally { setMediaBusy(null); }
   };
 
   const formatTime=(ts)=>{
@@ -6055,6 +6202,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
                     {!isMe&&<div style={{width:26,height:26,borderRadius:"50%",background:`linear-gradient(135deg,${CP.accent},#00bcf2)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{(convs.find(c=>c.id===selConv)?.name||"?").charAt(0).toUpperCase()}</div>}
                     <div style={{maxWidth:"78%",background:isMe?"linear-gradient(135deg,rgba(28,126,214,.9),rgba(0,100,200,.85))":"rgba(255,255,255,.1)",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"9px 13px",boxShadow:"0 2px 6px rgba(0,0,0,.2)"}}>
                       {msg.image&&<img src={msg.image} alt="img" style={{maxWidth:"100%",borderRadius:10,marginBottom:msg.content?6:0,display:"block",cursor:"pointer"}} onClick={()=>{ const src=String(msg.image||""); if(/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(src)){ try{ const [h,b]=src.split(","); const bin=atob(b); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); const u=URL.createObjectURL(new Blob([a],{type:h.slice(5).split(";")[0]})); window.open(u,"_blank","noopener"); setTimeout(()=>URL.revokeObjectURL(u),60000);}catch(e){} } else if(/^https:\/\//i.test(src)) window.open(src,"_blank","noopener"); }}/>}
+                      {typeof msg.video==="string"&&msg.video.startsWith(CHAT_MEDIA_PREFIX)&&<video src={msg.video} controls playsInline preload="metadata" style={{maxWidth:"100%",maxHeight:320,borderRadius:10,marginBottom:msg.content?6:0,display:"block",background:"#000"}}/>}
                       {msg.content&&<div style={{color:"#fff",fontSize:14,lineHeight:1.4}}>{msg.content}</div>}
                       <div style={{color:"rgba(255,255,255,.4)",fontSize:10,marginTop:3,textAlign:"right"}}>{formatTime(msg.timestamp)}</div>
                     </div>
@@ -6063,6 +6211,13 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
               })}
             </div>
             {/* Image preview */}
+            {mediaBusy&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,background:"rgba(0,0,0,.3)",color:"#74C0FC",fontSize:12.5}}>⏳ {mediaBusy.label}{mediaBusy.pct!=null?` ${mediaBusy.pct}%`:""}
+              {mediaBusy.pct!=null&&<div style={{height:4,borderRadius:2,background:"rgba(255,255,255,.1)",marginTop:5}}><div style={{height:4,borderRadius:2,background:"#1C7ED6",width:`${mediaBusy.pct}%`}}/></div>}</div>}
+            {vidPreview&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,display:"flex",alignItems:"center",gap:8,background:"rgba(0,0,0,.3)"}}>
+              <video src={vidPreview.url} muted playsInline style={{height:52,borderRadius:8,background:"#000"}}/>
+              <span style={{color:CP.textTertiary,fontSize:12,flex:1}}>🎬 {L("Video bereit","Vídeo listo","Video ready","Video pronto")} · {(vidPreview.blob.size/1048576).toFixed(1)} MB</span>
+              <button onClick={()=>{URL.revokeObjectURL(vidPreview.url);setVidPreview(null);}} style={{background:"rgba(255,0,0,.5)",border:"none",borderRadius:"50%",width:20,height:20,color:"#fff",cursor:"pointer",fontSize:11}}>✕</button>
+            </div>}
             {imgPreview&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,display:"flex",alignItems:"center",gap:8,background:"rgba(0,0,0,.3)"}}>
               <img src={imgPreview} alt="preview" style={{height:52,borderRadius:8,objectFit:"cover"}}/>
               <span style={{color:CP.textTertiary,fontSize:12,flex:1}}>{L("Bild bereit zum Senden","Imagen lista","Image ready","Immagine pronta")}</span>
@@ -6070,14 +6225,16 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
             </div>}
             {/* Input */}
             <div style={{padding:"10px 10px",borderTop:`1px solid ${CP.border}`,display:"flex",gap:7,alignItems:"center",background:"rgba(0,0,0,.15)"}}>
-              <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleImage}/>
+              <input ref={fileRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={handleImage}/>
+              <input ref={videoRef} type="file" accept="video/*" capture="environment" style={{display:"none"}} onChange={handleImage}/>
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleImage}/>
               <button onClick={()=>fileRef.current.click()} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🖼️</button>
               <button onClick={()=>cameraRef.current.click()} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>📷</button>
+              <button onClick={()=>videoRef.current.click()} title={L("Video aufnehmen","Grabar vídeo","Record video","Registra video")} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🎬</button>
               <input value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
                 placeholder={makeL(lang)("Nachricht schreiben…","Escribe un mensaje…","Write a message…","Scrivi un messaggio…")} style={{flex:1,padding:"10px 14px",background:"rgba(255,255,255,.08)",border:`1px solid ${CP.border}`,borderRadius:22,color:"#fff",fontSize:14,outline:"none",fontFamily:CP.font}}/>
-              <button onClick={send} disabled={!newMsg.trim()&&!imgPreview}
-                style={{width:38,height:38,borderRadius:"50%",background:(!newMsg.trim()&&!imgPreview)?"rgba(255,255,255,.1)":`linear-gradient(135deg,${CP.accent},#00bcf2)`,border:"none",color:"#fff",cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>➤</button>
+              <button onClick={send} disabled={(!newMsg.trim()&&!imgPreview&&!vidPreview)||!!mediaBusy}
+                style={{width:38,height:38,borderRadius:"50%",background:(!newMsg.trim()&&!imgPreview&&!vidPreview)||mediaBusy?"rgba(255,255,255,.1)":`linear-gradient(135deg,${CP.accent},#00bcf2)`,border:"none",color:"#fff",cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>➤</button>
             </div>
           </div>
         ) : (
@@ -6106,7 +6263,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
                         {last&&<span style={{color:u>0?CP.accent:CP.textTertiary,fontSize:11,flexShrink:0,marginLeft:6}}>{formatTime(last.timestamp)}</span>}
                       </div>
                       <div style={{color:last?.image?"#00bcf2":CP.textTertiary,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {last?(last.image?"📷 "+L("Bild","Imagen","Image","Immagine"):last.content):L("Noch keine Nachrichten","Sin mensajes","No messages","Nessun messaggio")}
+                        {last?(last.video?"🎬 "+L("Video","Vídeo","Video","Video"):last.image?"📷 "+L("Bild","Imagen","Image","Immagine"):last.content):L("Noch keine Nachrichten","Sin mensajes","No messages","Nessun messaggio")}
                       </div>
                     </div>
                     {u>0&&<div style={{width:20,height:20,borderRadius:"50%",background:CP.accent,color:"#fff",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</div>}
@@ -9515,6 +9672,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
   const [deleteProductId,setDeleteProductId] = useState(null);
   const [deleteSupplierId,setDeleteSupplierId] = useState(null);
   const [deleteOrderId,setDeleteOrderId] = useState(null);
+  const orderBulk = useBulkSelect();
   const [selId,setSelId] = useState(null);
   const [search,setSearch] = useState("");
 
@@ -9719,12 +9877,15 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       {/* ── ORDERS VIEW ── */}
       {view==="orders"&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <BulkBar bulk={orderBulk} visibleIds={orders.map(o=>o.id)} lang={lang} itemWord={{DE:"Bestellungen",ES:"pedidos",EN:"orders",IT:"ordini"}}
+            onDelete={ids=>{setOrders(p=>p.filter(o=>!ids.has(o.id)));notify(L("Bestellungen gelöscht","Pedidos eliminados","Orders deleted","Ordini eliminati"),"success");}}/>
           {orders.map(order=>{
             const sup=suppliers.find(s=>s.id===order.supplierId);
             return (
-              <CPCard key={order.id}>
+              <CPCard key={order.id} onClick={orderBulk.selectMode?()=>orderBulk.toggle(order.id):undefined} style={orderBulk.selected.has(order.id)?{outline:"2px solid #4DABF7"}:undefined}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,flexWrap:"wrap",gap:8}}>
-                  <div>
+                  {orderBulk.selectMode&&<SelBox checked={orderBulk.selected.has(order.id)} onChange={()=>orderBulk.toggle(order.id)}/>}
+                  <div style={{flex:1}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                       <span style={{fontSize:18}}>🚚</span>
                       <span style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{order.supplierName}</span>
@@ -10539,6 +10700,7 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
   const [selContract,setSelContract] = useState(null);
   const [form,setForm] = useState({});
   const [deleteContractId,setDeleteContractId] = useState(null);
+  const bulk = useBulkSelect();
 
   const deleteContract = (id) => {
     setContracts(prev=>prev.filter(c=>c.id!==id));
@@ -10645,10 +10807,10 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
       )],
       [L("Art. 3 – Lohn und Arbeitszeit","Art. 3 – Salario y jornada","Art. 3 – Salary and Working Hours","Art. 3 – Salario e orario di lavoro"),
        L(
-        `Lohn: CHF ${c.salary} ${c.salaryType==="hourly"?"/Stunde":"/Monat"} brutto\nGesetzliche Abzüge gemäss AHV/ALV/NBUV/BVG/KTG\nWöchentliche Arbeitszeit: ${c.hours||42} Stunden\nÜberstunden nach Art. 321c OR\nLohnzahlung: Monatlich am 25. des Monats auf IBAN: ${cs.iban}`,
-        `Salario: CHF ${c.salary} ${c.salaryType==="hourly"?"/hora":"/mes"} bruto\nDeducciones legales según AVS/AD/AINF/LPP/IS\nJornada semanal: ${c.hours||42} horas\nHoras extra según Art. 321c CO\nPago: mensualmente el día 25 en IBAN: ${cs.iban}`,
-        `Salary: CHF ${c.salary} ${c.salaryType==="hourly"?"/hour":"/month"} gross\nStatutory deductions per AHV/ALV/NBUV/BVG/KTG\nWeekly working hours: ${c.hours||42}\nOvertime per Art. 321c CO\nPayment: monthly on the 25th to IBAN: ${cs.iban}`,
-        `Stipendio: CHF ${c.salary} ${c.salaryType==="hourly"?"/ora":"/mese"} lordo\nDeduzioni legali AVS/AD/AINF/LPP/IS\nOre settimanali: ${c.hours||42}\nStraordinari Art. 321c CO\nPagamento: mensile il 25 su IBAN: ${cs.iban}`
+        `Lohn: CHF ${c.salary} ${(c.salaryType==="hourly"?"/Stunde":c.salaryType==="weekly"?"/Woche":"/Monat")} brutto\nGesetzliche Abzüge gemäss AHV/ALV/NBUV/BVG/KTG\nWöchentliche Arbeitszeit: ${c.hours||42} Stunden\nÜberstunden nach Art. 321c OR\nLohnzahlung: Monatlich am 25. des Monats auf IBAN: ${cs.iban}`,
+        `Salario: CHF ${c.salary} ${(c.salaryType==="hourly"?"/hora":c.salaryType==="weekly"?"/semana":"/mes")} bruto\nDeducciones legales según AVS/AD/AINF/LPP/IS\nJornada semanal: ${c.hours||42} horas\nHoras extra según Art. 321c CO\nPago: mensualmente el día 25 en IBAN: ${cs.iban}`,
+        `Salary: CHF ${c.salary} ${(c.salaryType==="hourly"?"/hour":c.salaryType==="weekly"?"/week":"/month")} gross\nStatutory deductions per AHV/ALV/NBUV/BVG/KTG\nWeekly working hours: ${c.hours||42}\nOvertime per Art. 321c CO\nPayment: monthly on the 25th to IBAN: ${cs.iban}`,
+        `Stipendio: CHF ${c.salary} ${(c.salaryType==="hourly"?"/ora":c.salaryType==="weekly"?"/settimana":"/mese")} lordo\nDeduzioni legali AVS/AD/AINF/LPP/IS\nOre settimanali: ${c.hours||42}\nStraordinari Art. 321c CO\nPagamento: mensile il 25 su IBAN: ${cs.iban}`
       )],
       [L("Art. 4 – Sorgfalts- und Treuepflicht","Art. 4 – Deber de diligencia y lealtad","Art. 4 – Duty of Care and Loyalty","Art. 4 – Dovere di diligenza e fedeltà"),
        L(
@@ -10688,10 +10850,10 @@ function ContractsApp({t,lang,clients,employees,companySettings,notify,onBack,cu
       )],
       [L("Art. 3 – Vergütung","Art. 3 – Remuneración","Art. 3 – Remuneration","Art. 3 – Remunerazione"),
        L(
-        `Preis: CHF ${c.price} ${c.salaryType==="hourly"?"/Stunde":"/Monat"}\nZahlungsziel: 30 Tage nach Rechnungsstellung\nZahlungsart: Banküberweisung auf IBAN: ${cs.iban}\nMWST: Preise ohne MWST (Patjac ist nicht MWST-pflichtig)`,
-        `Precio: CHF ${c.price} ${c.salaryType==="hourly"?"/hora":"/mes"}\nPlazo de pago: 30 días desde la factura\nForma de pago: Transferencia bancaria a IBAN: ${cs.iban}\nIVA: precios sin IVA (Patjac no está sujeta a IVA)`,
-        `Price: CHF ${c.price} ${c.salaryType==="hourly"?"/hour":"/month"}\nPayment term: 30 days from invoice\nPayment method: Bank transfer to IBAN: ${cs.iban}\nVAT: prices without VAT (Patjac is not VAT-registered)`,
-        `Prezzo: CHF ${c.price} ${c.salaryType==="hourly"?"/ora":"/mese"}\nTermine pagamento: 30 giorni dalla fattura\nModalità pagamento: Bonifico bancario a IBAN: ${cs.iban}\nIVA: prezzi senza IVA (Patjac non è assoggettata all'IVA)`
+        `Preis: CHF ${c.price} ${(c.salaryType==="hourly"?"/Stunde":c.salaryType==="weekly"?"/Woche":"/Monat")}\nZahlungsziel: 30 Tage nach Rechnungsstellung\nZahlungsart: Banküberweisung auf IBAN: ${cs.iban}\nMWST: Preise ohne MWST (Patjac ist nicht MWST-pflichtig)`,
+        `Precio: CHF ${c.price} ${(c.salaryType==="hourly"?"/hora":c.salaryType==="weekly"?"/semana":"/mes")}\nPlazo de pago: 30 días desde la factura\nForma de pago: Transferencia bancaria a IBAN: ${cs.iban}\nIVA: precios sin IVA (Patjac no está sujeta a IVA)`,
+        `Price: CHF ${c.price} ${(c.salaryType==="hourly"?"/hour":c.salaryType==="weekly"?"/week":"/month")}\nPayment term: 30 days from invoice\nPayment method: Bank transfer to IBAN: ${cs.iban}\nVAT: prices without VAT (Patjac is not VAT-registered)`,
+        `Prezzo: CHF ${c.price} ${(c.salaryType==="hourly"?"/ora":c.salaryType==="weekly"?"/settimana":"/mese")}\nTermine pagamento: 30 giorni dalla fattura\nModalità pagamento: Bonifico bancario a IBAN: ${cs.iban}\nIVA: prezzi senza IVA (Patjac non è assoggettata all'IVA)`
       )],
       [L("Art. 4 – Haftung","Art. 4 – Responsabilidad","Art. 4 – Liability","Art. 4 – Responsabilità"),
        L(
@@ -10847,7 +11009,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                         [L("Beginn","Inicio","Start","Inizio"), fmtDate(c.startDate)],
                         [c.endDate?L("Ende","Fin","End","Fine"):null, c.endDate?fmtDate(c.endDate):null],
                         [L("Probezeit","Período prueba","Trial period","Periodo prova"), fmtDate(c.trialPeriod)||"—"],
-                        [L("Lohn","Salario","Salary","Stipendio"), `CHF ${Number(c.salary||0).toLocaleString("de-CH")}/${c.salaryType==="hourly"?L("Std.","h","h","h"):L("Monat","mes","month","mese")}`],
+                        [L("Lohn","Salario","Salary","Stipendio"), `CHF ${Number(c.salary||0).toLocaleString("de-CH")}/${c.salaryType==="hourly"?L("Std.","h","h","h"):c.salaryType==="weekly"?L("Woche","semana","week","settimana"):L("Monat","mes","month","mese")}`],
                         [L("Wochenstunden","Horas semanales","Weekly hours","Ore settimanali"), c.hours?`${c.hours}h`:"—"],
                         [L("Kündigungsfrist","Preaviso","Notice period","Preavviso"), c.noticePeriod||"—"],
                         [L("AHV-Nr.","N. AVS","AHV No.","N. AVS"), emp?.ahv||"—"],
@@ -10939,6 +11101,22 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
       </div>
 
       {/* Contract list */}
+      <BulkBar bulk={bulk} visibleIds={filtered.map(c=>c.id)} lang={lang} itemWord={{DE:"Verträge",ES:"contratos",EN:"contracts",IT:"contratti"}}
+        onDelete={ids=>{setContracts(p=>p.filter(c=>!ids.has(c.id)));notify(L("Verträge gelöscht","Contratos eliminados","Contracts deleted","Contratti eliminati"),"success");}}
+        extra={ids=>(<>
+          <select defaultValue="" onChange={e=>{const v=e.target.value;if(!v)return;setContracts(p=>p.map(c=>ids.has(c.id)?{...c,status:v}:c));notify(t.success,"success");e.target.value="";}}
+            style={{background:"rgba(255,255,255,.1)",color:"#fff",border:`1px solid ${CP.border}`,borderRadius:8,padding:"5px 8px",fontSize:12}}>
+            <option value="">✏️ {L("Status ändern","Cambiar estado","Change status","Cambia stato")}</option>
+            {["draft","signed","active","expired","terminated"].map(st=><option key={st} value={st} style={{background:"#1a1a2e"}}>{statusLabel(st)}</option>)}
+          </select>
+          <select defaultValue="" onChange={e=>{const v=e.target.value;if(!v)return;setContracts(p=>p.map(c=>ids.has(c.id)?{...c,salaryType:v}:c));notify(t.success,"success");e.target.value="";}}
+            style={{background:"rgba(255,255,255,.1)",color:"#fff",border:`1px solid ${CP.border}`,borderRadius:8,padding:"5px 8px",fontSize:12}}>
+            <option value="">✏️ {L("Abrechnungsart","Tipo facturación","Billing type","Tipo fatturazione")}</option>
+            <option value="hourly" style={{background:"#1a1a2e"}}>{L("Pro Stunde","Por hora","Per hour","All'ora")}</option>
+            <option value="weekly" style={{background:"#1a1a2e"}}>{L("Wöchentlich","Semanal","Weekly","Settimanale")}</option>
+            <option value="monthly" style={{background:"#1a1a2e"}}>{L("Monatlich","Mensual","Monthly","Mensile")}</option>
+          </select>
+        </>)}/>
       {filtered.length===0 ? (
         <CPCard style={{textAlign:"center",padding:"40px 20px"}}>
           <div style={{fontSize:52,marginBottom:14}}>📝</div>
@@ -10958,9 +11136,10 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
           {filtered.map(c=>{
             const entity = c.type==="client" ? clients.find(x=>x.id===c.clientId) : employees.find(x=>x.id===c.employeeId);
             return (
-              <CPCard key={c.id}>
+              <CPCard key={c.id} onClick={bulk.selectMode?()=>bulk.toggle(c.id):undefined} style={bulk.selected.has(c.id)?{outline:"2px solid #4DABF7"}:undefined}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
                   <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                    {bulk.selectMode&&<SelBox checked={bulk.selected.has(c.id)} onChange={()=>bulk.toggle(c.id)}/>}
                     <div style={{width:48,height:48,borderRadius:14,background:c.type==="employee"?"rgba(112,72,232,0.2)":"rgba(28,126,214,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,border:`1px solid ${c.type==="employee"?"rgba(112,72,232,0.4)":"rgba(28,126,214,0.4)"}`}}>
                       {typeIcon(c.type)}
                     </div>
@@ -10971,8 +11150,8 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                         {t.contractStart}: {fmtDate(c.startDate)}
                         {c.endDate?" · "+t.contractEnd+": "+fmtDate(c.endDate):" · "+t.indefinite}
                       </div>
-                      {c.type==="employee"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.salary} {c.salaryType==="hourly"?"/h":"/M"}</div>}
-                      {c.type==="client"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.price} {c.salaryType==="hourly"?"/h":"/M"}</div>}
+                      {c.type==="employee"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.salary} {c.salaryType==="hourly"?"/h":c.salaryType==="weekly"?"/W":"/M"}</div>}
+                      {c.type==="client"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.price} {c.salaryType==="hourly"?"/h":c.salaryType==="weekly"?"/W":"/M"}</div>}
                     </div>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
@@ -11083,7 +11262,8 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
             </CPField>
             <CPField label={L("Abrechnungsart","Tipo facturación","Billing type","Tipo fatturazione")}>
               <CPSelect value={form.salaryType||"monthly"} onChange={e=>setForm(f=>({...f,salaryType:e.target.value}))}>
-                <option value="hourly">{L("Stündlich","Por horas","Hourly","Ad ore")}</option>
+                <option value="hourly">{L("Pro Stunde","Por hora","Per hour","All'ora")}</option>
+                <option value="weekly">{L("Wöchentlich","Semanal","Weekly","Settimanale")}</option>
                 <option value="monthly">{L("Monatlich","Mensual","Monthly","Mensile")}</option>
               </CPSelect>
             </CPField>
