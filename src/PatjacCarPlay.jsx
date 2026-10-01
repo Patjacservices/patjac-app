@@ -1290,6 +1290,38 @@ const hoursBetween = (start,end) => {
   let mins=(h2*60+m2)-(h1*60+m1); if(mins<0) mins+=24*60;
   return Math.round(mins/60*100)/100;
 };
+// ─── ATTENDANCE: hours are paid from the employee's arrival (never before the planned start) to the planned end ───
+const GEOFENCE_M = 300;   // the employee must be within ~300 m of the client to start
+const toMin = t => { const m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m ? (+m[1])*60+(+m[2]) : null; };
+const fromMin = m => `${String(Math.floor(m/60)%24).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+const jobPaidInfo = (j, now=new Date()) => {
+  const planned = hoursBetween(j?.timeStart, j?.timeEnd);
+  if(!j || j.status==="cancelled") return {hours:0, planned, state:"cancelled", lateMin:0};
+  const s = toMin(j.timeStart); let e = toMin(j.timeEnd);
+  if(s!==null && e!==null && e<=s) e += 1440;
+  if(j.actualStart){
+    const a = toMin(j.actualStart);
+    if(s===null || e===null || a===null) return {hours:Number(j.actualHours)||planned, planned, state:"ontime", lateMin:0};
+    const from = Math.max(a, s);
+    const hours = Math.round(Math.max(0, e-from)/60*100)/100;
+    const lateMin = Math.max(0, a - s);
+    return {hours, planned, state: lateMin>0 ? "late" : "ontime", lateMin};
+  }
+  const today = ymd(now);
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  if((j.date||"") < today || (j.date===today && e!==null && nowMin >= e)) return {hours:0, planned, state:"absent", lateMin:0};
+  return {hours:planned, planned, state:"planned", lateMin:0};
+};
+// Small label shown on job cards for the administrator
+function AttendanceBadge({job, lang}){
+  const L = makeL(lang);
+  const i = jobPaidInfo(job);
+  const st = {fontSize:11.5,fontWeight:700,padding:"2px 8px",borderRadius:10,display:"inline-block",marginTop:4};
+  if(i.state==="absent") return <span style={{...st,background:"rgba(201,42,42,.2)",color:"#FF8787"}}>❌ {L("Nicht erschienen – 0 Std.","No se presentó – 0 h","Did not show up – 0 h","Non presentato – 0 h")}</span>;
+  if(i.state==="late") return <span style={{...st,background:"rgba(240,140,0,.18)",color:"#FFA94D"}}>⏰ {L("Ankunft","Llegó","Arrived","Arrivato")} {job.actualStart} (+{i.lateMin} min) · {i.hours} h {L("bezahlt","pagadas","paid","pagate")}</span>;
+  if(i.state==="ontime") return <span style={{...st,background:"rgba(47,158,68,.18)",color:"#69DB7C"}}>✅ {L("Pünktlich","Puntual","On time","Puntuale")} {job.actualStart} · {i.hours} h</span>;
+  return null;
+}
 const jobAmountFor = (client,start,end) => {
   const rate=parseFloat(client?.price)||0;
   return Math.round(rate*hoursBetween(start,end)*100)/100;
@@ -1610,7 +1642,9 @@ export default function PatjacCarPlay(){
     const toAdd = [];
     const todayD = new Date(todayStr+"T00:00:00");
     Object.values(groups).forEach(group=>{
-      const sample = group[0];
+      // template = the series' usual times (a one-day schedule change must not spread to new jobs)
+      const mode = k => { const c={}; group.forEach(j=>{ const v=j[k]||""; c[v]=(c[v]||0)+1; }); return Object.entries(c).sort((a,b)=>b[1]-a[1])[0]?.[0]||""; };
+      const sample = {...group[0], timeStart:mode("timeStart"), timeEnd:mode("timeEnd"), notes:mode("notes")};
       const maxDate = group.reduce((m,j)=>j.date>m?j.date:m, group[0].date);
       const maxD = new Date(maxDate+"T00:00:00");
       const daysUntilEnd = Math.round((maxD - todayD)/86400000);
@@ -2480,8 +2514,9 @@ function calcSwissPayroll(emp, timeclock, month, year, jobs, extras){
   // Hourly employees: agreed (planned) hours of their jobs this month. Clock-in/out does not change pay.
   let hoursWorked;
   if(Array.isArray(jobs)){
+    // paid hours: from arrival (never earlier than planned start) to planned end; no-shows count 0
     hoursWorked = jobs.filter(j=>j.employeeId===emp.id && j.date && j.date.startsWith(monthStr))
-      .reduce((s,j)=>s+hoursBetween(j.timeStart,j.timeEnd),0);
+      .reduce((s,j)=>s+jobPaidInfo(j).hours,0);
     hoursWorked = Math.round(hoursWorked*100)/100;
   } else {
     hoursWorked = timeclock.filter(tc=>tc.employeeId===emp.id && tc.date&&tc.date.startsWith(monthStr) && tc.hours)
@@ -2653,7 +2688,7 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
         const r = await routeKm(from, addr);
         out.push({
           from, date:j.date, client:j.clientName||c?.name||"", addr,
-          planStart:j.timeStart||"", planEnd:j.timeEnd||"", hours:hoursBetween(j.timeStart,j.timeEnd),
+          planStart:j.timeStart||"", planEnd:j.timeEnd||"", hours:jobPaidInfo(j).hours, att:jobPaidInfo(j),
           actStart:j.actualStart||"", actEnd:j.actualEnd||"",
           first, km:r?r.km:null, approx:r?r.approx:false, missing:!r,
         });
@@ -2764,7 +2799,7 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
                     <td style={td}><b>{r.client}</b><br/><span style={{color:"#555"}}>{r.addr}</span></td>
                     <td style={td}>{r.planStart}–{r.planEnd}</td>
                     <td style={td}>{r.actStart||"—"} / {r.actEnd||"—"}</td>
-                    <td style={{...td,textAlign:"right"}}>{r.hours.toFixed(2)}</td>
+                    <td style={{...td,textAlign:"right"}}>{r.hours.toFixed(2)}{r.att?.state==="absent"?<div style={{color:"#C92A2A",fontSize:9.5,fontWeight:700}}>{L("abwesend","ausente","absent","assente")}</div>:r.att?.state==="late"?<div style={{color:"#E8590C",fontSize:9.5,fontWeight:700}}>+{r.att.lateMin} min</div>:null}</td>
                     <td style={{...td,color:"#555"}}>{r.first?`🏠 → ${L("1. Einsatz","1.er trabajo","1st job","1° lavoro")}`:`↪ ${L("von vorherigem Kunden","desde el cliente anterior","from previous client","dal cliente precedente")}`}</td>
                     <td style={{...td,textAlign:"right",cursor:"pointer"}} title={L("Klicken, um km zu korrigieren","Pulse para corregir los km","Click to correct km","Clic per correggere i km")}
                       onClick={()=>{
@@ -4067,6 +4102,46 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
   const [form,setForm]=useState({});
   const [deleteJobId,setDeleteJobId]=useState(null);
   const isAdmin = currentUser?.role==="admin";
+  // one-day schedule change (admin) / schedule change request (employee)
+  const [dayEdit,setDayEdit]=useState(null);   // {job,start,end,reason}
+  const sendMsg = async (to, toName, content) => {
+    try{ await docsFetch("messages","POST",{id:gid(), from: isAdmin?"admin":currentUser?.id, to, from_name: currentUser?.name||"Admin", to_name: toName||"", content, timestamp:new Date().toISOString(), read:false}); return true; }
+    catch(e){ return false; }
+  };
+  const saveDayEdit = async () => {
+    const {job,start,end,reason} = dayEdit||{};
+    if(!job || toMin(start)===null || toMin(end)===null){ notify(t.error,"error"); return; }
+    if(isAdmin){
+      const team = job.teamId ? jobs.filter(j=>j.teamId===job.teamId) : [job];
+      const ids = new Set(team.map(j=>j.id));
+      const note = `🕒 ${L("Nur heute geändert","Horario cambiado solo este día","Changed for this day only","Cambiato solo oggi")} (${job.timeStart}–${job.timeEnd} → ${start}–${end})${reason?": "+reason:""}`;
+      setJobs(p=>p.map(j=>{ if(!ids.has(j.id)) return j;
+        const nj={...j, timeStart:start, timeEnd:end, reminderSent:false, notes:[note, (j.notes||"").replace(/🕒[^\n]*\n?/g,"").trim()].filter(Boolean).join("\n")};
+        if(nj.actualStart) nj.actualHours = jobPaidInfo(nj).hours;
+        return nj; }));
+      for(const m of team){ if(m.employeeId) await sendMsg(m.employeeId, m.employeeName, `🕒 ${L("Neue Zeit nur für","Nuevo horario solo para el","New time only for","Nuovo orario solo per il")} ${fmtDate(job.date)} · ${job.clientName}: ${start}–${end}${reason?` (${reason})`:""}`); }
+      notify(L("Zeit nur für diesen Tag geändert","Horario cambiado solo para este día","Time changed for this day only","Orario cambiato solo per questo giorno"),"success");
+    } else {
+      const ok = await sendMsg("admin","Admin", `🕒 ${L("Bitte um Zeitänderung","Solicitud de cambio de horario","Schedule change request","Richiesta cambio orario")} · ${fmtDate(job.date)} · ${job.clientName}\n${job.timeStart}–${job.timeEnd} → ${start}–${end}${reason?`\n${L("Grund","Motivo","Reason","Motivo")}: ${reason}`:""}`);
+      notify(ok?L("Anfrage an den Administrator gesendet","Solicitud enviada al administrador","Request sent to the administrator","Richiesta inviata all'amministratore"):t.error, ok?"success":"error");
+    }
+    setDayEdit(null);
+  };
+  const dayEditModal = dayEdit && (
+    <CPModal title={isAdmin?`🕒 ${L("Zeit nur für diesen Tag ändern","Cambiar horario solo este día","Change time for this day only","Cambia orario solo oggi")}`:`🕒 ${L("Zeitänderung anfragen","Pedir cambio de horario","Request a schedule change","Richiedi cambio orario")}`} onClose={()=>setDayEdit(null)} width={440}>
+      <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10}}>{dayEdit.job.clientName} · {fmtDate(dayEdit.job.date)} · {L("bisher","antes","was","prima")} {dayEdit.job.timeStart}–{dayEdit.job.timeEnd}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}}>
+        <CPField label={L("Beginn","Inicio","Start","Inizio")}><CPInput type="time" value={dayEdit.start} onChange={e=>setDayEdit(d=>({...d,start:e.target.value}))}/></CPField>
+        <CPField label={L("Ende","Fin","End","Fine")}><CPInput type="time" value={dayEdit.end} onChange={e=>setDayEdit(d=>({...d,end:e.target.value}))}/></CPField>
+      </div>
+      <CPField label={L("Grund (optional)","Motivo (opcional)","Reason (optional)","Motivo (facoltativo)")}><CPInput value={dayEdit.reason||""} onChange={e=>setDayEdit(d=>({...d,reason:e.target.value.slice(0,200)}))}/></CPField>
+      <div style={{color:CP.textTertiary,fontSize:12,margin:"4px 0 12px"}}>ℹ️ {isAdmin?L("Nur dieser Tag ändert sich; die übrigen Termine der Serie bleiben gleich. Der Mitarbeiter wird benachrichtigt.","Solo cambia este día; el resto de los días de la serie se mantienen igual. El empleado recibe un aviso.","Only this day changes; the rest of the series stays the same. The employee is notified.","Cambia solo questo giorno; il resto della serie resta uguale. Il dipendente viene avvisato."):L("Der Administrator erhält Ihre Anfrage und bestätigt die neue Zeit.","El administrador recibe tu solicitud y confirma el nuevo horario.","The administrator receives your request and confirms the new time.","L'amministratore riceve la richiesta e conferma il nuovo orario.")}</div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <CPBtn variant="secondary" onClick={()=>setDayEdit(null)}>{t.cancel||"Cancelar"}</CPBtn>
+        <CPBtn onClick={saveDayEdit}>{isAdmin?`💾 ${t.save||"Guardar"}`:`📨 ${L("Senden","Enviar","Send","Invia")}`}</CPBtn>
+      </div>
+    </CPModal>
+  );
 
   const deleteJob = (id) => {
     setJobs(p=>p.filter(j=>j.id!==id));
@@ -4296,7 +4371,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                         <span style={{fontSize:14}}>📅</span>
                         <div style={{color:CP.textSecondary,fontSize:13}}>{fmtDate(job.date)}</div>
                       </div>
+                      {job.date>=todayStr&&!job.actualStart&&<button onClick={()=>setDayEdit({job,start:job.timeStart||"",end:job.timeEnd||"",reason:""})} style={{background:"rgba(177,151,252,.15)",border:"1px solid rgba(177,151,252,.35)",borderRadius:10,color:"#D0BFFF",padding:"6px 12px",cursor:"pointer",fontSize:12.5,fontWeight:700,fontFamily:CP.font}}>🕒 {L("Zeitänderung anfragen","Pedir cambio de horario","Request schedule change","Richiedi cambio orario")}</button>}
                     </div>
+                    {(job.notes||"").startsWith("🕒")&&<div style={{color:"#B197FC",fontSize:12,marginTop:6}}>{(job.notes||"").split("\n")[0]}</div>}
+                    <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:6}}>ℹ️ {L("Bezahlt wird ab Ihrer Ankunft beim Kunden bis zum geplanten Ende","Se pagan las horas desde tu llegada al cliente hasta la hora de fin programada","Paid from your arrival at the client until the planned end","Pagato dal tuo arrivo dal cliente fino alla fine prevista")} ({job.timeEnd}).</div>
                   </div>
                 </div>
               </CPCard>
@@ -4309,6 +4387,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             </div>
           )}
         </div>
+        {dayEditModal}
       </CPScreen>
     );
   }
@@ -4341,6 +4420,8 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                   <CPBadge text={statusLabel(job.status)} color={statusColor(job.status)}/>
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {fmtDate(job.date)} · {job.timeStart}–{job.timeEnd}</div>
+                <AttendanceBadge job={job} lang={lang}/>
+                {(job.notes||"").startsWith("🕒")&&<div style={{color:"#B197FC",fontSize:11.5,marginTop:3}}>{(job.notes||"").split("\n")[0]}</div>}
                 {(()=>{const c=clients.find(x=>x.id===job.clientId); const addr=c?fmtAddr(c):(job.clientAddress||""); return addr?(
                   <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
                     style={{display:"inline-block",color:"#74C0FC",fontSize:12.5,marginTop:3,textDecoration:"none"}}>📍 {addr}</a>
@@ -4359,6 +4440,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
               {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexShrink:0}}>
                 {<CPBtn onClick={()=>{setForm({...job, employeeIds:teamOf(job).map(m=>m.employeeId), totalHours:Math.round(hoursBetween(job.timeStart,job.timeEnd)*teamOf(job).length*100)/100});setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>}
                 {job.status!=="completed"&&<CPBtn onClick={()=>{setJobs(p=>p.map(j=>j.id===job.id?{...j,status:job.status==="pending"?"inProgress":"completed"}:j));notify(t.success);}} variant={job.status==="pending"?"warning":"success"} size="sm">{job.status==="pending"?"▶":"✓"}</CPBtn>}
+                {job.date>=todayStr&&<CPBtn onClick={()=>setDayEdit({job,start:job.timeStart||"",end:job.timeEnd||"",reason:""})} variant="secondary" size="sm" title={L("Zeit nur für diesen Tag ändern","Cambiar horario solo este día","Change time for this day only","Cambia orario solo oggi")}>🕒</CPBtn>}
                 <CPBtn onClick={()=>setDeleteJobId(job.id)} variant="danger" size="sm">🗑️</CPBtn>
               </div>}
             </div>
@@ -4367,6 +4449,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         {ff.length===0&&<div style={{color:CP.textTertiary,textAlign:"center",padding:"2rem",fontSize:14}}>{t.noRecords}</div>}
       </div>
 
+      {dayEditModal}
       {modal==="form"&&(
         <CPModal title={form.id?t.edit:t.newJob||"Neu"} onClose={()=>setModal(null)} width={540}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
@@ -5466,7 +5549,7 @@ async function captureClockLocation(clientAddr){
   const addr = await reverseGeocode(g.lat,g.lon);
   let dist = null;
   if(clientAddr){ const c = await geocodeCH(clientAddr); if(c) dist = Math.round(haversineKm({lat:g.lat,lon:g.lon},c)*1000); }
-  return {text:`${addr || `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}`} (±${g.acc} m)`, lat:g.lat, lon:g.lon, dist};
+  return {text:`${addr || `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}`} (±${g.acc} m)`, lat:g.lat, lon:g.lon, dist, acc:Number(g.acc)||0};
 }
 function DistBadge({m,lang}){
   const L = makeL(lang);
@@ -5550,37 +5633,52 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
     active: !!job.actualStart && !job.actualEnd,
   });
 
-  // Clock IN for a specific job/client
+  // Clock IN for a specific job/client — only possible at the client's address (employees)
+  const [clockBusy,setClockBusy] = useState(null);
   const jobClockIn = async (job) => {
+    if(clockBusy) return;
+    const isAdminUser = currentUser?.role==="admin";
+    setClockBusy(job.id);
+    let loc;
+    try{ loc = await captureClockLocation(clientAddrOf(job)); }catch(e){ loc = {text:"GPS?"}; }
+    finally{ setClockBusy(null); }
+    if(!isAdminUser){
+      if(loc.lat==null){
+        notify(`📍 ${L("Bitte Standort (GPS) erlauben: Einstempeln geht nur beim Kunden","Activa la ubicación (GPS): solo puedes fichar en el lugar del cliente","Please allow location (GPS): you can only clock in at the client","Attiva la posizione (GPS): puoi timbrare solo dal cliente")}`,"error",7000);
+        return;
+      }
+      if(loc.dist!=null && (loc.dist - Math.min(loc.acc||0,150)) > GEOFENCE_M){
+        notify(`🚫 ${L("Sie sind nicht beim Kunden","No estás en el lugar del cliente","You are not at the client","Non sei dal cliente")} (${loc.dist<1000?loc.dist+" m":(loc.dist/1000).toFixed(1)+" km"}). ${L("Einstempeln nur vor Ort möglich.","Solo puedes fichar al llegar.","You can only clock in on site.","Puoi timbrare solo sul posto.")}`,"error",8000);
+        return;
+      }
+    }
     const now = new Date().toTimeString().slice(0,5);
-    const updated = {...job, actualStart:now, status:"inProgress"};
+    const paid = jobPaidInfo({...job, actualStart:now}).hours;
+    const updated = {...job, actualStart:now, actualHours:paid, status:"inProgress",
+      startLocation:loc.text, startLat:loc.lat??null, startLon:loc.lon??null, startDistM:loc.dist??null};
     setJobs(prev=>prev.map(j=>j.id===job.id?updated:j));
-    captureClockLocation(clientAddrOf(job)).then(loc=>{
-      setJobs(prev=>prev.map(j=>j.id===job.id?{...j,startLocation:loc.text,startLat:loc.lat??null,startLon:loc.lon??null,startDistM:loc.dist??null}:j));
-      if(loc.dist>1000) notify(`⚠️ ${L("Sie sind weit von der Kundenadresse entfernt","Está lejos de la dirección del cliente","You are far from the client address","Sei lontano dall'indirizzo del cliente")} (${(loc.dist/1000).toFixed(1)} km)`,"warning",6000);
-    });
+    if(loc.dist==null) notify(`ℹ️ ${L("Kundenadresse konnte nicht geprüft werden","No se pudo comprobar la dirección del cliente","Client address could not be checked","Indirizzo del cliente non verificabile")}`,"warning",5000);
 
     // Also update or create the day record
     const emp = employees.find(e=>e.id===selEmp);
     if(!tc){
-      const loc = await getGeoLocation();
       setTimeclock(p=>[...p,{
         id:gid(), employeeId:selEmp, employeeName:emp?.name||"",
-        date:todayStr, clockIn:now, clockOut:null, hours:null,
-        location:loc, jobCount:todayJobs.length,
+        date:todayStr, clockIn:now, clockOut:null, hours:paid,
+        location:loc.text, jobCount:todayJobs.length,
       }]);
     } else if(!tc.clockIn){
       setTimeclock(p=>p.map(x=>x.id===tc.id?{...x,clockIn:now}:x));
     }
-    notify(`✅ ${L("Eingestempelt bei","Fichado entrada en","Clocked in at","Timbrato entrata da")} ${job.clientName}: ${now}`,"success");
+    const late = jobPaidInfo(updated).lateMin;
+    notify(`✅ ${L("Eingestempelt bei","Fichado entrada en","Clocked in at","Timbrato entrata da")} ${job.clientName}: ${now}${late>0?` · ⏰ +${late} min`:""} · ${paid} h ${L("bis","hasta","until","fino alle")} ${job.timeEnd}`,"success",6000);
   };
 
   // Clock OUT for a specific job/client
   const jobClockOut = (job) => {
     const now = new Date().toTimeString().slice(0,5);
-    const [h1,m1] = (job.actualStart||job.timeStart||"08:00").split(":").map(Number);
-    const [h2,m2] = now.split(":").map(Number);
-    const hrs = Math.max(0,((h2*60+m2)-(h1*60+m1))/60);
+    // The end time does not change the pay: hours run from arrival to the planned end
+    const hrs = jobPaidInfo(job).hours;
 
     const updated = {...job, actualEnd:now, actualHours:hrs, status:"completed"};
     setJobs(prev=>prev.map(j=>j.id===job.id?updated:j));
@@ -5777,7 +5875,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                         boxShadow:(!isDone&&!isActive)?"0 4px 16px rgba(47,158,68,0.35)":"none",
                       }}
                     >
-                      🟢 {t.clockIn}
+                      {clockBusy===job.id?"⏳ "+L("Standort wird geprüft…","Comprobando ubicación…","Checking location…","Verifica posizione…"):<>🟢 {t.clockIn}</>}
                     </button>
 
                     {/* Clock OUT button */}
@@ -5796,9 +5894,14 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                         boxShadow:isActive?"0 4px 16px rgba(201,42,42,0.35)":"none",
                       }}
                     >
-                      🔴 {t.clockOut}
+                      🔴 {t.clockOut} <span style={{fontSize:11,opacity:.8}}>({L("optional","opcional","optional","facoltativo")})</span>
                     </button>
                   </div>
+                  {(()=>{ const pi=jobPaidInfo(job); return (
+                    <div style={{color:pi.state==="late"?"#FFA94D":pi.state==="absent"?"#FF8787":CP.textTertiary,fontSize:12,marginTop:8,lineHeight:1.45}}>
+                      {pi.state==="late"?`⏰ ${L("Verspätung","Retraso","Late","Ritardo")}: ${pi.lateMin} min · `:pi.state==="absent"?`❌ ${L("Nicht eingestempelt","Sin fichar","Not clocked in","Non timbrato")} · `:""}
+                      💶 {L("Bezahlt","Horas pagadas","Paid","Pagate")}: <b>{pi.hours} h</b> {L("von","de","of","di")} {pi.planned} h · 📍 {L("Einstempeln nur beim Kunden; Ende automatisch um","Fichar solo en el cliente; fin automático a las","Clock in at the client only; ends automatically at","Timbra solo dal cliente; fine automatica alle")} {job.timeEnd}
+                    </div>); })()}
                 </div>
               );
             })}
