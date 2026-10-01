@@ -18,7 +18,7 @@ const T = {
     postalCode:"PLZ", city:"Stadt", phone:"Telefon", email:"E-Mail",
     frequency:"Häufigkeit", daily:"Täglich", weekly:"Wöchentlich",
     monthly:"Monatlich", once:"Einmalig", billingType:"Abrechnung",
-    perService:"Pro Dienst", monthlyContract:"Monatsvertrag",
+    perService:"Pro Auftrag", monthlyContract:"Monatsvertrag",
     monthlyPrice:"Monatspreis", save:"Speichern", cancel:"Abbrechen",
     confirm:"Bestätigen", delete:"Löschen", edit:"Bearbeiten", add:"Hinzufügen",
     status:"Status", pending:"Ausstehend", inProgress:"In Bearbeitung",
@@ -169,7 +169,7 @@ const T = {
     postalCode:"CP", city:"Ciudad", phone:"Teléfono", email:"Correo",
     frequency:"Frecuencia", daily:"Diario", weekly:"Semanal",
     monthly:"Mensual", once:"Una vez", billingType:"Facturación",
-    perService:"Por servicio", monthlyContract:"Contrato mensual",
+    perService:"Por trabajo", monthlyContract:"Contrato mensual",
     monthlyPrice:"Precio mensual", save:"Guardar", cancel:"Cancelar",
     confirm:"Confirmar", delete:"Eliminar", edit:"Editar", add:"Añadir",
     status:"Estado", pending:"Pendiente", inProgress:"En progreso",
@@ -320,7 +320,7 @@ const T = {
     postalCode:"Postal Code", city:"City", phone:"Phone", email:"Email",
     frequency:"Frequency", daily:"Daily", weekly:"Weekly",
     monthly:"Monthly", once:"Once", billingType:"Billing",
-    perService:"Per service", monthlyContract:"Monthly contract",
+    perService:"Per job", monthlyContract:"Monthly contract",
     monthlyPrice:"Monthly price", save:"Save", cancel:"Cancel",
     confirm:"Confirm", delete:"Delete", edit:"Edit", add:"Add",
     status:"Status", pending:"Pending", inProgress:"In Progress",
@@ -471,7 +471,7 @@ const T = {
     postalCode:"CAP", city:"Città", phone:"Telefono", email:"Email",
     frequency:"Frequenza", daily:"Quotidiano", weekly:"Settimanale",
     monthly:"Mensile", once:"Una volta", billingType:"Fatturazione",
-    perService:"Per servizio", monthlyContract:"Contratto mensile",
+    perService:"Per lavoro", monthlyContract:"Contratto mensile",
     monthlyPrice:"Prezzo mensile", save:"Salva", cancel:"Annulla",
     confirm:"Conferma", delete:"Elimina", edit:"Modifica", add:"Aggiungi",
     status:"Stato", pending:"In attesa", inProgress:"In corso",
@@ -638,8 +638,8 @@ const withNameParts = (o) => {
   return {...o, firstName:o.firstName||w.slice(0,k).join(" "), lastName:o.lastName??w.slice(k).join(" ")};
 };
 const gCode = () => "PJ-"+Math.random().toString(36).substr(2,6).toUpperCase();
-// 6-digit PIN (1 million combinations) from the secure random generator
-const gPin = () => { const a=new Uint32Array(1); crypto.getRandomValues(a); return String(100000 + (a[0] % 900000)); };
+// 4-digit PIN from the secure random generator (brute force is stopped by the server lock)
+const gPin = () => { const a=new Uint32Array(1); crypto.getRandomValues(a); return String(1000 + (a[0] % 9000)); };
 // Keeps generating a code until it finds one not already used by another employee
 const gCodeUnique = (existingEmployees, excludeId) => {
   let code;
@@ -1322,6 +1322,9 @@ function AttendanceBadge({job, lang}){
   if(i.state==="ontime") return <span style={{...st,background:"rgba(47,158,68,.18)",color:"#69DB7C"}}>✅ {L("Pünktlich","Puntual","On time","Puntuale")} {job.actualStart} · {i.hours} h</span>;
   return null;
 }
+// Hours billed to the client for a visit: the hours agreed with the client (client_hours) — separate from the employees' schedule.
+// Old jobs without them fall back to the employees' scheduled hours.
+const visitClientHours = (rows) => { const ch = rows.map(r=>Number(r.clientHours)).find(v=>v>0); return ch ? ch : rows.reduce((s,r)=>s+hoursBetween(r.timeStart,r.timeEnd),0); };
 const jobAmountFor = (client,start,end) => {
   const rate=parseFloat(client?.price)||0;
   return Math.round(rate*hoursBetween(start,end)*100)/100;
@@ -1443,7 +1446,7 @@ export default function PatjacCarPlay(){
       // Remove undefined/null values and unknown fields
       Object.keys(row).forEach(k => (row[k]===undefined||row[k]===null) && delete row[k]);
       // Convert empty strings to null for numeric and date fields
-      const numericFields = ['price','amount','salary','hourly_rate','fixed_salary','total','vat_amount','hours','actual_hours'];
+      const numericFields = ['price','amount','salary','hourly_rate','fixed_salary','total','vat_amount','hours','actual_hours','client_hours','billed_hours'];
       const dateFields = ['date','start_date','end_date','due_date','contract_date','delivery_date','clock_in','clock_out','trial_period','birth_date','period_from','period_to'];
       const uuidFields = ['client_id','employee_id','supplier_id','job_id'];
       numericFields.forEach(k => { if(row[k]==="") row[k]=null; if(row[k]!==undefined&&row[k]!==null&&isNaN(Number(row[k]))) delete row[k]; });
@@ -1758,7 +1761,7 @@ export default function PatjacCarPlay(){
           setDbReady(false);
           setCurrentUser({id:r.id,name:r.name,role:"employee",code:r.code||""});
           setAuthState("app"); setLoginPin("");
-        } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte 30 Min. warten","Demasiados intentos: espera 30 minutos","Too many attempts – wait 30 minutes","Troppi tentativi – attendi 30 minuti"));
+        } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte später erneut (max. 1 Std.)","Demasiados intentos: inténtalo más tarde (máx. 1 hora)","Too many attempts – try again later (max. 1 hour)","Troppi tentativi – riprova più tardi (max. 1 ora)"));
         else setLoginErr(L("Ungültiger Code oder PIN","Código o PIN incorrectos","Invalid code or PIN","Codice o PIN non corretti"));
       }
     } finally { setLoginBusy(false); }
@@ -1951,7 +1954,7 @@ export default function PatjacCarPlay(){
           ):(
             <>
               <CPField label={`${t.pin} (4 dígitos)`}>
-                <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••••" type="password" inputMode="numeric" autoComplete="off" maxLength={6} style={{textAlign:"center",fontSize:28,letterSpacing:10}}/>
+                <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••" type="password" inputMode="numeric" autoComplete="off" maxLength={6} style={{textAlign:"center",fontSize:28,letterSpacing:10}}/>
               </CPField>
             </>
           )}
@@ -4074,6 +4077,10 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
             </CPField>
             <CPField label={L("CHF pro Stunde","CHF por hora","CHF per hour","CHF all'ora")}><CPInput type="number" value={form.price||""} onChange={e=>setForm(f=>({...f,price:parseFloat(e.target.value)||""}))} placeholder="z.B. 45"/></CPField>
           </div>
+          <CPField label={`🧾 ${L("Mit dem Kunden vereinbarte Stunden pro Einsatz","Horas acordadas con el cliente por trabajo","Hours agreed with the client per job","Ore concordate con il cliente per lavoro")}`}>
+            <CPInput type="number" step="0.25" min="0" value={form.billedHours??""} onChange={e=>{const v=parseFloat(String(e.target.value).replace(",","."));setForm(f=>({...f,billedHours:isNaN(v)?"":v}));}} placeholder={L("z.B. 3","ej. 3","e.g. 3","es. 3")}/>
+            <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:4}}>ℹ️ {L("Wird dem Kunden verrechnet. Die Stunden der Mitarbeiter legen Sie beim Zuweisen des Auftrags fest.","Es lo que se factura al cliente. Las horas de los empleados se ponen al asignar el trabajo.","This is what the client is billed. Employee hours are set when you assign the job.","È ciò che si fattura al cliente. Le ore dei dipendenti si impostano assegnando il lavoro.")}</div>
+          </CPField>
           <CPField label={t.notes}><CPInput value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></CPField>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}>
             <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.cancel}</CPBtn>
@@ -4149,10 +4156,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
     notify(L("Auftrag gelöscht","Trabajo eliminado","Job deleted","Lavoro eliminato"),"success");
   };
 
-  // Employees only see their own jobs
+  // Employees only see their own jobs of today's working day; the administrator sees everything
   const visibleJobs = isAdmin
     ? jobs
-    : jobs.filter(j=>j.employeeId===currentUser?.id);
+    : jobs.filter(j=>j.employeeId===currentUser?.id && j.date===todayStr);
 
   const [jobSearch,setJobSearch] = useState(()=>takePendingSearch("jobs"));
   const ff = visibleJobs
@@ -4161,7 +4168,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
     .sort((a,b)=>`${a.date||""}${a.timeStart||""}`.localeCompare(`${b.date||""}${b.timeStart||""}`));
   const bulk = useBulkSelect();
   // Client price is CHF per hour → job amount = rate × planned hours
-  const withAutoAmount = (f) => ({...f, amount: jobAmountFor(clients.find(c=>c.id===f.clientId), f.timeStart, f.timeEnd)});
+  // amount per person-row = client rate × hours agreed with the client ÷ people (so the visit total is right)
+  const withAutoAmount = (f) => { const c=clients.find(x=>x.id===f.clientId); const rate=parseFloat(c?.price)||0; const n=Math.max(1,(f.employeeIds||[]).length);
+    const ch = Number(f.clientHours)>0 ? Number(f.clientHours) : hoursBetween(f.timeStart,f.timeEnd)*n;
+    return {...f, amount: Math.round(rate*ch/n*100)/100}; };
   // Total work hours are shared between the people on the job: 5 h with 2 people → each works 2.5 h,
   // the job ends earlier, each person is paid (and the client billed) for their share.
   const addHours = (start, h) => { const [hh,mm]=(start||"08:00").split(":").map(Number); const t=Math.round(hh*60+mm+h*60); const m=((t%1440)+1440)%1440; return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`; };
@@ -4430,7 +4440,11 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                   <div style={{color:"#69DB7C",fontSize:12,marginTop:2}}>👥 {L("Team","Equipo","Team","Squadra")} ({team.length}): {team.map(m=>m.employeeName).join(", ")}</div>
                 ):null;})()}
                 {job.description&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{job.description}</div>}
-                <div style={{color:"#FFD43B",fontWeight:700,fontSize:13,marginTop:4}}>CHF {(Number(job.amount)||0).toFixed(2)} <span style={{color:CP.textTertiary,fontWeight:500,fontSize:11}}>({hoursBetween(job.timeStart,job.timeEnd)} h)</span>{job.recurringId&&<span style={{color:"#74C0FC",fontWeight:600,fontSize:11}}> · 🔁</span>}</div>
+                {(()=>{ const team=teamOf(job); const ch=visitClientHours(team); const rate=parseFloat(clients.find(c=>c.id===job.clientId)?.price)||0; return (
+                  <div style={{fontSize:12.5,marginTop:4}}>
+                    <span style={{color:"#FFD43B",fontWeight:700}}>🧾 {L("Kunde","Cliente","Client","Cliente")}: {Math.round(ch*100)/100} h · CHF {(ch*rate).toFixed(2)}</span>
+                    <span style={{color:CP.textTertiary}}> · 👷 {L("Mitarbeiter","Empleado","Employee","Dipendente")}: {hoursBetween(job.timeStart,job.timeEnd)} h</span>
+                  </div>); })()}
                 {bulk.selectMode&&job.recurringId&&(
                   <button type="button" onClick={e=>{e.stopPropagation();const ids=ff.filter(j=>j.recurringId===job.recurringId).map(j=>j.id);bulk.setSelected(prev=>new Set([...prev,...ids]));}} style={{marginTop:6,padding:"3px 10px",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,border:"1px dashed rgba(116,192,252,0.6)",background:"transparent",color:"#74C0FC"}}>
                     🔁 {L("Ganze Serie auswählen","Seleccionar toda la serie","Select whole series","Seleziona tutta la serie")}
@@ -4454,7 +4468,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         <CPModal title={form.id?t.edit:t.newJob||"Neu"} onClose={()=>setModal(null)} width={540}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.clients}>
-              <CPSelect value={form.clientId} onChange={e=>setForm(f=>withAutoAmount({...f,clientId:e.target.value}))}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}{clientAddr(c)?` — ${clientAddr(c)}`:""}</option>)}</CPSelect>
+              <CPSelect value={form.clientId} onChange={e=>{const id=e.target.value;const c=clients.find(x=>x.id===id);setForm(f=>withAutoAmount({...f,clientId:id,clientHours:Number(c?.billedHours)>0?Number(c.billedHours):(f.id?f.clientHours:"")}));}}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}{clientAddr(c)?` — ${clientAddr(c)}`:""}</option>)}</CPSelect>
               {(()=>{const c=clients.find(x=>x.id===form.clientId);const addr=c?`${c.street||""} ${c.number||""}, ${c.postalCode||""} ${c.city||""}`.trim().replace(/^,\s*/,""):"";return addr?(<div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📍 {addr}</div>):null;})()}
             </CPField>
             <CPField label={`${t.employees} (${(form.employeeIds||[]).length})`}>
@@ -4492,12 +4506,13 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.service||"Service"}><CPSelect value={form.serviceType} onChange={e=>setForm(f=>({...f,serviceType:e.target.value}))}><option value="cleaning">{t.cleaning}</option><option value="gardening">{t.gardening}</option><option value="other">{t.other}</option></CPSelect></CPField>
-            <CPField label={L("Betrag CHF","Importe CHF","Amount CHF","Importo CHF")}>
-              <CPInput type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:parseFloat(e.target.value)||""}))}/>
-              {(()=>{const c=clients.find(x=>x.id===form.clientId);const rate=parseFloat(c?.price)||0;const h=hoursBetween(form.timeStart,form.timeEnd);
+            <CPField label={`🧾 ${L("Stunden für den Kunden","Horas a facturar al cliente","Hours billed to client","Ore da fatturare al cliente")}`}>
+              <CPInput type="number" step="0.25" min="0" value={form.clientHours??""} onChange={e=>{const v=parseFloat(String(e.target.value).replace(",","."));setForm(f=>withAutoAmount({...f,clientHours:isNaN(v)?"":v}));}}
+                placeholder={String(Math.round(hoursBetween(form.timeStart,form.timeEnd)*teamSize(form)*100)/100)}/>
+              {(()=>{const c=clients.find(x=>x.id===form.clientId);const rate=parseFloat(c?.price)||0;const n=teamSize(form);const ch=Number(form.clientHours)>0?Number(form.clientHours):Math.round(hoursBetween(form.timeStart,form.timeEnd)*n*100)/100;
                 return rate
-                  ? <div style={{color:"#74C0FC",fontSize:11,marginTop:4}}>CHF {rate.toFixed(2)}/h × {h} h = CHF {(rate*h).toFixed(2)} {L("pro Person","por persona","per person","per persona")}
-                      {(form.employeeIds||[]).length>1&&<div style={{color:"#FFD43B",fontWeight:700}}>{L("Total Kunde","Total cliente","Client total","Totale cliente")}: {Math.round(h*(form.employeeIds||[]).length*100)/100} h × CHF {rate.toFixed(2)} = CHF {((form.employeeIds||[]).length*rate*h).toFixed(2)}</div>}
+                  ? <div style={{color:"#FFD43B",fontSize:11.5,marginTop:4,fontWeight:700}}>{L("Kunde","Cliente","Client","Cliente")}: {ch} h × CHF {rate.toFixed(2)} = CHF {(ch*rate).toFixed(2)}
+                      <div style={{color:CP.textTertiary,fontWeight:500}}>👷 {L("Mitarbeiter","Empleados","Employees","Dipendenti")}: {Math.round(hoursBetween(form.timeStart,form.timeEnd)*n*100)/100} h ({n} × {hoursBetween(form.timeStart,form.timeEnd)} h)</div>
                     </div>
                   : <div style={{color:"#FFA94D",fontSize:11,marginTop:4}}>{L("Kunde hat keinen Stundensatz","El cliente no tiene precio por hora","Client has no hourly rate","Il cliente non ha tariffa oraria")}</div>;})()}
             </CPField>
@@ -4510,7 +4525,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             <>
               <CPField label={L("Wiederholung","Repetición","Repeat","Ripetizione")}>
                 <CPSelect value={form.recurrence||"once"} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))}>
-                  <option value="once">{t.perService}</option>
+                  <option value="once">{L("Einmalig","Una vez","Once","Una volta")}</option>
                   <option value="weekly">{t.weekly}</option>
                   <option value="monthly">{t.monthlyContract}</option>
                 </CPSelect>
@@ -4751,9 +4766,10 @@ const computeBillingDue = (clients, jobs, invoices, today=ymd(new Date())) => {
       else if(mode==="week"){ [from,to]=invWeekRange(j.date); key=from; }
       else { [from,to]=invMonthRange(j.date.slice(0,7)); key=from.slice(0,7); }
       if(mode!=="job" && today<to) return;               // week / month not finished yet
-      const g = groups[key] || (groups[key]={clientId:c.id, clientName:c.name, mode, from, to, hours:0, jobIds:[]});
-      g.hours += hoursBetween(j.timeStart,j.timeEnd); g.jobIds.push(j.id);
+      const g = groups[key] || (groups[key]={clientId:c.id, clientName:c.name, mode, from, to, hours:0, jobIds:[], visits:{}});
+      const vk = j.teamId||j.id; (g.visits[vk]=g.visits[vk]||[]).push(j); g.jobIds.push(j.id);
     });
+    Object.values(groups).forEach(g=>{ g.hours = Object.values(g.visits).reduce((s,rows)=>s+visitClientHours(rows),0); delete g.visits; });
     Object.values(groups).forEach(g=>{ g.hours=Math.round(g.hours*100)/100; g.amount=Math.round(g.hours*(parseFloat(c.price)||0)*100)/100; g.key=`${c.id}_${g.mode}_${g.from}`; g.today = g.mode==="job" ? g.from===today : g.to===today; out.push(g); });
   });
   let dismissed={}; try{ dismissed=JSON.parse(localStorage.getItem("patjac_billing_dismissed")||"{}"); }catch(e){}
@@ -4765,7 +4781,7 @@ function BillingDuePanel({due, lang, onIssue, compact}){
   due = due.filter(g=>!hidden[g.key]);
   if(!due.length) return null;
   const dismiss = (g) => { try{ const d=JSON.parse(localStorage.getItem("patjac_billing_dismissed")||"{}"); d[g.key]=1; localStorage.setItem("patjac_billing_dismissed",JSON.stringify(d)); }catch(e){} setHidden(h=>({...h,[g.key]:1})); };
-  const modeTxt = m => m==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):m==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile");
+  const modeTxt = m => m==="job"?L("Pro Auftrag","Por trabajo","Per job","Per lavoro"):m==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile");
   const list = compact ? due.slice(0,5) : due;
   return (
     <CPCard style={{marginBottom:14,border:"1px solid rgba(250,176,5,.45)",background:"rgba(250,176,5,.08)"}}>
@@ -4840,7 +4856,7 @@ const uploadInvoicePdf = async (blob, path) => {
 function InvoiceDocument({inv, client, cs, lang}){
   const L = makeL(lang);
   const fm = n => Number(n||0).toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const modeLabel = inv.billingMode==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):inv.billingMode==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):inv.billingMode==="month"?L("Monatlich","Mensual","Monthly","Mensile"):"";
+  const modeLabel = inv.billingMode==="job"?L("Pro Auftrag","Por trabajo","Per job","Per lavoro"):inv.billingMode==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):inv.billingMode==="month"?L("Monatlich","Mensual","Monthly","Mensile"):"";
   const addr = client ? [`${client.street||""} ${client.number||""}`.trim(), `${client.postalCode||""} ${client.city||""}`.trim()].filter(Boolean) : [];
   const th = {padding:"7px 8px",textAlign:"left",fontWeight:700,fontSize:11};
   const td = {padding:"7px 8px",fontSize:11,borderBottom:"1px solid #e5e7eb",verticalAlign:"top"};
@@ -4946,7 +4962,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
     rows.forEach(j=>{ const k=j.teamId||j.id; const g=map.get(k)||{key:k,ids:[],date:j.date,start:j.timeStart,end:j.timeEnd,service:invSvcId(j.serviceType),hours:0,people:0};
       g.ids.push(j.id); g.hours+=hoursBetween(j.timeStart,j.timeEnd); g.people+=1;
       if((j.timeStart||"")<(g.start||"99")) g.start=j.timeStart; if((j.timeEnd||"")>(g.end||"")) g.end=j.timeEnd; map.set(k,g); });
-    return [...map.values()].map(g=>({...g,hours:r2(g.hours),billed:g.ids.some(id=>billedJobIds.has(id))})).sort((a,b)=>`${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`));
+    return [...map.values()].map(g=>({...g,hours:r2(visitClientHours(rows.filter(j=>g.ids.includes(j.id)))),billed:g.ids.some(id=>billedJobIds.has(id))})).sort((a,b)=>`${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`));
   },[jobs, form.clientId, form.periodFrom, form.periodTo, billedJobIds]);
 
   const buildItems = (mode, groups, selected) => {
@@ -5095,14 +5111,14 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
             </CPSelect>
           </CPField>
           {client&&<div style={{color:clientAddr(client)?CP.textSecondary:"#FF8787",fontSize:12,margin:"-4px 0 4px"}}>📍 {L("Adresse","Dirección","Address","Indirizzo")}: <strong style={{color:clientAddr(client)?"#8CE99A":"#FF8787"}}>{clientAddr(client)||L("fehlt – im Kunden ergänzen","falta: complétala en Clientes","missing – add it in Clients","mancante – aggiungilo nei Clienti")}</strong></div>}
-          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 4px"}}>🧾 {L("Abrechnung des Kunden","Facturación del cliente","Client billing","Fatturazione del cliente")}: <strong style={{color:"#74C0FC"}}>{clientBillingMode(client)==="job"?L("Pro Dienst","Por servicio","Per service","Per servizio"):clientBillingMode(client)==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile")}</strong></div>}
+          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 4px"}}>🧾 {L("Abrechnung des Kunden","Facturación del cliente","Client billing","Fatturazione del cliente")}: <strong style={{color:"#74C0FC"}}>{clientBillingMode(client)==="job"?L("Pro Auftrag","Por trabajo","Per job","Per lavoro"):clientBillingMode(client)==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile")}</strong></div>}
           {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 10px"}}>💶 {L("Preis pro Stunde","Precio por hora","Price per hour","Prezzo orario")}: <strong style={{color:rate?"#69DB7C":"#FF8787"}}>CHF {rate.toFixed(2)}</strong>{!rate&&` — ${L("im Kunden erfassen","añádalo en la ficha del cliente","set it on the client","impostalo nel cliente")}`}</div>}
 
           {/* 2. Billing mode */}
           {form.clientId&&(<>
             <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"4px 0 8px",textTransform:"uppercase",letterSpacing:.5}}>2. {L("Abrechnungsart","Tipo de facturación","Billing type","Tipo di fatturazione")}</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-              {modeBtn("job","🧾",L("Pro Dienst","Por servicio","Per service","Per servizio"),L("Tag des Dienstes","Día del servicio","Day of service","Giorno del servizio"))}
+              {modeBtn("job","🧾",L("Pro Auftrag","Por trabajo","Per job","Per lavoro"),L("Tag des Auftrags","Día del trabajo","Day of the job","Giorno del lavoro"))}
               {modeBtn("week","📅",L("Woche","Semana","Week","Settimana"),L("Mo – So","Lun – Dom","Mon – Sun","Lun – Dom"))}
               {modeBtn("month","🗓️",L("Monat","Mensual","Monthly","Mensile"),L("Ganzer Monat","Mes completo","Whole month","Mese intero"))}
             </div>
