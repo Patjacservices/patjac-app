@@ -140,7 +140,7 @@ const T = {
     notClockedIn:"Nicht eingecheckt",
     swissLegalNotes:"Schweizer Rechtshinweise",
     securityActive:"Sicherheitsstatus: Aktiv",
-    contracts:"Verträge", documents:"Dokumente", newContract:"Neuer Vertrag", contractType:"Vertragsart",
+    contracts:"Verträge", documents:"Dokumente", pricecalc:"Preisrechner", newContract:"Neuer Vertrag", contractType:"Vertragsart",
     clientContract:"Kundenvertrag", employeeContract:"Arbeitsvertrag",
     contractDate:"Vertragsdatum", contractStart:"Beginn", contractEnd:"Ende",
     contractSalary:"Lohn/Tarif", contractHours:"Arbeitsstunden/Woche",
@@ -292,7 +292,7 @@ const T = {
     notClockedIn:"Sin fichar",
     swissLegalNotes:"Notas legales suizas",
     securityActive:"Estado seguridad: Activo",
-    contracts:"Contratos", documents:"Documentos", newContract:"Nuevo contrato", contractType:"Tipo de contrato",
+    contracts:"Contratos", documents:"Documentos", pricecalc:"Calculadora de precios", newContract:"Nuevo contrato", contractType:"Tipo de contrato",
     clientContract:"Contrato cliente", employeeContract:"Contrato laboral",
     contractDate:"Fecha contrato", contractStart:"Inicio", contractEnd:"Fin",
     contractSalary:"Salario/Tarifa", contractHours:"Horas semanales",
@@ -443,7 +443,7 @@ const T = {
     notClockedIn:"Not clocked in",
     swissLegalNotes:"Swiss Legal Notes",
     securityActive:"Security status: Active",
-    contracts:"Contracts", documents:"Documents", newContract:"New Contract", contractType:"Contract type",
+    contracts:"Contracts", documents:"Documents", pricecalc:"Price calculator", newContract:"New Contract", contractType:"Contract type",
     clientContract:"Client contract", employeeContract:"Employment contract",
     contractDate:"Contract date", contractStart:"Start", contractEnd:"End",
     contractSalary:"Salary/Rate", contractHours:"Weekly hours",
@@ -594,7 +594,7 @@ const T = {
     notClockedIn:"Non timbrato",
     swissLegalNotes:"Note legali svizzere",
     securityActive:"Stato sicurezza: Attivo",
-    contracts:"Contratti", documents:"Documenti", newContract:"Nuovo contratto", contractType:"Tipo contratto",
+    contracts:"Contratti", documents:"Documenti", pricecalc:"Calcolatore prezzi", newContract:"Nuovo contratto", contractType:"Tipo contratto",
     clientContract:"Contratto cliente", employeeContract:"Contratto di lavoro",
     contractDate:"Data contratto", contractStart:"Inizio", contractEnd:"Fine",
     contractSalary:"Salario/Tariffa", contractHours:"Ore settimanali",
@@ -1110,6 +1110,7 @@ const APPS = [
   {id:"inventory", icon:"📦", color:"#6741D9"},
   {id:"contracts", icon:"📝", color:"#0B7285"},
   {id:"documents", icon:"📁", color:"#1098AD"},
+  {id:"pricecalc", icon:"🧮", color:"#2C5F7C"},
 ];
 
 // ─── CSS CONSTANTS ───────────────────────────────────────────
@@ -1939,6 +1940,7 @@ export default function PatjacCarPlay(){
       case "payroll":    return <PayrollApp {...props} lang={lang}/>;
       case "inventory":  return <InventoryApp {...props} lang={lang}/>;
       case "documents":  return <DocumentsApp {...props} lang={lang} currentUser={currentUser} contracts={contracts} companySettings={companySettings}/>;
+      case "pricecalc":  return currentUser?.role==="admin" ? <PriceCalculatorApp {...props} lang={lang}/> : null;
       case "contracts":  return <ContractsApp {...props} lang={lang} currentUser={currentUser} contracts={contracts} setContracts={dbSetContracts}/>;
       default: return null;
     }
@@ -10463,6 +10465,153 @@ const computeSpesen = async (emp, month, year, jobs, clients) => {
   saveSpesen(emp.id,year,month,total);
   return total;
 };
+
+// ─── PRICE CALCULATOR (admin) — same rates & hour estimates as the website calculator ───
+const PRICE_RATE = { clean: 40, garden: 65, repair: 65 };          // CHF per hour (Tarife 2026)
+const PRICE_CLEAN_H = [2, 2.5, 3, 4, 5];                           // regular cleaning, hours per visit
+const PRICE_DEEP_H  = [3, 4, 5, 6.5, 8];                           // one-off deep cleaning
+const PRICE_MOVE_H  = [6, 8, 10, 13, 16];                          // move-out cleaning
+const PRICE_GARDEN_H = [[2, 3], [4, 6], [7, 10]];
+const PRICE_REPAIR_H = [[1, 1], [2, 3], [4, 6]];
+const priceRateOf = s => s <= 2 ? PRICE_RATE.clean : s === 3 ? PRICE_RATE.garden : PRICE_RATE.repair;
+const priceChf = n => "CHF " + (Math.round(n / 5) * 5).toLocaleString("de-CH");
+function priceCompute(svc, size){
+  if(svc <= 2){
+    const rate = PRICE_RATE.clean;
+    const h = (svc === 0 ? PRICE_CLEAN_H : svc === 1 ? PRICE_DEEP_H : PRICE_MOVE_H)[Math.min(size, 4)];
+    return { lo: h * rate, hi: h * 1.25 * rate, h: [h, Math.round(h * 1.25 * 2) / 2], per: svc === 0, mat: false, rate };
+  }
+  const r = (svc === 3 ? PRICE_GARDEN_H : PRICE_REPAIR_H)[Math.min(size, 2)], rate = priceRateOf(svc);
+  return { lo: r[0] * rate, hi: r[1] * rate, h: r, per: false, mat: svc === 4, rate };
+}
+
+function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
+  const L = makeL(lang);
+  const [svc,setSvc] = useState(0);
+  const [size,setSize] = useState(2);
+  const [freq,setFreq] = useState(1);
+  const [clientId,setClientId] = useState("");
+  if(currentUser?.role!=="admin") return null;
+
+  const SVCS = [
+    {ic:"🧹", acc:"#1C7ED6", name:L("Regelmässige Reinigung","Limpieza regular","Regular cleaning","Pulizia regolare"), hint:L("Wohnung & Büro","Hogar y oficina","Home & office","Casa e ufficio")},
+    {ic:"✨", acc:"#1C7ED6", name:L("Einmalige Grundreinigung","Limpieza única / a fondo","One-off / deep cleaning","Pulizia unica / a fondo"), hint:L("Einmalige Reinigung","Limpieza única","One-off cleaning","Pulizia unica")},
+    {ic:"📦", acc:"#1C7ED6", name:L("Umzugsreinigung","Limpieza de mudanza","Move-out cleaning","Pulizia di trasloco"), hint:L("Mit Abnahmegarantie","Con garantía de entrega","With handover guarantee","Con garanzia di consegna")},
+    {ic:"🌿", acc:"#2F9E44", name:L("Gartenpflege","Jardinería","Garden care","Giardinaggio"), hint:L("Gartenpflege","Cuidado del jardín","Garden care","Cura del giardino")},
+    {ic:"🔧", acc:"#F08C00", name:L("Kleine Reparaturen","Pequeñas reparaciones","Small repairs","Piccole riparazioni"), hint:L("Montagen & Reparaturen","Montajes y arreglos","Assembly & fixes","Montaggi e riparazioni")},
+  ];
+  const ROOMS = L(
+    ["1–1.5 Zimmer","2–2.5 Zimmer","3–3.5 Zimmer","4–4.5 Zimmer","5 und mehr Zimmer"],
+    ["1–1.5 habitaciones","2–2.5 habitaciones","3–3.5 habitaciones","4–4.5 habitaciones","5 o más habitaciones"],
+    ["1–1.5 rooms","2–2.5 rooms","3–3.5 rooms","4–4.5 rooms","5+ rooms"],
+    ["1–1.5 locali","2–2.5 locali","3–3.5 locali","4–4.5 locali","5 o più locali"]);
+  const GARDEN = L(
+    ["Kleiner Garten (bis 100 m²)","Mittlerer Garten (100–300 m²)","Grosser Garten (über 300 m²)"],
+    ["Jardín pequeño (hasta 100 m²)","Jardín mediano (100–300 m²)","Jardín grande (más de 300 m²)"],
+    ["Small garden (up to 100 m²)","Medium garden (100–300 m²)","Large garden (over 300 m²)"],
+    ["Giardino piccolo (fino a 100 m²)","Giardino medio (100–300 m²)","Giardino grande (oltre 300 m²)"]);
+  const REPAIR = L(
+    ["Kleiner Auftrag (≈1 Std.)","Mittlerer Auftrag (2–3 Std.)","Grosser Auftrag (4–6 Std.)"],
+    ["Trabajo pequeño (≈1 h)","Trabajo mediano (2–3 h)","Trabajo grande (4–6 h)"],
+    ["Small job (≈1 h)","Medium job (2–3 h)","Large job (4–6 h)"],
+    ["Lavoro piccolo (≈1 h)","Lavoro medio (2–3 h)","Lavoro grande (4–6 h)"]);
+  const FREQS = L(["Wöchentlich","Alle 2 Wochen","Monatlich"],["Semanal","Cada 2 semanas","Mensual"],["Weekly","Every 2 weeks","Monthly"],["Settimanale","Ogni 2 settimane","Mensile"]);
+  const VISITS_PER_MONTH = [4.33, 2.17, 1];
+
+  const sizes = svc <= 2 ? ROOMS : svc === 3 ? GARDEN : REPAIR;
+  const sz = Math.min(size, sizes.length - 1);
+  const r = priceCompute(svc, sz);
+  const priceTxt = r.lo === r.hi ? priceChf(r.lo) : priceChf(r.lo) + " – " + priceChf(r.hi).replace("CHF ", "");
+  const hTxt = r.h[0] === r.h[1] ? String(r.h[0]) : r.h[0] + "–" + r.h[1];
+  const monthTxt = svc === 0 ? priceChf(r.lo * VISITS_PER_MONTH[freq]) + " – " + priceChf(r.hi * VISITS_PER_MONTH[freq]).replace("CHF ", "") : "";
+  const incl = [
+    L("Gratis Besichtigung vor Ort","Visita gratis a domicilio","Free on-site visit","Sopralluogo gratuito"),
+    L("Kostenlose, unverbindliche Offerte","Presupuesto gratuito y sin compromiso","Free, no-obligation quote","Preventivo gratuito e senza impegno"),
+    ...(svc === 2 ? [L("Abnahmegarantie bei der Wohnungsabgabe","Garantía de entrega del piso","Apartment handover guarantee","Garanzia di consegna dell'appartamento")] : []),
+    L("Schnelle Antwort per WhatsApp","Respuesta rápida por WhatsApp","Fast reply via WhatsApp","Risposta rapida via WhatsApp"),
+  ];
+
+  const client = (clients||[]).find(c=>c.id===clientId);
+  const greet = client ? `${L("Guten Tag","Hola","Hello","Buongiorno")} ${client.name},` : `${L("Guten Tag","Hola","Hello","Buongiorno")},`;
+  const msg = `${greet}\n\n${L("Gerne senden wir Ihnen unseren Richtpreis","Le enviamos nuestro precio orientativo","Here is our indicative price","Le inviamo il nostro prezzo indicativo")}:\n`+
+    `• ${SVCS[svc].name} – ${sizes[sz]}${svc===0?` (${FREQS[freq]})`:""}\n`+
+    `• ${L("Ca.","Aprox.","Approx.","Ca.")} ${hTxt} h × CHF ${r.rate}.–${r.mat?" "+L("+ Material","+ material","+ materials","+ materiale"):""}\n`+
+    `• ${L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")}${r.per?" "+L("pro Einsatz","por visita","per visit","per intervento"):""}: ${priceTxt}\n`+
+    (svc===0?`• ${L("Pro Monat ca.","Al mes aprox.","Per month approx.","Al mese ca.")}: ${monthTxt}\n`:"")+
+    `\n${L("Den genauen Preis bestätigen wir nach der kostenlosen Besichtigung.","El precio final lo confirmamos tras la visita gratis.","We confirm the final price after the free visit.","Il prezzo finale lo confermiamo dopo il sopralluogo gratuito.")}\n\n`+
+    `${L("Freundliche Grüsse","Saludos cordiales","Kind regards","Cordiali saluti")}\nPatjac Reinigung Garten & Services\n${COMPANY_EMAIL}`;
+  const waNum = (()=>{ let d=String(client?.phone||"").replace(/[^\d+]/g,""); if(d.startsWith("+")) d=d.slice(1); else if(d.startsWith("00")) d=d.slice(2); else if(d.startsWith("0")) d="41"+d.slice(1); return /^\d{8,15}$/.test(d)?d:""; })();
+  const copy = () => { try{ navigator.clipboard.writeText(msg); notify&&notify(L("Kopiert","Copiado","Copied","Copiato"),"success"); }catch(e){} };
+
+  const opt = (active, acc) => ({border:`1.5px solid ${active?(acc||"#2C5F7C"):CP.border}`,background:active?(acc||"#2C5F7C"):"rgba(255,255,255,.05)",color:"#fff",borderRadius:999,padding:"9px 14px",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:CP.font});
+  const step = (n,label) => (
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+      <span style={{width:26,height:26,borderRadius:"50%",background:"#2C5F7C",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13}}>{n}</span>
+      <span style={{color:CP.textSecondary,fontSize:12,fontWeight:800,letterSpacing:.5,textTransform:"uppercase"}}>{label}</span>
+    </div>
+  );
+  const abtn = bg => ({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"11px 12px",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
+
+  return (
+    <CPScreen title={t.pricecalc||"Calculadora de precios"} icon="🧮" onBack={onBack} t={t}>
+      <CPCard style={{marginBottom:12}}>
+        {step(1,L("Leistung","Servicio","Service","Servizio"))}
+        <div data-testid="pc-svcs" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
+          {SVCS.map((s,i)=>(
+            <button key={i} onClick={()=>setSvc(i)} aria-pressed={svc===i} style={{textAlign:"left",border:`1.5px solid ${svc===i?s.acc:CP.border}`,background:svc===i?"rgba(255,255,255,.09)":"rgba(255,255,255,.03)",boxShadow:svc===i?`0 0 0 3px ${s.acc}44`:"none",borderRadius:14,padding:"10px 12px",cursor:"pointer",color:"#fff",fontFamily:CP.font,display:"flex",flexDirection:"column",gap:4}}>
+              <span style={{fontSize:22}}>{s.ic}</span>
+              <span style={{fontWeight:800,fontSize:13.5,lineHeight:1.2}}>{s.name}</span>
+              <span style={{color:CP.textTertiary,fontSize:11.5}}>{s.hint}</span>
+              <span style={{color:s.acc,fontSize:12,fontWeight:800}}>{L("ab","desde","from","da")} CHF {priceRateOf(i)}.–/h</span>
+            </button>
+          ))}
+        </div>
+      </CPCard>
+      <CPCard style={{marginBottom:12}}>
+        {step(2,L("Grösse","Tamaño","Size","Dimensione"))}
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {sizes.map((x,i)=><button key={i} onClick={()=>setSize(i)} style={opt(sz===i)}>{x}</button>)}
+        </div>
+        {svc===0&&(<div style={{marginTop:14}}>
+          {step(3,L("Häufigkeit","Frecuencia","Frequency","Frequenza"))}
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {FREQS.map((x,i)=><button key={i} onClick={()=>setFreq(i)} style={opt(freq===i)}>{x}</button>)}
+          </div>
+        </div>)}
+      </CPCard>
+
+      <div style={{background:"linear-gradient(160deg,#2c5f7c 0%,#173a4d 100%)",borderRadius:CP.radius,padding:"18px 20px",color:"#fff",marginBottom:12}}>
+        <span style={{display:"inline-block",background:"rgba(255,255,255,.14)",border:"1px solid rgba(255,255,255,.25)",borderRadius:999,padding:"3px 10px",fontSize:12,fontWeight:700}}>✓ {L("Unverbindlich","Sin compromiso","No obligation","Senza impegno")}</span>
+        <div style={{fontSize:12,fontWeight:800,letterSpacing:.6,textTransform:"uppercase",opacity:.85,marginTop:10}}>{L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")} · {r.per?L("pro Einsatz","por visita","per visit","per intervento"):L("Gesamtpreis","precio total","total price","prezzo totale")}</div>
+        <div data-testid="pc-price" style={{fontSize:34,fontWeight:800,lineHeight:1.15,margin:"4px 0 10px"}}>{priceTxt}</div>
+        <div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.14)"}}>
+          <span>{L("Berechnung","Cálculo","Calculation","Calcolo")}</span>
+          <b data-testid="pc-break">{hTxt} h × CHF {r.rate}.–{r.mat?" "+L("+ Material","+ material","+ materials","+ materiale"):""}</b>
+        </div>
+        {svc===0&&<div data-testid="pc-month" style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.14)",marginTop:6}}>
+          <span>{L("Pro Monat ca.","Al mes aprox.","Per month approx.","Al mese ca.")} ({FREQS[freq]})</span><b>{monthTxt}</b>
+        </div>}
+        <div style={{fontSize:12,fontWeight:800,letterSpacing:.6,textTransform:"uppercase",opacity:.8,margin:"12px 0 6px"}}>{L("In Ihrer Offerte enthalten","Incluido en tu presupuesto","Included in your quote","Incluso nel preventivo")}</div>
+        {incl.map((x,i)=><div key={i} style={{fontSize:13.5,display:"flex",gap:8,marginBottom:4}}><span style={{color:"#8ed3a6"}}>✓</span>{x}</div>)}
+        <div style={{fontSize:12,opacity:.8,marginTop:8}}>{L("Richtpreis gemäss unseren Ansätzen. Den genauen Preis bestätigen wir nach der kostenlosen Besichtigung.","Precio orientativo según nuestras tarifas. El precio final lo confirmamos tras la visita gratis.","Indicative price based on our rates. We confirm the final price after the free visit.","Prezzo indicativo secondo le nostre tariffe. Il prezzo finale lo confermiamo dopo il sopralluogo gratuito.")}</div>
+        <div style={{fontSize:11,opacity:.6,marginTop:4}}>{L("Tarife 2026 · Preise in CHF","Tarifas 2026 · precios en CHF","2026 rates · prices in CHF","Tariffe 2026 · prezzi in CHF")}</div>
+      </div>
+
+      <CPCard style={{marginBottom:20}}>
+        <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14,marginBottom:8}}>📤 {L("Richtpreis an Kunden senden","Enviar precio al cliente","Send price to client","Invia prezzo al cliente")}</div>
+        <CPSelect value={clientId} onChange={e=>setClientId(e.target.value)} style={{marginBottom:10}}>
+          <option value="">{L("— Kunde wählen (optional) —","— Elegir cliente (opcional) —","— Choose client (optional) —","— Scegli cliente (facoltativo) —")}</option>
+          {(clients||[]).filter(c=>c.active!==false).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </CPSelect>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
+          <a href={`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer" style={abtn("#25D366")}>💬 WhatsApp{waNum?` → ${client.phone}`:""}</a>
+          <button onClick={copy} style={abtn("rgba(255,255,255,.14)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
+        </div>
+        <CompanyEmailButtons to={client?.email||""} subject={`${L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")} – ${SVCS[svc].name} – Patjac`} body={msg} lang={lang}/>
+      </CPCard>
+    </CPScreen>
+  );
+}
 
 function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,companySettings,currentUser,notify,onBack}){
   const L = makeL(lang);
