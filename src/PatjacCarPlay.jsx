@@ -6390,243 +6390,123 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
 }
 
 // ─── ROUTES ──────────────────────────────────────────────────
-function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
+function RoutesApp({t,jobs,clients,employees=[],notify,onBack,lang,currentUser}){
   const L = makeL(lang);
-  const [navigating,setNavigating] = useState(null); // job.id being navigated
+  const isAdmin = currentUser?.role==="admin";
+  const [day,setDay] = useState(todayStr);                       // employees: always today
+  const [empSel,setEmpSel] = useState(isAdmin ? "" : currentUser?.id);
+  const [legs,setLegs] = useState({});                            // job.id -> {km, approx} from previous stop
+  const showDay = isAdmin ? day : todayStr;
+  const dayLong = (()=>{ const d=new Date(showDay+"T12:00:00"); const s=d.toLocaleDateString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}); return s.charAt(0).toUpperCase()+s.slice(1); })();
+  const addrOf = job => { const c=clients.find(x=>x.id===job.clientId); return c ? fmtAddr(c) : (job.clientAddress||""); };
 
-  // Filter today's jobs; employees see only their own
-  const allToday = jobs
-    .filter(j=>j.date===todayStr)
-    .sort((a,b)=>(a.timeStart||"").localeCompare(b.timeStart||""));
-  const tj = currentUser?.role==="employee"
-    ? allToday.filter(j=>j.employeeId===currentUser?.id)
-    : allToday;
+  // Only the jobs still to be done that day (no cancelled / no-show), in time order
+  const dayJobs = jobs.filter(j=>j.date===showDay && j.status!=="cancelled" && jobStatus(j)!=="noshow");
+  const mine = isAdmin ? (empSel ? dayJobs.filter(j=>j.employeeId===empSel) : dayJobs) : dayJobs.filter(j=>j.employeeId===currentUser?.id);
+  const byTime = (a,b)=>`${a.timeStart||""}`.localeCompare(`${b.timeStart||""}`) || (a.clientName||"").localeCompare(b.clientName||"");
+  const todo = mine.filter(j=>jobStatus(j)!=="completed").sort(byTime);
+  const done = mine.filter(j=>jobStatus(j)==="completed").sort(byTime);
+  const empsThatDay = isAdmin ? employees.filter(e=>dayJobs.some(j=>j.employeeId===e.id)) : [];
+  const canRoute = !isAdmin || !!empSel || empsThatDay.length<=1;
 
-  const getAddr = (job) => {
-    const c = clients.find(x=>x.id===job.clientId);
-    if(c) return `${c.street} ${c.number}, ${c.postalCode} ${c.city}`;
-    return job.clientAddress || "Zürich";
+  // Distance from the previous stop (driving km, cached)
+  useEffect(()=>{
+    if(!canRoute){ setLegs({}); return; }
+    let alive=true;
+    (async()=>{
+      const out={};
+      for(let i=1;i<todo.length;i++){
+        const a=addrOf(todo[i-1]), b=addrOf(todo[i]); if(!a||!b) continue;
+        const r=await routeKm(a,b); if(!alive) return;
+        if(r){ out[todo[i].id]=r; setLegs(x=>({...x,[todo[i].id]:r})); }
+      }
+    })();
+    return ()=>{ alive=false; };
+  },[todo.map(j=>j.id+addrOf(j)).join("|"), canRoute]);
+
+  const navTo = addr => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`,"_blank","noopener");
+  // Whole day in Google Maps: starts at the phone's current position, stops in time order
+  const openFullRoute = () => {
+    const stops = todo.map(addrOf).filter(Boolean);
+    if(!stops.length){ notify(L("Keine offenen Adressen für diesen Tag","No hay direcciones pendientes este día","No pending addresses for this day","Nessun indirizzo per questo giorno"),"warning"); return; }
+    const dest = encodeURIComponent(stops[stops.length-1]);
+    const wps = stops.slice(0,-1).map(encodeURIComponent).join("|");
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}${wps?`&waypoints=${wps}`:""}&travelmode=driving`,"_blank","noopener");
   };
 
-  // Build Google Maps navigation URL for a specific job
-  const buildNavUrl = (job) => {
-    const dest = encodeURIComponent(getAddr(job));
-    // Use current location as origin → destination
-    return `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
-  };
-
-  // Open navigation for a job
-  const startNavigation = (job) => {
-    setNavigating(job.id);
-    const url = buildNavUrl(job);
-    window.open(url, "_blank");
-    notify(
-      `🗺️ ${L("Navigation gestartet zu","Navegación iniciada hacia","Navigation started to","Navigazione avviata verso")} ${job.clientName}`,
-      "success"
+  const chip = on => ({padding:"6px 12px",borderRadius:16,border:`1px solid ${on?CP.accent:CP.borderActive}`,background:on?CP.accent:"#fff",color:on?"#fff":CP.textPrimary,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:CP.font});
+  const stopCard = (job, n, isDone) => {
+    const addr = addrOf(job), leg = legs[job.id];
+    const st = jobStatus(job);
+    return (
+      <div key={job.id}>
+        {leg&&!isDone&&<div style={{display:"flex",alignItems:"center",gap:8,color:CP.textSecondary,fontSize:12.5,margin:"0 0 6px 18px"}}>
+          <span style={{width:2,height:18,background:CP.borderActive,display:"inline-block"}}/>🚗 {leg.approx?"≈ ":""}{leg.km} km {L("vom vorherigen Kunden","desde el cliente anterior","from the previous client","dal cliente precedente")}
+        </div>}
+        <CPCard style={{opacity:isDone?0.6:1,border:`1px solid ${st==="inProgress"?CP.accent:CP.border}`}}>
+          <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+            <div style={{width:38,height:38,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,
+              background:isDone?"#0f7b0f":st==="inProgress"?CP.accent:"#fff",color:isDone||st==="inProgress"?"#fff":CP.textPrimary,border:isDone||st==="inProgress"?"none":`2px solid ${CP.accent}`}}>{isDone?"✓":n}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:CP.accent,fontWeight:800,fontSize:18,lineHeight:1.1}}>🕐 {job.timeStart||"--:--"}{job.timeEnd?` – ${job.timeEnd}`:""}</div>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16,marginTop:4}}>{job.clientName}</div>
+              {addr
+                ? <div style={{color:CP.textSecondary,fontSize:13.5,marginTop:2}}>📍 {addr}</div>
+                : <div style={{color:"#c42b1c",fontSize:13,marginTop:2}}>📍 {L("Kunde ohne Adresse","Cliente sin dirección","Client without address","Cliente senza indirizzo")}</div>}
+              <div style={{color:CP.textTertiary,fontSize:12,marginTop:2}}>📅 {fmtDate(job.date)}{isAdmin&&job.employeeName?` · 👤 ${job.employeeName}`:""}{st==="inProgress"?` · ${t.inProgress}`:""}</div>
+            </div>
+          </div>
+          {!isDone&&addr&&<div style={{display:"flex",gap:8,marginTop:12}}>
+            <button onClick={()=>navTo(addr)} style={{flex:1,padding:"11px 14px",background:CP.accent,border:"none",borderRadius:8,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:CP.font}}>🚗 {L("Hierhin navigieren","Ir aquí","Navigate here","Naviga qui")}</button>
+            <button onClick={()=>{ try{navigator.clipboard.writeText(addr);}catch(e){} notify(`📋 ${L("Adresse kopiert","Dirección copiada","Address copied","Indirizzo copiato")}`,"info"); }} style={{padding:"11px 14px",background:"#fff",border:`1px solid ${CP.borderActive}`,borderRadius:8,color:CP.textPrimary,fontSize:14,cursor:"pointer"}} title={L("Adresse kopieren","Copiar dirección","Copy address","Copia indirizzo")}>📋</button>
+          </div>}
+        </CPCard>
+      </div>
     );
   };
 
-  // Build full-day optimised route in Google Maps
-  const openFullRoute = () => {
-    if(tj.length===0) return;
-    const origin = encodeURIComponent("Industriestrasse 14, 8004 Zürich");
-    const waypoints = tj.slice(0,-1).map(j=>encodeURIComponent(getAddr(j))).join("|");
-    const dest = encodeURIComponent(getAddr(tj[tj.length-1]));
-    const url = waypoints
-      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&waypoints=${waypoints}&travelmode=driving`
-      : `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
-    window.open(url, "_blank");
-    notify(L("Gesamtroute in Google Maps geöffnet","Ruta completa abierta en Google Maps","Full route opened in Google Maps","Percorso completo aperto in Google Maps"),"success");
-  };
-
-  const statusColor = (s) => s==="completed"?"green":s==="inProgress"?"blue":"yellow";
-  const statusLabel = (s) => s==="completed"?t.completed:s==="inProgress"?t.inProgress:t.pending;
-
   return (
-    <CPScreen title={t.routes} icon="🗺️" onBack={onBack} t={t}
-      actions={
-        <CPBtn onClick={openFullRoute} size="sm" variant="primary">
-          🗺️ {L("Gesamtroute","Ruta completa","Full route","Percorso completo")}
-        </CPBtn>
-      }
-    >
-      {/* Start point + summary */}
-      <div style={{
-        background:"rgba(28,126,214,0.1)",border:"1px solid rgba(28,126,214,0.25)",
-        borderRadius:14,padding:"12px 16px",marginBottom:16,
-        display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,
-      }}>
-        <div style={{color:"#0067c0",fontSize:13}}>
-          📍 <strong>Industriestrasse 14, 8004 Zürich</strong>
-          <span style={{color:CP.textSecondary,marginLeft:8}}>→ {tj.length} Stops</span>
+    <CPScreen title={t.routes} icon="🗺️" onBack={onBack} t={t}>
+      {/* Day header */}
+      <div style={{marginBottom:12}}>
+        <div style={{color:CP.textPrimary,fontSize:22,fontWeight:700}}>📅 {dayLong}</div>
+        <div style={{color:CP.textSecondary,fontSize:13.5,marginTop:2}}>
+          {todo.length} {L("Kunden zu besuchen","clientes por visitar","clients to visit","clienti da visitare")}{done.length?` · ✓ ${done.length} ${L("erledigt","hechos","done","fatti")}`:""} · {L("nach Uhrzeit geordnet","ordenados por hora","ordered by time","ordinati per ora")}
         </div>
-        <button onClick={openFullRoute} style={{
-          background:"linear-gradient(90deg,#1C7ED6,#0CA678)",border:"none",
-          borderRadius:10,color:"#fff",padding:"8px 16px",cursor:"pointer",
-          fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:6,
-          fontFamily:CP.font,boxShadow:"0 4px 16px rgba(28,126,214,0.4)",
-        }}>
-          🚗 {L("Alle Stops in Google Maps","Todos en Google Maps","All stops in Google Maps","Tutti in Google Maps")}
-        </button>
       </div>
-
-      {/* Job cards with navigation */}
-      <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
-        {tj.length===0&&(
-          <CPCard style={{textAlign:"center",padding:"32px 20px"}}>
-            <div style={{fontSize:40,marginBottom:10}}>🗺️</div>
-            <div style={{color:CP.textTertiary,fontSize:14}}>{t.noRecords}</div>
-          </CPCard>
-        )}
-        {tj.map((job,idx)=>{
-          const addr = getAddr(job);
-          const isNav = navigating===job.id;
-          return (
-            <CPCard key={job.id} style={{
-              border:isNav?"2px solid rgba(28,126,214,0.6)":"1px solid rgba(0,0,0,0.042)",
-              background:isNav?"rgba(28,126,214,0.08)":"rgba(0,0,0,0.021)",
-            }}>
-              {/* Stop number + client info */}
-              <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
-                <div style={{
-                  width:38,height:38,borderRadius:"50%",flexShrink:0,
-                  background:job.status==="completed"?"#2F9E44":job.status==="inProgress"?CP.accent:"rgba(0,0,0,0.105)",
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                  color:(job.status==="completed"?"#2F9E44":job.status==="inProgress")?"#fff":CP.textPrimary,fontWeight:700,fontSize:16,
-                  boxShadow:job.status==="inProgress"?`0 0 12px rgba(28,126,214,0.5)`:"none",
-                }}>{idx+1}</div>
-
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:6}}>
-                    <div>
-                      <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16}}>{job.clientName}</div>
-                      <div style={{
-                        color:"#0067c0",fontSize:13,marginTop:3,
-                        display:"flex",alignItems:"center",gap:4,
-                      }}>
-                        📍 {addr}
-                      </div>
-                      <div style={{color:CP.textTertiary,fontSize:12,marginTop:3}}>
-                        🕐 {job.timeStart}–{job.timeEnd}
-                        {job.employeeName&&currentUser?.role==="admin"&&(
-                          <span style={{marginLeft:8}}>· {job.employeeName}</span>
-                        )}
-                      </div>
-                    </div>
-                    <CPBadge text={statusLabel(jobStatus(job))} color={statusColor(jobStatus(job))}/>
-                  </div>
-                </div>
-              </div>
-
-              {/* Navigation buttons row */}
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-
-                {/* 🚗 Start navigation button */}
-                <button onClick={()=>startNavigation(job)} style={{
-                  flex:1,minWidth:140,
-                  padding:"11px 14px",
-                  background:isNav
-                    ?"linear-gradient(90deg,rgba(28,126,214,0.9),rgba(12,166,120,0.9))"
-                    :"rgba(28,126,214,0.85)",
-                  border:"none",borderRadius:12,
-                  color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",
-                  display:"flex",alignItems:"center",justifyContent:"center",gap:7,
-                  transition:"all .2s",fontFamily:CP.font,
-                  boxShadow:"0 4px 14px rgba(28,126,214,0.4)",
-                }}
-                  onMouseEnter={e=>e.currentTarget.style.transform="scale(1.02)"}
-                  onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
-                >
-                  🚗 {isNav
-                    ? L("Navigation läuft…","Navegando…","Navigating…","Navigando…")
-                    : L("Navigation starten","Iniciar navegación","Start navigation","Avvia navigazione")}
-                </button>
-
-                {/* 🗺️ Open in Google Maps (address only) */}
-                <button onClick={()=>{
-                  const url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
-                  window.open(url,"_blank");
-                }} style={{
-                  padding:"11px 14px",
-                  background:"rgba(0,0,0,0.035)",
-                  border:"1px solid rgba(0,0,0,0.105)",
-                  borderRadius:12,color:CP.textSecondary,fontWeight:600,fontSize:13,
-                  cursor:"pointer",display:"flex",alignItems:"center",gap:6,
-                  transition:"all .2s",fontFamily:CP.font,
-                }}
-                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(0,0,0,0.098)";e.currentTarget.style.color="#fff";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(0,0,0,0.049)";e.currentTarget.style.color=CP.textSecondary;}}
-                  title={L("Adresse in Google Maps anzeigen","Ver dirección en Google Maps","View address in Google Maps","Visualizza indirizzo in Google Maps")}
-                >
-                  🗺️ Maps
-                </button>
-
-                {/* 📋 Copy address */}
-                <button onClick={()=>{
-                  try{ navigator.clipboard.writeText(addr); }catch(e){}
-                  notify(
-                    `📋 ${L("Adresse kopiert","Dirección copiada","Address copied","Indirizzo copiato")}: ${addr}`,
-                    "info"
-                  );
-                }} style={{
-                  padding:"11px 14px",
-                  background:"rgba(0,0,0,0.035)",
-                  border:"1px solid rgba(0,0,0,0.105)",
-                  borderRadius:12,color:CP.textSecondary,fontWeight:600,fontSize:13,
-                  cursor:"pointer",display:"flex",alignItems:"center",gap:6,
-                  transition:"all .2s",fontFamily:CP.font,
-                }}
-                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(0,0,0,0.098)";e.currentTarget.style.color="#fff";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(0,0,0,0.049)";e.currentTarget.style.color=CP.textSecondary;}}
-                  title={L("Adresse kopieren","Copiar dirección","Copy address","Copia indirizzo")}
-                >
-                  📋
-                </button>
-              </div>
-
-              {/* Navigation active indicator */}
-              {isNav&&(
-                <div style={{
-                  marginTop:10,padding:"8px 12px",
-                  background:"rgba(12,166,120,0.1)",border:"1px solid rgba(12,166,120,0.3)",
-                  borderRadius:10,display:"flex",alignItems:"center",gap:8,
-                }}>
-                  <div style={{
-                    width:8,height:8,borderRadius:"50%",background:"#0CA678",
-                    boxShadow:"0 0 8px rgba(12,166,120,0.8)",
-                    animation:"pulse 1s infinite",
-                  }}/>
-                  <span style={{color:"#107c10",fontSize:12,fontWeight:600}}>
-                    {L("Google Maps geöffnet – Navigation läuft","Google Maps abierto – Navegando","Google Maps opened – Navigating","Google Maps aperto – Navigazione attiva")}
-                  </span>
-                  <button onClick={()=>setNavigating(null)} style={{
-                    marginLeft:"auto",background:"none",border:"none",
-                    color:CP.textTertiary,cursor:"pointer",fontSize:12,
-                  }}>✕</button>
-                </div>
-              )}
-            </CPCard>
-          );
-        })}
-      </div>
-
-      {/* Quick tip */}
-      {tj.length>0&&(
-        <div style={{
-          background:"rgba(240,140,0,0.08)",border:"1px solid rgba(240,140,0,0.2)",
-          borderRadius:12,padding:"10px 14px",fontSize:12,color:"#9a5b00",
-        }}>
-          💡 {L(
-            "Tipp: '🚗 Navigation starten' öffnet Google Maps mit Echtzeit-Navigation direkt zum Kundenstandort.",
-            "Consejo: '🚗 Iniciar navegación' abre Google Maps con navegación en tiempo real hasta la ubicación del cliente.",
-            "Tip: '🚗 Start navigation' opens Google Maps with real-time navigation directly to the client location.",
-            "Suggerimento: '🚗 Avvia navigazione' apre Google Maps con navigazione in tempo reale verso la sede del cliente."
-          )}
+      {isAdmin&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            <button style={chip(day===todayStr)} onClick={()=>setDay(todayStr)}>{L("Heute","Hoy","Today","Oggi")}</button>
+            <button style={chip(day===ymd(new Date(Date.now()+86400000)))} onClick={()=>setDay(ymd(new Date(Date.now()+86400000)))}>{L("Morgen","Mañana","Tomorrow","Domani")}</button>
+            <input type="date" value={day} onChange={e=>e.target.value&&setDay(e.target.value)} style={{padding:"5px 10px",borderRadius:8,border:`1px solid ${CP.borderActive}`,fontFamily:CP.font,fontSize:13,background:"#fff",color:CP.textPrimary}}/>
+          </div>
+          {empsThatDay.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {empsThatDay.length>1&&<button style={chip(!empSel)} onClick={()=>setEmpSel("")}>{L("Alle","Todos","All","Tutti")}</button>}
+            {empsThatDay.map(e=><button key={e.id} style={chip(empSel===e.id)} onClick={()=>setEmpSel(e.id)}>👤 {e.name}</button>)}
+          </div>}
         </div>
       )}
+      {todo.length>0&&(canRoute
+        ? <button onClick={openFullRoute} style={{width:"100%",padding:"13px 16px",marginBottom:14,background:"#0f7b0f",border:"none",borderRadius:10,color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:CP.font}}>🗺️ {L("Ganze Route des Tages in Google Maps","Ruta completa del día en Google Maps","Whole day route in Google Maps","Percorso completo del giorno in Google Maps")} ({todo.length})</button>
+        : <div style={{color:CP.textSecondary,fontSize:12.5,marginBottom:12}}>ℹ️ {L("Wählen Sie einen Mitarbeiter, um seine Route zu sehen.","Elige un empleado para ver su ruta del día.","Choose an employee to see their route.","Scegli un dipendente per vedere il suo percorso.")}</div>)}
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+        {todo.map((job,i)=>stopCard(job,i+1,false))}
+        {todo.length===0&&(
+          <CPCard style={{textAlign:"center",padding:"30px 20px"}}>
+            <div style={{fontSize:40,marginBottom:8}}>🗺️</div>
+            <div style={{color:CP.textSecondary,fontSize:14}}>{done.length?L("Alle Kunden dieses Tages sind erledigt 👍","Todos los clientes del día están hechos 👍","All clients of the day are done 👍","Tutti i clienti del giorno sono fatti 👍"):L("Keine Aufträge an diesem Tag","No hay trabajos este día","No jobs on this day","Nessun lavoro in questo giorno")}</div>
+          </CPCard>
+        )}
+      </div>
+      {done.length>0&&<>
+        <div style={{color:CP.textSecondary,fontSize:13,fontWeight:600,margin:"4px 0 8px"}}>✓ {L("Bereits erledigt","Ya realizados","Already done","Già fatti")}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>{done.map(job=>stopCard(job,0,true))}</div>
+      </>}
     </CPScreen>
   );
 }
+
 
 // ─── REPORTS ─────────────────────────────────────────────────
 function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timeclock,companySettings,products=[],setProducts,suppliers=[]}){
