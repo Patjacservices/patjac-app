@@ -5178,7 +5178,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
   // Patjac is not VAT-registered (turnover < CHF 100'000): invoices are issued without VAT.
   const calc=(items)=>{const s=items.reduce((a,i)=>a+(Number(i.total)||0),0);return{s:s.toFixed(2),v:(0).toFixed(2),t:s.toFixed(2)};};
   const sc=(s)=>s==="paid"?"green":s==="overdue"?"red":"yellow";
-  const sl=(s)=>s==="paid"?t.paid:s==="overdue"?t.overdue:t.pending;
+  const sl=(s)=>s==="paid"?L("Bezahlt","Pagado","Paid","Pagato"):s==="overdue"?t.overdue:L("Zu bezahlen","Por pagar","To be paid","Da pagare");
   const r2 = n => Math.round(n*100)/100;
 
   // ── Automatic calculation from the jobs ─────────────────────
@@ -5324,7 +5324,9 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
             {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <CPBtn onClick={()=>openPreview(inv)} variant="primary" size="sm">📤 {L("Senden","Enviar","Send","Invia")}</CPBtn>
               <CPBtn onClick={()=>openPreview(inv)} variant="secondary" size="sm">👁️</CPBtn>
-              {inv.status!=="paid"&&<CPBtn onClick={()=>{setInvoices(p=>p.map(i=>i.id===inv.id?{...i,status:"paid"}:i));notify(t.paid,"success");}} variant="success" size="sm">✓ {t.paid}</CPBtn>}
+              {inv.status==="paid"
+                ? <CPBtn onClick={()=>{setInvoices(p=>p.map(i=>i.id===inv.id?{...i,status:"pending"}:i));notify(L("Wieder als offen markiert","Marcada otra vez como por pagar","Marked as unpaid again","Segnata di nuovo da pagare"),"warning");}} variant="success" size="sm" style={{minWidth:118,justifyContent:"center"}}>✅ {L("Bezahlt","Pagado","Paid","Pagato")}</CPBtn>
+                : <CPBtn onClick={()=>{setInvoices(p=>p.map(i=>i.id===inv.id?{...i,status:"paid"}:i));notify(`✅ ${inv.invoiceNumber} · ${L("Bezahlt","Pagado","Paid","Pagato")}`,"success");}} variant="danger" size="sm" style={{minWidth:118,justifyContent:"center"}}>💳 {L("Zu bezahlen","Por pagar","To be paid","Da pagare")}</CPBtn>}
               <CPBtn onClick={()=>{setForm({...inv,items:(inv.items||[]).map(i=>({_k:gid(),service:i.service||"cleaning",detail:i.detail??i.description??"",...i})),_sel:[],_manual:true});setSelInv(inv.id);setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>
               <CPBtn onClick={()=>setDeleteInvId(inv.id)} variant="danger" size="sm">🗑️</CPBtn>
             </div>}
@@ -7957,6 +7959,23 @@ const ACADEMY_COURSES_V2 = [
       "EN": "🎓 PATJAC ACADEMY\nHere you learn your job: cleaning, garden and safety.\n• Tap a course → read the lesson → «Mark as Complete».\n• At the end there is a short quiz. Don't worry – you can repeat it.\n\n⭐ THE 8 GOLDEN RULES\n1. Be on time. Running late? Tell us in the chat right away.\n2. Always clock in and out at the client's place.\n3. Never give your PIN to anyone.\n4. Wear protective clothing (gloves, shoes).\n5. Never mix cleaning products.\n6. Report damage right away with a photo – being honest is always better.\n7. Be friendly and respect the client's privacy.\n8. Questions? Ask! The company is happy to help.\n\n❓ PROBLEM WITH THE APP?\n• Reload the page (pull down or tap ⟳).\n• Log out and log in again with your PIN.\n• Still not working? Tell the company in the chat or by phone.",
       "IT": "🎓 PATJAC ACADEMY\nQui impari il tuo mestiere: pulizie, giardino e sicurezza.\n• Tocca un corso → leggi la lezione → «Segna come completata».\n• Alla fine c'è un piccolo quiz. Tranquillo/a: puoi ripeterlo.\n\n⭐ LE 8 REGOLE D'ORO\n1. Sii puntuale. In ritardo? Avvisa subito nella chat.\n2. Timbra sempre sul posto dal cliente, in entrata e in uscita.\n3. Non dare a nessuno il tuo PIN.\n4. Indossa gli indumenti protettivi (guanti, scarpe).\n5. Non mescolare mai i prodotti di pulizia.\n6. Segnala subito un danno con una foto: essere onesti è sempre meglio.\n7. Sii gentile e rispetta la privacy del cliente.\n8. Hai dubbi? Chiedi! L'azienda ti aiuta volentieri.\n\n❓ PROBLEMI CON L'APP?\n• Ricarica la pagina (scorri verso il basso o tocca ⟳).\n• Esci e rientra con il tuo PIN.\n• Se non funziona ancora, avvisa l'azienda nella chat o per telefono."
      }
+    },
+    {
+     "id": "ac7l7",
+     "titleKey": {
+      "DE": "7. Neu in der App",
+      "ES": "7. Novedades de la app",
+      "EN": "7. What's new in the app",
+      "IT": "7. Novità dell'app"
+     },
+     "done": false,
+     "illustrationKey": "app_phone",
+     "contentKey": {
+      "ES": "🪟 NUEVO ASPECTO\n• La app ahora es clara, con el logo de Patjac arriba en el centro.\n• Abajo tienes 4 botones: 🏠 Inicio, ⏱️ Fichaje, 📋 Trabajos y 💬 Mensajes.\n\n🗺️ TU RUTA DEL DÍA\n• Toca 🗺️ «Rutas». Ves la fecha de hoy y SOLO tus clientes de hoy, en orden de hora (1, 2, 3…).\n• Entre un cliente y otro ves los km en coche.\n• «🚗 Ir aquí» te lleva con Google Maps. «Ruta completa del día» pone todas las paradas en orden.\n\n⏰ LLEGA A TIEMPO Y FICHA\n• Ficha la entrada en cuanto llegues al cliente.\n• Si 15 minutos después de la hora no has fichado, la empresa recibe un aviso y puede enviar a un compañero.\n• Si no llegas en todo el horario, el trabajo se cierra como «No se presentó» y esas horas no se pagan.\n\n🔄 SI TE TOCA REEMPLAZAR A ALGUIEN\n• Recibes un mensaje: «🔄 Nuevo trabajo para ti» con la hora y la dirección.\n• Ve lo antes posible y ficha al llegar. El trabajo ya aparece en tus Trabajos y Rutas.\n\n📷 FOTOS Y VÍDEOS EN EL CHAT\n• En 💬 Mensajes puedes enviar fotos 🖼️ o grabar un vídeo 🎬. La app los hace pequeños sola.\n\n📱 TU TELÉFONO\n• La app solo funciona en el teléfono que activaste con tu código. Si cambias de teléfono, pide un código nuevo a la empresa.\n• Sábado desde las 12:00, domingos y festivos de Zúrich la app está cerrada.",
+      "DE": "🪟 NEUES AUSSEHEN\n• Die App ist jetzt hell, das Patjac-Logo oben in der Mitte.\n• Unten 4 Knöpfe: 🏠 Start, ⏱️ Zeit, 📋 Aufträge, 💬 Nachrichten.\n\n🗺️ IHRE ROUTE DES TAGES\n• 🗺️ «Routen»: das heutige Datum und NUR Ihre Kunden von heute, nach Uhrzeit (1, 2, 3 …), mit km dazwischen.\n• «🚗 Hierhin navigieren» öffnet Google Maps.\n\n⏰ PÜNKTLICH UND EINSTEMPELN\n• Stempeln Sie ein, sobald Sie beim Kunden sind.\n• 15 Minuten nach Beginn ohne Einstempeln erhält die Firma eine Warnung und kann jemand anderen schicken.\n• Kommen Sie gar nicht, wird der Auftrag als «Nicht erschienen» geschlossen und nicht bezahlt.\n\n🔄 ALS ERSATZ\n• Sie erhalten die Nachricht «🔄 Neuer Auftrag für Sie» mit Zeit und Adresse. Bitte sofort hinfahren.\n\n📷 FOTOS UND VIDEOS IM CHAT\n• In 💬 Nachrichten können Sie Fotos und Videos senden.",
+      "EN": "🪟 NEW LOOK\n• The app is now light, with the Patjac logo at the top centre. 4 buttons at the bottom: 🏠 Home, ⏱️ Clock, 📋 Jobs, 💬 Messages.\n\n🗺️ YOUR ROUTE OF THE DAY\n• 🗺️ «Routes»: today's date and ONLY your clients of today, in time order, with km between them. «🚗 Navigate here» opens Google Maps.\n\n⏰ BE ON TIME AND CLOCK IN\n• Clock in as soon as you arrive. 15 minutes after the start without clocking in, the company is warned and may send a colleague.\n• If you never arrive, the job is closed as «No-show» and not paid.\n\n🔄 AS A REPLACEMENT\n• You get the message «🔄 New job for you» with time and address. Please go straight away.\n\n📷 PHOTOS AND VIDEOS IN THE CHAT\n• In 💬 Messages you can send photos and videos.",
+      "IT": "🪟 NUOVO ASPETTO\n• L'app ora è chiara, con il logo Patjac in alto al centro. In basso 4 pulsanti: 🏠 Inizio, ⏱️ Presenze, 📋 Lavori, 💬 Messaggi.\n\n🗺️ IL TUO PERCORSO DEL GIORNO\n• 🗺️ «Percorsi»: la data di oggi e SOLO i tuoi clienti di oggi, in ordine di ora, con i km tra loro.\n\n⏰ PUNTUALITÀ\n• Timbra appena arrivi. 15 minuti dopo l'inizio senza timbrare, l'azienda viene avvisata e può mandare un collega.\n• Se non arrivi, il lavoro si chiude come «Assente» e non viene pagato.\n\n🔄 COME SOSTITUTO\n• Ricevi il messaggio «🔄 Nuovo lavoro per te» con ora e indirizzo.\n\n📷 FOTO E VIDEO NELLA CHAT\n• In 💬 Messaggi puoi inviare foto e video."
+     }
     }
    ],
    "quiz": [
@@ -8182,10 +8201,10 @@ const ACADEMY_COURSES_V2 = [
    "illustrationKey": "management_invoice",
    "adminOnly": true,
    "titleKey": {
-    "DE": "Patjac Business Suite — Administratorhandbuch v3",
-    "ES": "Patjac Business Suite — Manual del Administrador v3",
-    "EN": "Patjac Business Suite — Administrator Guide v3",
-    "IT": "Patjac Business Suite — Guida Amministratore v3"
+    "DE": "Patjac Business Suite — Administratorhandbuch v4",
+    "ES": "Patjac Business Suite — Manual del Administrador v4",
+    "EN": "Patjac Business Suite — Administrator Guide v4",
+    "IT": "Patjac Business Suite — Guida Amministratore v4"
    },
    "descKey": {
     "DE": "Aktualisiert mit allen Neuheiten: wiederkehrende Aufträge, Teams mit Stundenaufteilung, Preis pro Stunde, Lohnabrechnung 2026 mit Quellensteuer-Liste, Monatsrapport mit Kilometern, Verträge mit Rechte-&-Pflichten-Seite, Rechnungen ohne MwSt., Lieferanten & Inventar, Standort beim Stempeln, Erinnerungen und automatischer Zugangsversand.",
@@ -8285,6 +8304,23 @@ const ACADEMY_COURSES_V2 = [
       "ES": "⏱️ FICHAJE\n🔹 Los empleados fichan entrada y salida en cada cliente. Las horas se calculan solas.\n🔹 Como administrador: elige arriba el empleado para ver sus fichajes.\n\n📍 UBICACIONES (contra fraudes)\n🔹 Pestaña «📍 Ubicaciones»: dirección al fichar entrada y al fichar salida, con la distancia hasta la dirección del cliente.\n🔹 Verde = estaba en el cliente · Amarillo/rojo = estaba lejos. En ese caso, pregunta.\n🔹 Puedes filtrar por empleado.\n\n💬 MENSAJES\n🔹 Chat con cada empleado, con fotos (de la galería o de la cámara).\n🔹 🔔 Permite las notificaciones para que los mensajes nuevos salgan al momento.\n🔹 ⏰ Aviso automático al empleado 1 hora antes de cada trabajo.\n🔹 🧹 Cada domingo a las 12:00 se borran todos los mensajes automáticamente.\n\n🛡️ CONSEJOS\n🔹 Los empleados solo ven sus propios datos: trabajos, fichajes y nómina.\n🔹 A cada empleado nuevo, pídele que haga el curso «Guía de la app para empleados» de la Academy.",
       "EN": "⏱️ TIME CLOCK\n🔹 Employees clock in and out per client. Hours are calculated automatically.\n🔹 As admin: choose the employee at the top to see their records.\n\n📍 LOCATIONS (anti-fraud)\n🔹 «📍 Locations» tab: address at clock-in and clock-out, with distance to the client address.\n🔹 Green = at the client · Yellow/red = far away → ask.\n🔹 Filter by employee.\n\n💬 MESSAGES\n🔹 Chat with each employee, with photos (gallery or camera).\n🔹 🔔 Allow notifications so new messages appear immediately.\n🔹 ⏰ Automatic reminder to the employee 1 hour before each job.\n🔹 🧹 Every Sunday at 12:00 all messages are deleted automatically.\n\n🛡️ TIPS\n🔹 Employees only see their own data (jobs, clock records, pay).\n🔹 Ask every new employee to take the «App guide for employees» course in the Academy.",
       "IT": "⏱️ TIMBRATURE\n🔹 I dipendenti timbrano entrata e uscita per ogni cliente. Le ore sono calcolate automaticamente.\n🔹 Come admin: scegli il dipendente in alto per vedere le sue timbrature.\n\n📍 POSIZIONI (antifrode)\n🔹 Scheda «📍 Posizioni»: indirizzo all'entrata e all'uscita, con distanza dall'indirizzo del cliente.\n🔹 Verde = dal cliente · Giallo/rosso = lontano → chiedi.\n🔹 Filtro per dipendente.\n\n💬 MESSAGGI\n🔹 Chat con ogni dipendente, con foto (galleria o fotocamera).\n🔹 🔔 Consenti le notifiche per vedere subito i nuovi messaggi.\n🔹 ⏰ Promemoria automatico al dipendente 1 ora prima di ogni lavoro.\n🔹 🧹 Ogni domenica alle 12:00 tutti i messaggi vengono cancellati automaticamente.\n\n🛡️ CONSIGLI\n🔹 I dipendenti vedono solo i propri dati (lavori, timbrature, stipendio).\n🔹 Chiedi a ogni nuovo dipendente di seguire il corso «Guida all'app per dipendenti» nell'Academy."
+     }
+    },
+    {
+     "id": "ac6l6",
+     "titleKey": {
+      "DE": "Neuheiten Oktober 2026",
+      "ES": "Novedades de octubre 2026",
+      "EN": "What's new – October 2026",
+      "IT": "Novità ottobre 2026"
+     },
+     "done": false,
+     "illustrationKey": "management_customer",
+     "contentKey": {
+      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.",
+      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.",
+      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.",
+      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca."
      }
     }
    ],
@@ -9142,6 +9178,9 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
 // ─── HELP MODAL ──────────────────────────────────────────────
 function HelpModal({t, lang, onClose}){
   const [activeSection, setActiveSection] = useState("overview");
+  const [q, setQ] = useState("");
+  const [focusItem, setFocusItem] = useState(null);
+  const mob = useIsMobile();
   const L = makeL(lang);
 
   const SECTIONS = [
@@ -9160,6 +9199,7 @@ function HelpModal({t, lang, onClose}){
     {id:"contracts",  icon:"📝", label:{DE:"Verträge",         ES:"Contratos",       EN:"Contracts",      IT:"Contratti"}},
     {id:"reports",    icon:"📈", label:{DE:"Berichte",         ES:"Informes",        EN:"Reports",        IT:"Rapporti"}},
     {id:"academy",    icon:"🎓", label:{DE:"Academy",          ES:"Academy",         EN:"Academy",        IT:"Academy"}},
+    {id:"pricecalc",  icon:"🧮", label:{DE:"Preisrechner",     ES:"Calculadora de precios", EN:"Price calculator", IT:"Calcolatore prezzi"}},
     {id:"settings",   icon:"⚙️", label:{DE:"Einstellungen",   ES:"Configuración",   EN:"Settings",       IT:"Impostazioni"}},
   ];
 
@@ -9168,6 +9208,9 @@ function HelpModal({t, lang, onClose}){
       icon:"🏠",
       title:{DE:"Patjac Business Suite – Übersicht",ES:"Patjac Business Suite – Visión general",EN:"Patjac Business Suite – Overview",IT:"Patjac Business Suite – Panoramica"},
       items:[
+        {h:{"DE": "🆕 Neuheiten (Oktober 2026)", "ES": "🆕 Novedades (octubre 2026)", "EN": "🆕 What's new (October 2026)", "IT": "🆕 Novità (ottobre 2026)"},
+          b:{"ES": "🪟 Nuevo diseño estilo Windows 11: logo en el centro arriba, menú a la izquierda (ordenador) o barra abajo (móvil).\n🧮 Calculadora de precios con las tarifas de la página web.\n❌ Trabajos «No se presentó» y reemplazo por el empleado más cercano.\n🗺️ Rutas: solo los clientes del día, por hora.\n🧾 Facturas: botón rojo «Por pagar» → verde «Pagado».\n🔍 Esta ayuda tiene ahora un buscador arriba.\n🎓 Todo está explicado también en Patjac Academy (Manual del Administrador v4 y Guía de la app para empleados).", "DE": "🪟 Neues Windows-11-Design.\n🧮 Preisrechner.\n❌ «Nicht erschienen» und Ersatz durch nächsten Mitarbeiter.\n🗺️ Routen nur des Tages, nach Uhrzeit.\n🧾 Rechnungen: rot «Zu bezahlen» → grün «Bezahlt».\n🔍 Suche in dieser Hilfe.\n🎓 Alles auch in der Patjac Academy.", "EN": "🪟 New Windows 11 design.\n🧮 Price calculator.\n❌ «No-show» jobs and replacement by the nearest employee.\n🗺️ Routes: only the day's clients, in time order.\n🧾 Invoices: red «To be paid» → green «Paid».\n🔍 Search in this help.\n🎓 Everything is also in Patjac Academy.", "IT": "🪟 Nuovo design Windows 11.\n🧮 Calcolatore prezzi.\n❌ Lavori «Assente» e sostituzione con il più vicino.\n🗺️ Percorsi: solo i clienti del giorno, per ora.\n🧾 Fatture: rosso «Da pagare» → verde «Pagato».\n🔍 Ricerca in questo aiuto.\n🎓 Tutto anche in Patjac Academy."}},
+
         {
           h:{DE:"Was ist Patjac Business Suite?",ES:"¿Qué es Patjac Business Suite?",EN:"What is Patjac Business Suite?",IT:"Cos'è Patjac Business Suite?"},
           b:{DE:"Patjac Business Suite ist die zentrale Verwaltungsanwendung für Patjac Reinigung Garten & Services – entwickelt für den Schweizer Markt.\n\nAlle Unternehmensfunktionen in einer App:\n• 👥 Kundenverwaltung\n• 📋 Auftragsplanung & -verfolgung\n• 👤 Mitarbeiterverwaltung mit Schweizer Lohnabrechnung\n• 🧾 Swiss QR-Rechnungen\n• 💰 Finanzen, Steuern & Berichte\n• ⏱️ Zeiterfassung\n• 💬 Interner Chat\n• 🗺️ Tagesrouten\n• 📦 Lagerverwaltung & Bestellungen\n• 📝 Verträge (Kunden & Mitarbeiter)\n• 🎓 Patjac Academy\n• 📊 Berichte & Statistiken",
@@ -9238,6 +9281,9 @@ function HelpModal({t, lang, onClose}){
       icon:"📋",
       title:{DE:"Aufträge & Arbeitsplanung",ES:"Trabajos y planificación",EN:"Jobs & Work Planning",IT:"Lavori e pianificazione"},
       items:[
+        {h:{"DE": "❌ Mitarbeiter erscheint nicht / ersetzen", "ES": "❌ Empleado que no se presenta / reemplazar", "EN": "❌ Employee no-show / replace", "IT": "❌ Dipendente assente / sostituire"},
+          b:{"ES": "⚠️ 15 min después del inicio sin fichar: aviso naranja grande en el trabajo.\n\n1. Pulsa «🔄 Reemplazar por el empleado más cercano».\n2. La lista está ordenada por distancia al cliente (posición de hoy o domicilio). Ves si alguien ya tiene trabajo a esa hora.\n3. Pulsa «Asignar»: el trabajo pasa al nuevo empleado y recibe un mensaje al momento. Queda anotado quién faltó.\n\n💡 El botón 🔄 está también en cualquier trabajo que aún no empezó.\n\n❌ Si termina la hora y nadie llegó: el trabajo se cierra solo como «NO SE PRESENTÓ» (0 h pagadas, no se cobra al cliente) y aparece en «Completados».", "DE": "⚠️ 15 Min. nach Beginn ohne Einstempeln: grosse orange Warnung.\n\n1. «🔄 Durch nächsten Mitarbeiter ersetzen» drücken.\n2. Liste nach Entfernung zum Kunden sortiert.\n3. «Zuweisen»: der neue Mitarbeiter erhält sofort eine Nachricht.\n\n❌ Ist die Zeit vorbei und niemand kam: automatisch «NICHT ERSCHIENEN» (0 Std., nicht verrechnet).", "EN": "⚠️ 15 min after the start without clock-in: big orange warning.\n\n1. Press «🔄 Replace with the nearest employee».\n2. The list is sorted by distance to the client.\n3. «Assign»: the new employee is messaged immediately.\n\n❌ When the time is over and nobody came: closed automatically as «NO-SHOW» (0 h, not billed).", "IT": "⚠️ 15 min dopo l'inizio senza timbratura: grande avviso arancione.\n\n1. Premi «🔄 Sostituisci con il più vicino».\n2. Lista ordinata per distanza dal cliente.\n3. «Assegna»: il nuovo dipendente riceve subito un messaggio.\n\n❌ Finito l'orario senza nessuno: chiuso come «ASSENTE» (0 h, non fatturato)."}},
+
         {
           h:{DE:"Auftrag erstellen",ES:"Crear un trabajo",EN:"Creating a Job",IT:"Creare un lavoro"},
           b:{DE:"1. App 'Aufträge' öffnen → '＋ Neuer Auftrag'\n2. Kunde wählen (Dropdown)\n3. Mitarbeiter zuweisen\n4. Datum + Startzeit + Endzeit\n5. Dienstleistungsart + Beschreibung\n6. Preis in CHF\n7. Status: Ausstehend (Standard)\n8. Speichern\n\nAuftragsablauf:\n🟡 Ausstehend → ▶ starten → 🔵 In Bearbeitung → ✓ abschliessen → 🟢 Abgeschlossen\n\n✅ Abschluss registriert automatisch den Einnahmebetrag in den Finanzen.",
@@ -9301,6 +9347,9 @@ function HelpModal({t, lang, onClose}){
       icon:"🧾",
       title:{DE:"Rechnungen & Swiss QR",ES:"Facturas y Swiss QR",EN:"Invoices & Swiss QR",IT:"Fatture e Swiss QR"},
       items:[
+        {h:{"DE": "💳 Zu bezahlen / ✅ Bezahlt", "ES": "💳 Por pagar / ✅ Pagado", "EN": "💳 To be paid / ✅ Paid", "IT": "💳 Da pagare / ✅ Pagato"},
+          b:{"ES": "🔹 Cada factura tiene un botón ROJO «💳 Por pagar».\n🔹 Cuando el cliente paga, tócalo: cambia a VERDE «✅ Pagado».\n🔹 Si te equivocaste, toca el botón verde y vuelve a «Por pagar».", "DE": "🔹 Jede Rechnung hat einen ROTEN Knopf «💳 Zu bezahlen». Nach Zahlung antippen → GRÜN «✅ Bezahlt». Nochmals antippen macht es rückgängig.", "EN": "🔹 Each invoice has a RED «💳 To be paid» button. When paid, tap it → GREEN «✅ Paid». Tap again to undo.", "IT": "🔹 Ogni fattura ha un pulsante ROSSO «💳 Da pagare». Quando è pagata, toccalo → VERDE «✅ Pagato». Tocca di nuovo per annullare."}},
+
         {
           h:{DE:"Rechnung erstellen",ES:"Crear una factura",EN:"Creating an Invoice",IT:"Creare una fattura"},
           b:{DE:"1. App 'Rechnungen' → '＋ Rechnung erstellen'\n2. Kunden wählen\n3. Rechnungsnummer (auto generiert: 2024-001)\n4. Datum + Fälligkeitsdatum (Standard 14 Tage)\n5. Positionen hinzufügen:\n   • Beschreibung, Menge, CHF/Einheit\n   • Total wird automatisch berechnet\n   • '＋ Position' für weitere Zeilen\n6. MWST 8.1% wird automatisch addiert\n7. Speichern\n\nVorschau: 👁️ Button → Swiss QR-Rechnung mit:\n• Firmenkopf mit Logo\n• Kundenadresse\n• Positionen, Subtotal, MWST, Total\n• Swiss QR-Zahlungsschein mit IBAN\n\n📧 Rechnung per E-Mail senden möglich.",
@@ -9371,6 +9420,9 @@ function HelpModal({t, lang, onClose}){
       icon:"🗺️",
       title:{DE:"Routen & Tagesplanung",ES:"Rutas y planificación diaria",EN:"Routes & Daily Planning",IT:"Percorsi e pianificazione giornaliera"},
       items:[
+        {h:{"DE": "🗺️ Route des Tages (neu)", "ES": "🗺️ Ruta del día (nuevo)", "EN": "🗺️ Route of the day (new)", "IT": "🗺️ Percorso del giorno (nuovo)"},
+          b:{"ES": "🔹 Arriba la fecha del día. Solo aparecen los clientes por visitar ese día, numerados y ordenados por hora.\n🔹 Entre un cliente y otro: km en coche.\n🔹 «🚗 Ir aquí» abre Google Maps hasta ese cliente; «Ruta completa del día» pone todas las paradas en orden desde donde estás.\n🔹 Los trabajos hechos pasan abajo («Ya realizados»). No salen los cancelados ni los «No se presentó».\n🔹 Administrador: elige Hoy / Mañana / otra fecha y el empleado.", "DE": "🔹 Datum oben. Nur die Kunden des Tages, nummeriert und nach Uhrzeit, mit km dazwischen.\n🔹 «🚗 Hierhin navigieren» / «Ganze Route» öffnen Google Maps.\n🔹 Administrator: Tag und Mitarbeiter wählen.", "EN": "🔹 Date at the top. Only that day's clients, numbered and in time order, with km between them.\n🔹 «🚗 Navigate here» / «Whole day route» open Google Maps.\n🔹 Administrator: choose the day and the employee.", "IT": "🔹 Data in alto. Solo i clienti del giorno, numerati e in ordine di ora, con i km tra loro.\n🔹 «🚗 Naviga qui» / «Percorso completo» aprono Google Maps.\n🔹 Amministratore: scegli giorno e dipendente."}},
+
         {
           h:{DE:"Tagesroute planen & optimieren",ES:"Planificar y optimizar la ruta del día",EN:"Planning & Optimising the Daily Route",IT:"Pianificare e ottimizzare il percorso giornaliero"},
           b:{DE:"1. App 'Routen' öffnen\n2. Alle heutigen Aufträge werden chronologisch gelistet\n3. Jeder Auftrag zeigt: Kunde, vollständige Adresse, Uhrzeit, Mitarbeiter\n4. Status: Ausstehend 🟡 / In Bearbeitung 🔵 / Abgeschlossen 🟢\n5. '🗺️ Route optimieren' Button → Aufträge nach Nähe sortiert\n\nStartpunkt: Industriestrasse 14, 8004 Zürich (Firmensitz)\n\nKarte: Zeigt alle Stops der Tagesroute in der Zürich Region\n\n💡 Geografisch sinnvolle Auftragsplanung reduziert Fahrzeit!",
@@ -9458,6 +9510,15 @@ function HelpModal({t, lang, onClose}){
       ]
     },
 
+    pricecalc: {
+      icon:"🧮",
+      title:{DE:"Preisrechner",ES:"Calculadora de precios",EN:"Price calculator",IT:"Calcolatore prezzi"},
+      items:[
+        {h:{"DE": "Richtpreis berechnen und senden", "ES": "Calcular y enviar un precio orientativo", "EN": "Calculate and send an indicative price", "IT": "Calcolare e inviare un prezzo indicativo"},
+          b:{"ES": "1. Abre 🧮 «Calculadora de precios» (solo administrador).\n2. Elige el servicio: limpieza regular, a fondo, mudanza (desde CHF 40/h), jardinería o reparaciones (desde CHF 65/h).\n3. Elige el tamaño y, en limpieza regular, la frecuencia.\n4. Ves el precio orientativo, el cálculo (horas × tarifa) y, en limpieza regular, el total aproximado al mes.\n5. Elige el cliente (opcional) y envíalo por WhatsApp o e-mail, o copia el texto.\n\n💡 Son los mismos precios que la calculadora de la página web.", "DE": "1. 🧮 «Preisrechner» öffnen (nur Administrator).\n2. Leistung, Grösse und Häufigkeit wählen.\n3. Richtpreis und Berechnung (Std. × Ansatz) erscheinen.\n4. Kunde wählen und per WhatsApp oder E-Mail senden.\n\n💡 Gleiche Preise wie auf der Webseite.", "EN": "1. Open 🧮 «Price calculator» (administrator only).\n2. Choose service, size and frequency.\n3. See the indicative price and the calculation (hours × rate).\n4. Choose the client and send by WhatsApp or e-mail.\n\n💡 Same prices as the website.", "IT": "1. Apri 🧮 «Calcolatore prezzi» (solo amministratore).\n2. Scegli servizio, dimensione e frequenza.\n3. Vedi il prezzo indicativo e il calcolo (ore × tariffa).\n4. Scegli il cliente e invialo via WhatsApp o e-mail."}},
+      ]
+    },
+
     settings: {
       icon:"⚙️",
       title:{DE:"Einstellungen & Firmendaten",ES:"Configuración y datos de empresa",EN:"Settings & Company Data",IT:"Impostazioni e dati aziendali"},
@@ -9481,6 +9542,28 @@ function HelpModal({t, lang, onClose}){
   };
 
   const current = HELP[activeSection];
+  // Search every title (and text) of the help in the current language
+  const norm = x => String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const results = (()=>{
+    const words = norm(q).split(/\s+/).filter(Boolean);
+    if(!words.length) return null;
+    const out=[];
+    SECTIONS.forEach(sec=>{
+      const h=HELP[sec.id]; if(!h) return;
+      const secLabel=sec.label[lang]||sec.label.EN;
+      (h.items||[]).forEach((it,ii)=>{
+        const title=it.h?.[lang]||it.h?.EN||"", body=it.b?.[lang]||it.b?.EN||"";
+        const tN=norm(title+" "+secLabel), bN=norm(body);
+        if(!words.every(w=>tN.includes(w)||bN.includes(w))) return;
+        const score=words.filter(w=>tN.includes(w)).length*10 + (norm(title).startsWith(words[0])?5:0);
+        const at=bN.indexOf(words[0]);
+        const snippet = at>=0 ? (at>40?"…":"")+body.slice(Math.max(0,at-40),at+90).replace(/\n/g," ")+"…" : body.slice(0,110).replace(/\n/g," ")+"…";
+        out.push({sec,secLabel,ii,title,snippet,score});
+      });
+    });
+    return out.sort((a,b)=>b.score-a.score);
+  })();
+  const openResult = r => { setActiveSection(r.sec.id); setFocusItem(r.ii); setQ(""); setTimeout(()=>{ const el=document.getElementById(`help-item-${r.ii}`); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); },60); };
   const CP2 = CP; // use existing design system
 
   // Render line with smart styling
@@ -9492,7 +9575,7 @@ function HelpModal({t, lang, onClose}){
     const isBullet = line.startsWith("•") || line.startsWith("→");
     const isNumber = /^\d+\./.test(line.trim());
     const isArt = /^Art\. \d/.test(line.trim());
-    const color = isWarning?"#c42b1c":isTip?"#107c10":isSection?"#9a5b00":isArt?"#0067c0":isBullet?"#a8d8ff":"rgba(0,0,0,0.85)";
+    const color = isWarning?"#c42b1c":isTip?"#107c10":isSection?"#9a5b00":isArt?"#0067c0":isBullet?"#1a1a1a":"rgba(0,0,0,0.85)";
     return (
       <div key={i} style={{
         color, fontSize:13, lineHeight:1.65,
@@ -9544,9 +9627,9 @@ function HelpModal({t, lang, onClose}){
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{background:"rgba(201,42,42,0.2)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:20,padding:"3px 12px",color:"#c42b1c",fontSize:11,fontWeight:700}}>
+            {!mob&&<div style={{background:"rgba(201,42,42,0.2)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:20,padding:"3px 12px",color:"#c42b1c",fontSize:11,fontWeight:700}}>
               {t.helpAdminOnly||"👑 Admin only"}
-            </div>
+            </div>}
             <button onClick={onClose} style={{
               width:30,height:30,borderRadius:"50%",
               background:"rgba(0,0,0,0.035)",border:"none",
@@ -9556,11 +9639,21 @@ function HelpModal({t, lang, onClose}){
           </div>
         </div>
 
+        {/* ── SEARCH ── */}
+        <div style={{padding:mob?"10px 12px":"10px 22px",borderBottom:`1px solid ${CP.border}`,background:"#fafafa",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,background:"#fff",border:`1px solid ${CP.border}`,borderBottom:"2px solid #0067c0",borderRadius:8,padding:"0 12px"}}>
+            <span style={{fontSize:15}}>🔍</span>
+            <input autoFocus={!mob} value={q} onChange={e=>setQ(e.target.value.slice(0,80))} placeholder={L("Thema suchen… (z. B. Rechnung, Route, PIN)","Buscar un tema… (p. ej. factura, ruta, PIN)","Search a topic… (e.g. invoice, route, PIN)","Cerca un argomento… (es. fattura, percorso, PIN)")}
+              style={{flex:1,border:"none",outline:"none",padding:"10px 0",fontSize:14.5,fontFamily:CP.font,background:"transparent",color:CP.textPrimary}}/>
+            {q&&<button onClick={()=>setQ("")} aria-label="clear" style={{background:"none",border:"none",cursor:"pointer",fontSize:15,color:CP.textSecondary}}>✕</button>}
+          </div>
+        </div>
+
         {/* ── BODY ── */}
         <div style={{flex:1,display:"flex",overflow:"hidden"}}>
 
           {/* Sidebar */}
-          <div style={{
+          {!mob&&<div style={{
             width:185,flexShrink:0,
             borderRight:"1px solid rgba(0,0,0,0.042)",
             background:"rgba(0,0,0,0.035)",
@@ -9572,13 +9665,13 @@ function HelpModal({t, lang, onClose}){
               return (
                 <button key={sec.id} onClick={()=>setActiveSection(sec.id)} style={{
                   width:"100%",padding:"8px 10px",borderRadius:9,border:"none",
-                  background:isActive?"rgba(28,126,214,0.32)":"transparent",
-                  color:isActive?"#fff":"rgba(0,0,0,0.64)",
+                  background:isActive?"rgba(0,103,192,0.12)":"transparent",
+                  color:isActive?"#0067c0":"rgba(0,0,0,0.72)",
                   cursor:"pointer",textAlign:"left",fontSize:12.5,fontWeight:isActive?700:500,
                   display:"flex",alignItems:"center",gap:7,marginBottom:2,
                   transition:"all .13s",fontFamily:CP.font,
                 }}
-                  onMouseEnter={e=>{if(!isActive){e.currentTarget.style.background="rgba(0,0,0,0.049)";e.currentTarget.style.color="#fff";}}}
+                  onMouseEnter={e=>{if(!isActive){e.currentTarget.style.background="rgba(0,0,0,0.049)";}}}
                   onMouseLeave={e=>{if(!isActive){e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(0,0,0,0.64)";}}}
                 >
                   <span style={{fontSize:15,flexShrink:0}}>{sec.icon}</span>
@@ -9591,13 +9684,33 @@ function HelpModal({t, lang, onClose}){
             <div style={{margin:"12px 4px 4px",padding:"10px 10px",background:"rgba(28,126,214,0.08)",border:"1px solid rgba(28,126,214,0.15)",borderRadius:10}}>
               <div style={{color:"rgba(116,192,252,0.8)",fontSize:10,fontWeight:700,marginBottom:3}}>PATJAC BUSINESS SUITE</div>
               <div style={{color:"rgba(0,0,0,0.47)",fontSize:10}}>Version 2.0 · 🇨🇭 Zürich</div>
-              <div style={{color:"rgba(0,0,0,0.47)",fontSize:10}}>© 2024 Patjac</div>
+              <div style={{color:"rgba(0,0,0,0.47)",fontSize:10}}>© 2026 Patjac</div>
             </div>
-          </div>
+          </div>}
 
           {/* Content */}
-          <div style={{flex:1,overflow:"auto",padding:"18px 22px"}}>
-            {current&&(
+          <div style={{flex:1,overflow:"auto",padding:mob?"12px 14px":"18px 22px"}}>
+            {mob&&!results&&(
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:10,marginBottom:6}}>
+                {SECTIONS.map(sec=>(
+                  <button key={sec.id} onClick={()=>{setActiveSection(sec.id);setFocusItem(null);}} style={{flexShrink:0,padding:"6px 11px",borderRadius:16,border:`1px solid ${activeSection===sec.id?CP.accent:CP.borderActive}`,background:activeSection===sec.id?CP.accent:"#fff",color:activeSection===sec.id?"#fff":CP.textPrimary,fontSize:12.5,fontWeight:600,fontFamily:CP.font,whiteSpace:"nowrap"}}>{sec.icon} {sec.label[lang]||sec.label.EN}</button>
+                ))}
+              </div>
+            )}
+            {results&&(
+              <div>
+                <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10}}>{results.length} {L("Ergebnisse","resultados","results","risultati")}</div>
+                {results.map((r,k)=>(
+                  <button key={r.sec.id+"-"+r.ii} onClick={()=>openResult(r)} style={{display:"block",width:"100%",textAlign:"left",background:"#fff",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 14px",marginBottom:8,cursor:"pointer",fontFamily:CP.font}}>
+                    <div style={{color:CP.textSecondary,fontSize:11.5}}>{r.sec.icon} {r.secLabel}</div>
+                    <div style={{color:"#0067c0",fontWeight:700,fontSize:14.5,margin:"2px 0"}}>{r.title}</div>
+                    <div style={{color:CP.textSecondary,fontSize:12.5,lineHeight:1.4}}>{r.snippet}</div>
+                  </button>
+                ))}
+                {results.length===0&&<div style={{color:CP.textTertiary,fontSize:14,textAlign:"center",padding:"30px 0"}}>🔍 {L("Nichts gefunden. Versuchen Sie ein anderes Wort.","No se encontró nada. Prueba con otra palabra.","Nothing found. Try another word.","Nessun risultato. Prova un'altra parola.")}</div>}
+              </div>
+            )}
+            {!results&&current&&(
               <>
                 {/* Section title */}
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18,paddingBottom:12,borderBottom:"1px solid rgba(0,0,0,0.049)"}}>
@@ -9607,7 +9720,7 @@ function HelpModal({t, lang, onClose}){
 
                 {/* Items */}
                 {current.items?.map((item,ii)=>(
-                  <div key={ii} style={{marginBottom:20}}>
+                  <div key={ii} id={`help-item-${ii}`} style={{marginBottom:20,scrollMarginTop:10,...(focusItem===ii?{outline:"2px solid rgba(0,103,192,0.35)",outlineOffset:6,borderRadius:8}:{})}}>
                     {/* Item heading */}
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                       <div style={{width:4,height:18,background:"#1C7ED6",borderRadius:2,flexShrink:0}}/>
