@@ -1372,12 +1372,15 @@ const hoursBetween = (start,end) => {
   return Math.round(mins/60*100)/100;
 };
 // ─── ATTENDANCE: hours are paid from the employee's arrival (never before the planned start) to the planned end ───
+const NOSHOW_GRACE_MIN = 15;
+const REPLACEMENT_TRAVEL_MIN = 45; // a replacement gets 45 min to arrive before a new warning // after 15 min without arrival the administrator is warned and can send a replacement
 const GEOFENCE_M = 300;   // the employee must be within ~300 m of the client to start
 const toMin = t => { const m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m ? (+m[1])*60+(+m[2]) : null; };
 const fromMin = m => `${String(Math.floor(m/60)%24).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
 const jobPaidInfo = (j, now=new Date()) => {
   const planned = hoursBetween(j?.timeStart, j?.timeEnd);
   if(!j || j.status==="cancelled") return {hours:0, planned, state:"cancelled", lateMin:0};
+  if(j.status==="noshow") return {hours:0, planned, state:"absent", lateMin:0};
   const s = toMin(j.timeStart); let e = toMin(j.timeEnd);
   if(s!==null && e!==null && e<=s) e += 1440;
   if(j.actualStart){
@@ -1391,6 +1394,9 @@ const jobPaidInfo = (j, now=new Date()) => {
   const today = ymd(now);
   const nowMin = now.getHours()*60 + now.getMinutes();
   if((j.date||"") < today || (j.date===today && e!==null && nowMin >= e)) return {hours:0, planned, state:"absent", lateMin:0};
+  const rep = /^🔄 [^\n]*?(\d{1,2}):(\d{2}):/m.exec(j.notes||"");   // replaced today → give the new person time to travel
+  const graceFrom = rep ? Math.max(s??0, (+rep[1])*60 + (+rep[2]) + REPLACEMENT_TRAVEL_MIN - NOSHOW_GRACE_MIN) : s;
+  if(j.date===today && s!==null && nowMin >= graceFrom + NOSHOW_GRACE_MIN) return {hours:planned, planned, state:"missing", lateMin:nowMin - s};
   return {hours:planned, planned, state:"planned", lateMin:0};
 };
 // Small label shown on job cards for the administrator
@@ -1405,6 +1411,91 @@ function AttendanceBadge({job, lang}){
 }
 // Hours billed to the client for a visit: the hours agreed with the client (client_hours) — separate from the employees' schedule.
 // Old jobs without them fall back to the employees' scheduled hours.
+// Real status of a job: a job whose time is over and nobody arrived counts as finished – "no-show" (never "pending")
+const jobStatus = j => {
+  if(!j) return "pending";
+  if(j.status==="noshow") return "noshow";
+  if(j.status!=="completed" && j.status!=="cancelled" && !j.actualStart && jobPaidInfo(j).state==="absent") return "noshow";
+  return j.status||"pending";
+};
+const jobStatusText = (st, t, lang) => st==="noshow" ? makeL(lang)("Nicht erschienen","No se presentó","No-show","Assente") : st==="completed"?t.completed:st==="inProgress"?t.inProgress:st==="cancelled"?(t.cancelled||"—"):t.pending;
+const jobStatusColor = st => st==="noshow"?"red":st==="completed"?"green":st==="inProgress"?"blue":"yellow";
+function JobStatusBadge({job,t,lang}){ const st=jobStatus(job); return <CPBadge text={jobStatusText(st,t,lang)} color={jobStatusColor(st)}/>; }
+// Big, clear warning on the job card when the employee did not come
+function NoShowBanner({job, lang, onReplace}){
+  const L = makeL(lang);
+  const st = jobStatus(job), i = jobPaidInfo(job);
+  if(st==="noshow") return (
+    <div style={{marginTop:8,background:"rgba(196,43,28,0.08)",border:"2px solid #c42b1c",borderRadius:10,padding:"10px 14px"}}>
+      <div style={{color:"#c42b1c",fontSize:19,fontWeight:800,lineHeight:1.25}}>❌ {(job.employeeName||L("Mitarbeiter","El empleado","The employee","Il dipendente"))} {L("ist NICHT erschienen","NO SE PRESENTÓ","DID NOT SHOW UP","NON SI È PRESENTATO")}</div>
+      <div style={{color:CP.textSecondary,fontSize:12.5,marginTop:3}}>{L("Auftrag abgeschlossen ohne Arbeit · 0 Std. bezahlt · wird dem Kunden nicht verrechnet","Trabajo cerrado sin realizar · 0 h pagadas · no se cobra al cliente","Job closed without work · 0 h paid · not billed to the client","Lavoro chiuso senza esecuzione · 0 h pagate · non fatturato")}</div>
+    </div>
+  );
+  if(i.state==="missing") return (
+    <div style={{marginTop:8,background:"rgba(197,90,0,0.08)",border:"2px solid #c55a00",borderRadius:10,padding:"10px 14px"}}>
+      <div style={{color:"#c55a00",fontSize:18,fontWeight:800,lineHeight:1.25}}>⚠️ {(job.employeeName||"")} {L("ist noch nicht angekommen","todavía no ha llegado","has not arrived yet","non è ancora arrivato")} (+{i.lateMin} min)</div>
+      {onReplace&&<button onClick={e=>{e.stopPropagation();onReplace(job);}} style={{marginTop:8,background:CP.accent,color:"#fff",border:"none",borderRadius:8,padding:"9px 14px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:CP.font}}>🔄 {L("Durch nächsten Mitarbeiter ersetzen","Reemplazar por el empleado más cercano","Replace with the nearest employee","Sostituisci con il più vicino")}</button>}
+    </div>
+  );
+  return null;
+}
+// Choose another employee for a job, sorted by distance to the client (current GPS position today, otherwise home address)
+function ReplaceEmployeeModal({job, jobs, employees, clients, lang, onClose, onConfirm}){
+  const L = makeL(lang);
+  const client = clients.find(c=>c.id===job.clientId);
+  const dest = client ? fmtAddr(client) : "";
+  const team = job.teamId ? jobs.filter(j=>j.teamId===job.teamId).map(j=>j.employeeId) : [job.employeeId];
+  const cands = employees.filter(e=>e.active!==false && !team.includes(e.id));
+  const [rows,setRows] = useState(()=>cands.map(e=>({emp:e, km:null, src:"", busy:null, loading:true})));
+  const [destOk,setDestOk] = useState(true);
+  useEffect(()=>{
+    let alive = true;
+    (async()=>{
+      const d = await geocodeCH(dest);
+      if(!d){ if(alive){ setDestOk(false); setRows(r=>r.map(x=>({...x,loading:false}))); } }
+      const s = toMin(job.timeStart), e = toMin(job.timeEnd);
+      for(const emp of cands){
+        const sameDay = jobs.filter(j=>j.employeeId===emp.id && j.date===job.date && j.id!==job.id && jobStatus(j)!=="noshow" && j.status!=="cancelled");
+        const clash = sameDay.find(j=>{ const a=toMin(j.timeStart), b=toMin(j.timeEnd); return a!==null&&b!==null&&s!==null&&e!==null && a<e && b>s; });
+        const busy = clash ? `${clash.timeStart}–${clash.timeEnd} · ${clash.clientName||""}` : null;
+        let pos=null, src="";
+        const started = sameDay.filter(j=>j.startLat!=null && j.startLon!=null).sort((a,b)=>String(b.actualStart||"").localeCompare(String(a.actualStart||"")))[0];
+        if(started){ pos={lat:+started.startLat, lon:+started.startLon}; src=L("Heute bei","Hoy en","Today at","Oggi da")+" "+(started.clientName||""); }
+        else { const home=fmtAddr(emp); if(home && d){ pos=await geocodeCH(home); src=L("Wohnadresse","Domicilio","Home address","Domicilio"); } else src=L("Keine Adresse","Sin dirección","No address","Senza indirizzo"); }
+        const km = (pos && d) ? Math.round(haversineKm(pos,d)*10)/10 : null;
+        if(!alive) return;
+        setRows(r=>r.map(x=>x.emp.id===emp.id?{...x,km,src,busy,loading:false}:x));
+      }
+    })();
+    return ()=>{ alive=false; };
+  },[]);
+  const sorted = [...rows].sort((a,b)=>(!!a.busy-!!b.busy) || ((a.km??9999)-(b.km??9999)));
+  return (
+    <CPModal title={`🔄 ${L("Mitarbeiter ersetzen","Reemplazar empleado","Replace employee","Sostituisci dipendente")}`} onClose={onClose} width={520}>
+      <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10,lineHeight:1.5}}>
+        <b style={{color:CP.textPrimary}}>{job.clientName}</b> · {fmtDate(job.date)} · {job.timeStart}–{job.timeEnd}<br/>
+        📍 {dest||L("Kunde ohne Adresse","Cliente sin dirección","Client without address","Cliente senza indirizzo")}<br/>
+        ❌ {L("Fehlt","Falta","Missing","Assente")}: <b style={{color:"#c42b1c"}}>{job.employeeName}</b>
+      </div>
+      {!destOk&&<div style={{color:"#c55a00",fontSize:12.5,marginBottom:8}}>⚠️ {L("Adresse des Kunden nicht gefunden – Entfernungen nicht verfügbar.","No se encontró la dirección del cliente: no se pueden calcular distancias.","Client address not found – distances unavailable.","Indirizzo del cliente non trovato – distanze non disponibili.")}</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {sorted.map((r,idx)=>(
+          <div key={r.emp.id} style={{display:"flex",alignItems:"center",gap:10,background:"#fff",border:`1px solid ${idx===0&&!r.busy&&r.km!=null?CP.accent:CP.border}`,borderRadius:10,padding:"10px 12px"}}>
+            <Avatar photo={r.emp.photo} size={38}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{r.emp.name}{idx===0&&!r.busy&&r.km!=null&&<span style={{marginLeft:6,background:CP.accent,color:"#fff",borderRadius:8,padding:"1px 7px",fontSize:11}}>{L("Am nächsten","Más cercano","Nearest","Più vicino")}</span>}</div>
+              <div style={{color:CP.textSecondary,fontSize:12.5}}>{r.loading?`⏳ ${L("Berechne Entfernung…","Calculando distancia…","Calculating distance…","Calcolo distanza…")}`:<>{r.km!=null?<b style={{color:CP.textPrimary}}>≈ {r.km} km</b>:"— km"} · {r.src}</>}</div>
+              {r.busy&&<div style={{color:"#c55a00",fontSize:12}}>⏰ {L("Hat schon einen Auftrag","Ya tiene trabajo","Already has a job","Ha già un lavoro")}: {r.busy}</div>}
+            </div>
+            <CPBtn size="sm" variant={r.busy?"secondary":"primary"} onClick={()=>onConfirm(r.emp)}>{L("Zuweisen","Asignar","Assign","Assegna")}</CPBtn>
+          </div>
+        ))}
+        {sorted.length===0&&<div style={{color:CP.textTertiary,fontSize:13}}>{L("Keine anderen aktiven Mitarbeiter.","No hay otros empleados activos.","No other active employees.","Nessun altro dipendente attivo.")}</div>}
+      </div>
+      <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:10}}>ℹ️ {L("Entfernung in Luftlinie: aktuelle Position (wenn heute schon eingestempelt), sonst Wohnadresse. Der neue Mitarbeiter erhält sofort eine Nachricht.","Distancia en línea recta: posición actual (si hoy ya fichó en otro cliente) o su domicilio. El nuevo empleado recibe un mensaje al momento.","Straight-line distance: current position (if already clocked in today), otherwise home address. The new employee is messaged immediately.","Distanza in linea d'aria: posizione attuale (se oggi ha già timbrato), altrimenti domicilio. Il nuovo dipendente riceve subito un messaggio.")}</div>
+    </CPModal>
+  );
+}
 const visitClientHours = (rows) => { const ch = rows.map(r=>Number(r.clientHours)).find(v=>v>0); return ch ? ch : rows.reduce((s,r)=>s+hoursBetween(r.timeStart,r.timeEnd),0); };
 const jobAmountFor = (client,start,end) => {
   const rate=parseFloat(client?.price)||0;
@@ -2321,8 +2412,7 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
                   <div style={{color:CP.textPrimary,fontWeight:600,fontSize:14}}>{job.clientName}</div>
                   <div style={{color:CP.textSecondary,fontSize:12}}>{job.employeeName} · {job.timeStart}</div>
                 </div>
-                <CPBadge text={job.status==="completed"?t.completed:job.status==="inProgress"?t.inProgress:t.pending}
-                  color={job.status==="completed"?"green":job.status==="inProgress"?"blue":"yellow"}/>
+                <JobStatusBadge job={job} t={t} lang={lang}/>
               </div>
             ))}
           </div>
@@ -2397,7 +2487,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
   const todayClock = timeclock.find(tc=>tc.employeeId===currentUser?.id&&tc.date===todayStr);
   const isClockedIn = !!(todayClock?.clockIn&&!todayClock?.clockOut);
   const unread = messages.filter(m=>m.to===currentUser?.id&&!m.read).length;
-  const pendingCount = todayJobs.filter(j=>j.status==="pending").length;
+  const pendingCount = todayJobs.filter(j=>jobStatus(j)==="pending").length;
   const completedCount = todayJobs.filter(j=>j.status==="completed").length;
   const [ticker,setTicker] = useState(0);
 
@@ -2496,7 +2586,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
                     <div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{job.serviceType==="cleaning"?t.cleaning:t.gardening} · {job.timeStart}–{job.timeEnd}</div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <CPBadge text={job.status==="completed"?t.completed:job.status==="inProgress"?t.inProgress:t.pending} color={job.status==="completed"?"green":job.status==="inProgress"?"blue":"yellow"}/>
+                    <JobStatusBadge job={job} t={t} lang={lang}/>
                     <CPBtn onClick={()=>openApp("jobs")} variant="secondary" size="sm">→</CPBtn>
                   </div>
                 </div>
@@ -4084,8 +4174,7 @@ function DashApp({t,clients,jobs,invoices,employees,timeclock,notify,openApp,onB
                 <div style={{color:CP.textPrimary,fontWeight:600,fontSize:13}}>{job.clientName}</div>
                 <div style={{color:CP.textSecondary,fontSize:11}}>{job.timeStart} · {job.employeeName}</div>
               </div>
-              <CPBadge text={job.status==="completed"?t.completed:job.status==="inProgress"?t.inProgress:t.pending}
-                color={job.status==="completed"?"green":job.status==="inProgress"?"blue":"yellow"}/>
+              <JobStatusBadge job={job} t={t} lang={lang}/>
             </div>
           ))}
           {todayJobs.length===0&&<div style={{color:CP.textTertiary,fontSize:13,textAlign:"center",padding:"1rem 0"}}>—</div>}
@@ -4232,6 +4321,7 @@ function ClientsApp({t,clients,setClients,notify,onBack,lang}){
 
 // ─── JOBS ────────────────────────────────────────────────────
 function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lang}){
+  const [replaceJob,setReplaceJob]=useState(null);
   const L = makeL(lang);
   const [filter,setFilter]=useState("all");
   const [modal,setModal]=useState(null);
@@ -4292,7 +4382,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
 
   const [jobSearch,setJobSearch] = useState(()=>takePendingSearch("jobs"));
   const ff = visibleJobs
-    .filter(j=>filter==="all"?true:j.status===filter)
+    .filter(j=>{ const st=jobStatus(j); return filter==="all"?true:filter==="completed"?(st==="completed"||st==="noshow"):st===filter; })
     .filter(j=>matchSearch(jobSearch,j.clientName,j.employeeName,j.date,j.description,fmtAddr(clients.find(c=>c.id===j.clientId))))
     .sort((a,b)=>`${a.date||""}${a.timeStart||""}`.localeCompare(`${b.date||""}${b.timeStart||""}`));
   const bulk = useBulkSelect();
@@ -4306,8 +4396,8 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
   const addHours = (start, h) => { const [hh,mm]=(start||"08:00").split(":").map(Number); const t=Math.round(hh*60+mm+h*60); const m=((t%1440)+1440)%1440; return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`; };
   const teamSize = (f) => Math.max(1,(f.employeeIds||[]).length);
   const splitHours = (f) => { const tot=Number(f.totalHours)||0; return tot>0 ? withAutoAmount({...f, timeEnd:addHours(f.timeStart, tot/teamSize(f))}) : withAutoAmount(f); };
-  const statusLabel=(s)=>s==="completed"?t.completed:s==="inProgress"?t.inProgress:t.pending;
-  const statusColor=(s)=>s==="completed"?"green":s==="inProgress"?"blue":"yellow";
+  const statusLabel=(s)=>jobStatusText(s,t,lang);
+  const statusColor=(s)=>jobStatusColor(s);
 
   // A job can have several people. Internally each person gets their own copy of the job
   // (own clock-in/out, pay, reminder, work sheet), linked together by a shared teamId.
@@ -4406,9 +4496,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
           {[
             [L("Heute","Hoy","Today","Oggi"), visibleJobs.filter(j=>j.date===todayStr).length, "#0067c0"],
-            [t.pending, visibleJobs.filter(j=>j.status==="pending").length, "#9a5b00"],
-            [t.inProgress, visibleJobs.filter(j=>j.status==="inProgress").length, "#1C7ED6"],
-            [t.completed, visibleJobs.filter(j=>j.status==="completed").length, "#2F9E44"],
+            [t.pending, visibleJobs.filter(j=>jobStatus(j)==="pending").length, "#9a5b00"],
+            [t.inProgress, visibleJobs.filter(j=>jobStatus(j)==="inProgress").length, "#1C7ED6"],
+            [t.completed, visibleJobs.filter(j=>jobStatus(j)==="completed").length, "#2F9E44"],
+            ...(visibleJobs.some(j=>jobStatus(j)==="noshow")?[[jobStatusText("noshow",t,lang), visibleJobs.filter(j=>jobStatus(j)==="noshow").length, "#c42b1c"]]:[]),
           ].map(([label,val,color])=>(
             <div key={label} style={{
               background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.056)",
@@ -4458,7 +4549,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                       <span style={{fontSize:20}}>{job.serviceType==="cleaning"?"🧹":"🌿"}</span>
                       <div>
                         <div style={{color:CP.textPrimary,fontWeight:700,fontSize:17}}>{job.clientName}</div>
-                        <CPBadge text={statusLabel(job.status)} color={statusColor(job.status)}/>
+                        <CPBadge text={statusLabel(jobStatus(job))} color={statusColor(jobStatus(job))}/>
                       </div>
                     </div>
 
@@ -4537,7 +4628,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
       actions={<>
         <div style={{display:"flex",gap:4}}>
           {["all","pending","inProgress","completed"].map(s=>(
-            <button key={s} onClick={()=>setFilter(s)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filter===s?CP.accent:"rgba(0,0,0,0.07)",color:(filter===s)?"#fff":CP.textPrimary}}>{s==="all"?"All":statusLabel(s)}</button>
+            <button key={s} onClick={()=>setFilter(s)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filter===s?CP.accent:"rgba(0,0,0,0.07)",color:(filter===s)?"#fff":CP.textPrimary}}>{s==="all"?L("Alle","Todos","All","Tutti"):statusLabel(s)}</button>
           ))}
         </div>
         {<CPBtn onClick={()=>{setForm(withAutoAmount({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",employeeIds:employees[0]?[employees[0].id]:[],totalHours:2,serviceType:"cleaning",description:"",date:ymd(new Date()),timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]}));setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
@@ -4550,16 +4641,17 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {ff.map(job=>(
           <CPCard key={job.id} onClick={bulk.selectMode?()=>bulk.toggle(job.id):undefined} style={bulk.selected.has(job.id)?{outline:"2px solid #4DABF7"}:undefined}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
               {bulk.selectMode&&<SelBox checked={bulk.selected.has(job.id)} onChange={()=>bulk.toggle(job.id)}/>}
-              <div style={{flex:1}}>
+              <div style={{flex:"1 1 280px",minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                   <span style={{fontSize:18}}>{job.serviceType==="cleaning"?"🧹":job.serviceType==="repairs"?"🔧":"🌿"}</span>
                   <span style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{job.clientName}</span>
-                  <CPBadge text={statusLabel(job.status)} color={statusColor(job.status)}/>
+                  <CPBadge text={statusLabel(jobStatus(job))} color={statusColor(jobStatus(job))}/>
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {fmtDate(job.date)} · {job.timeStart}–{job.timeEnd}</div>
-                <AttendanceBadge job={job} lang={lang}/>
+                {jobStatus(job)==="noshow"||jobPaidInfo(job).state==="missing" ? <NoShowBanner job={job} lang={lang} onReplace={setReplaceJob}/> : <AttendanceBadge job={job} lang={lang}/>}
+                {(job.notes||"").split("\n").filter(x=>x.startsWith("🔄")).map((x,k)=><div key={k} style={{color:"#0067c0",fontSize:12,marginTop:3}}>{x}</div>)}
                 {(job.notes||"").startsWith("🕒")&&<div style={{color:"#6b3fbf",fontSize:11.5,marginTop:3}}>{(job.notes||"").split("\n")[0]}</div>}
                 {(()=>{const c=clients.find(x=>x.id===job.clientId); const addr=c?fmtAddr(c):(job.clientAddress||""); return addr?(
                   <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
@@ -4580,9 +4672,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                   </button>
                 )}
               </div>
-              {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexShrink:0}}>
+              {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
                 {<CPBtn onClick={()=>{setForm({...job, employeeIds:teamOf(job).map(m=>m.employeeId), totalHours:Math.round(hoursBetween(job.timeStart,job.timeEnd)*teamOf(job).length*100)/100});setModal("form");}} variant="secondary" size="sm">✏️</CPBtn>}
-                {job.status!=="completed"&&<CPBtn onClick={()=>{setJobs(p=>p.map(j=>j.id===job.id?{...j,status:job.status==="pending"?"inProgress":"completed"}:j));notify(t.success);}} variant={job.status==="pending"?"warning":"success"} size="sm">{job.status==="pending"?"▶":"✓"}</CPBtn>}
+                {!job.actualStart&&jobStatus(job)!=="noshow"&&job.status!=="completed"&&job.status!=="cancelled"&&<CPBtn onClick={()=>setReplaceJob(job)} variant="secondary" size="sm" title={L("Mitarbeiter ersetzen","Reemplazar empleado","Replace employee","Sostituisci dipendente")}>🔄</CPBtn>}
+                {job.status!=="completed"&&jobStatus(job)!=="noshow"&&<CPBtn onClick={()=>{setJobs(p=>p.map(j=>j.id===job.id?{...j,status:job.status==="pending"?"inProgress":"completed"}:j));notify(t.success);}} variant={job.status==="pending"?"warning":"success"} size="sm">{job.status==="pending"?"▶":"✓"}</CPBtn>}
                 {job.date>=todayStr&&<CPBtn onClick={()=>setDayEdit({job,start:job.timeStart||"",end:job.timeEnd||"",reason:""})} variant="secondary" size="sm" title={L("Zeit nur für diesen Tag ändern","Cambiar horario solo este día","Change time for this day only","Cambia orario solo oggi")}>🕒</CPBtn>}
                 <CPBtn onClick={()=>setDeleteJobId(job.id)} variant="danger" size="sm">🗑️</CPBtn>
               </div>}
@@ -4593,6 +4686,15 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
       </div>
 
       {dayEditModal}
+      {replaceJob&&<ReplaceEmployeeModal job={replaceJob} jobs={jobs} employees={employees} clients={clients} lang={lang} onClose={()=>setReplaceJob(null)} onConfirm={async emp=>{
+        const old = replaceJob; const hhmm = new Date().toTimeString().slice(0,5);
+        const note = `🔄 ${L("Ersatz","Reemplazo","Replacement","Sostituzione")} ${fmtDate(old.date)} ${hhmm}: ${old.employeeName||"—"} ${L("nicht erschienen","no se presentó","did not show up","assente")} → ${emp.name}`;
+        setJobs(p=>p.map(j=>j.id===old.id?{...j, employeeId:emp.id, employeeName:emp.name, status:"pending", actualStart:null, actualEnd:null, actualHours:null, startLocation:null, startLat:null, startLon:null, startDistM:null, reminderSent:false, notes:[note,(j.notes||"").trim()].filter(Boolean).join("\n")}:j));
+        const addr = fmtAddr(clients.find(c=>c.id===old.clientId));
+        await sendMsg(emp.id, emp.name, `🔄 ${L("Neuer Auftrag für Sie","Nuevo trabajo para ti","New job for you","Nuovo lavoro per te")}: ${old.date===todayStr?L("HEUTE","HOY","TODAY","OGGI"):fmtDate(old.date)} · ${old.timeStart}–${old.timeEnd}\n${old.clientName||""}${addr?"\n📍 "+addr:""}\n${L("Bitte so schnell wie möglich hinfahren.","Por favor, ve lo antes posible.","Please go as soon as possible.","Per favore vai il prima possibile.")}`);
+        setReplaceJob(null);
+        notify(`✅ ${emp.name} ${L("übernimmt den Auftrag und wurde benachrichtigt","se encarga del trabajo y ya fue avisado","takes over the job and was notified","prende il lavoro ed è stato avvisato")}`,"success");
+      }}/>}
       {modal==="form"&&(
         <CPModal title={form.id?t.edit:t.newJob||"Neu"} onClose={()=>setModal(null)} width={540}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
@@ -4647,7 +4749,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             </CPField>
           </div>
           <CPField label={t.description}><CPInput value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></CPField>
-          <CPField label={t.status}><CPSelect value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option value="pending">{t.pending}</option><option value="inProgress">{t.inProgress}</option><option value="completed">{t.completed}</option></CPSelect></CPField>
+          <CPField label={t.status}><CPSelect value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option value="pending">{t.pending}</option><option value="inProgress">{t.inProgress}</option><option value="noshow">{L("Nicht erschienen","No se presentó","No-show","Assente")}</option><option value="completed">{t.completed}</option></CPSelect></CPField>
           <CPField label={t.notes}><CPInput value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></CPField>
 
           {!form.id && (
@@ -4886,7 +4988,7 @@ const computeBillingDue = (clients, jobs, invoices, today=ymd(new Date())) => {
   const out=[];
   (clients||[]).filter(c=>c.active!==false).forEach(c=>{
     const mode = clientBillingMode(c);
-    const js = (jobs||[]).filter(j=>j.clientId===c.id && j.date && j.date>=limit && j.date<=today && j.status!=="cancelled" && !covered(j));
+    const js = (jobs||[]).filter(j=>j.clientId===c.id && j.date && j.date>=limit && j.date<=today && j.status!=="cancelled" && jobStatus(j)!=="noshow" && !covered(j));
     if(!js.length) return;
     const groups = {};
     js.forEach(j=>{
@@ -5086,7 +5188,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
   // One entry per job (team jobs = several rows with the same teamId → one job with the total hours)
   const jobGroups = useMemo(()=>{
     if(!form.clientId||!form.periodFrom||!form.periodTo) return [];
-    const rows=(jobs||[]).filter(j=>j.clientId===form.clientId&&j.date&&j.date>=form.periodFrom&&j.date<=form.periodTo&&j.status!=="cancelled");
+    const rows=(jobs||[]).filter(j=>j.clientId===form.clientId&&j.date&&j.date>=form.periodFrom&&j.date<=form.periodTo&&j.status!=="cancelled"&&jobStatus(j)!=="noshow");
     const map=new Map();
     rows.forEach(j=>{ const k=j.teamId||j.id; const g=map.get(k)||{key:k,ids:[],date:j.date,start:j.timeStart,end:j.timeEnd,service:invSvcId(j.serviceType),hours:0,people:0};
       g.ids.push(j.id); g.hours+=hoursBetween(j.timeStart,j.timeEnd); g.people+=1;
@@ -6411,7 +6513,7 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
                         )}
                       </div>
                     </div>
-                    <CPBadge text={statusLabel(job.status)} color={statusColor(job.status)}/>
+                    <CPBadge text={statusLabel(jobStatus(job))} color={statusColor(jobStatus(job))}/>
                   </div>
                 </div>
               </div>
