@@ -766,7 +766,7 @@ function ImagePicker({value, onChange, lang, round=true, fallback="📷", size=2
     try{ onChange(await compressImage(f, size)); }catch(err){ alert(L("Bild konnte nicht gelesen werden","No se pudo leer la imagen","Could not read the image","Impossibile leggere l'immagine")); }
     finally{ setBusy(false); }
   };
-  const btn = {background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,color:"#fff",padding:"7px 11px",cursor:"pointer",fontSize:12.5,fontWeight:700,fontFamily:CP.font};
+  const btn = {background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,color:CP.textPrimary,padding:"7px 11px",cursor:"pointer",fontSize:12.5,fontWeight:700,fontFamily:CP.font};
   return (
     <div style={{display:"flex",alignItems:"center",gap:14,margin:"4px 0 14px"}}>
       <Avatar photo={value} size={76} round={round} fallback={busy?"⏳":fallback}/>
@@ -774,7 +774,7 @@ function ImagePicker({value, onChange, lang, round=true, fallback="📷", size=2
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           <button type="button" style={btn} onClick={()=>camRef.current?.click()}>📷 {L("Foto aufnehmen","Hacer foto","Take photo","Scatta foto")}</button>
           <button type="button" style={btn} onClick={()=>fileRef.current?.click()}>🖼️ {L("Bild wählen","Elegir imagen","Choose image","Scegli immagine")}</button>
-          {safeImg(value)&&<button type="button" style={{...btn,color:"#FF8787"}} onClick={()=>onChange(null)}>🗑️</button>}
+          {safeImg(value)&&<button type="button" style={{...btn,color:"#c42b1c"}} onClick={()=>onChange(null)}>🗑️</button>}
         </div>
         <div style={{color:CP.textTertiary,fontSize:11}}>{L("Wird automatisch verkleinert (~20 KB)","Se reduce automáticamente (~20 KB)","Automatically reduced (~20 KB)","Ridotta automaticamente (~20 KB)")}</div>
       </div>
@@ -848,7 +848,7 @@ const openCompanyMailbox = () => { window.open(INFOMANIAK_MAIL_URL,"_blank","noo
 function CompanyEmailButtons({to, subject, body, lang, disabled}){
   const L = makeL(lang||appLang);
   const [copied,setCopied] = useState(false);
-  const b = bg => ({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"11px 12px",cursor:disabled?"not-allowed":"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font,opacity:disabled?.45:1,boxSizing:"border-box"});
+  const b = bg => ({background:bg,border:lightBg(bg)?`1px solid ${CP.borderActive}`:"none",borderRadius:12,color:fgOn(bg),padding:"11px 12px",cursor:disabled?"not-allowed":"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font,opacity:disabled?.45:1,boxSizing:"border-box"});
   const copyAndOpen = () => {
     const txt = `${L("An","Para","To","A")}: ${to}\n${L("Betreff","Asunto","Subject","Oggetto")}: ${subject}\n\n${body}`;
     try{ navigator.clipboard.writeText(txt); }catch(e){}
@@ -859,7 +859,7 @@ function CompanyEmailButtons({to, subject, body, lang, disabled}){
     <div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
         <a href={disabled?undefined:mailtoUrl({to,subject,body})} onClick={e=>{if(disabled)e.preventDefault();}} style={b("#E0115F")}>📧 {L("Senden","Enviar","Send","Invia")} · {COMPANY_EMAIL}</a>
-        <button disabled={disabled} onClick={copyAndOpen} style={b("rgba(255,255,255,.14)")}>{copied?`✅ ${L("Kopiert – im Mail einfügen","Copiado: pégalo en el correo","Copied – paste it in the mail","Copiato – incollalo nella mail")}`:`📬 ${L("Kopieren + Webmail öffnen","Copiar y abrir mi correo web","Copy + open webmail","Copia + apri webmail")}`}</button>
+        <button disabled={disabled} onClick={copyAndOpen} style={b("rgba(0,0,0,0.098)")}>{copied?`✅ ${L("Kopiert – im Mail einfügen","Copiado: pégalo en el correo","Copied – paste it in the mail","Copiato – incollalo nella mail")}`:`📬 ${L("Kopieren + Webmail öffnen","Copiar y abrir mi correo web","Copy + open webmail","Copia + apri webmail")}`}</button>
       </div>
       <div style={{color:CP.textTertiary,fontSize:11,marginTop:5,lineHeight:1.45}}>
         ℹ️ {L("Der Knopf «Senden» öffnet Ihr Mailprogramm (Outlook) mit dem Firmenkonto. Alternativ: Webmail.","El botón «Enviar» abre tu programa de correo (Outlook) con la cuenta de empresa. Alternativa: correo web.","«Send» opens your mail program (Outlook) with the company account. Alternative: webmail.","«Invia» apre il programma di posta (Outlook) con l'account aziendale. Alternativa: webmail.")}
@@ -932,17 +932,17 @@ function EmailHost({lang}){
   if(!job) return null;
   const close = () => setJob(null);
   const dl = () => { if(!pdf.blob) return; const u=URL.createObjectURL(pdf.blob); const a=document.createElement("a"); a.href=u; a.download=`${safeFileName(job.fileName||job.subject)}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),30000); };
-  const inp = {width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,.07)",border:`1px solid ${CP.border}`,borderRadius:10,color:"#fff",padding:"9px 11px",fontSize:14,fontFamily:CP.font};
+  const inp = {width:"100%",boxSizing:"border-box",background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,color:CP.textPrimary,padding:"9px 11px",fontSize:14,fontFamily:CP.font};
   const lab = {color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"10px 0 4px"};
   const validTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((job.to||"").trim());
   return (
     <div onClick={close} style={{position:"fixed",inset:0,zIndex:100000,background:"rgba(0,0,0,.8)",backdropFilter:"blur(10px)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,overflowY:"auto"}}>
       <div onClick={e=>e.stopPropagation()} style={{width:"min(560px,96vw)",background:CP.surface,border:`1px solid ${CP.border}`,borderRadius:18,padding:18,marginTop:20,fontFamily:CP.font}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-          <div style={{color:"#fff",fontWeight:800,fontSize:16}}>📧 {L("Per E-Mail senden","Enviar por email","Send by e-mail","Invia per e-mail")}</div>
-          <button onClick={close} style={{background:"rgba(255,255,255,.1)",border:"none",borderRadius:10,color:"#fff",padding:"6px 11px",cursor:"pointer"}}>✕</button>
+          <div style={{color:CP.textPrimary,fontWeight:800,fontSize:16}}>📧 {L("Per E-Mail senden","Enviar por email","Send by e-mail","Invia per e-mail")}</div>
+          <button onClick={close} style={{background:"rgba(0,0,0,0.035)",border:"none",borderRadius:10,color:CP.textPrimary,padding:"6px 11px",cursor:"pointer"}}>✕</button>
         </div>
-        <div style={{color:"#8CE99A",fontSize:12,fontWeight:700}}>{L("Von","De","From","Da")}: {COMPANY_EMAIL}</div>
+        <div style={{color:"#107c10",fontSize:12,fontWeight:700}}>{L("Von","De","From","Da")}: {COMPANY_EMAIL}</div>
         <div style={lab}>{L("An","Para","To","A")}</div>
         <input value={job.to} onChange={e=>setJob({...job,to:e.target.value})} placeholder="cliente@email.ch" style={inp} type="email"/>
         <div style={lab}>{L("Betreff","Asunto","Subject","Oggetto")}</div>
@@ -953,9 +953,9 @@ function EmailHost({lang}){
           <span>{pdf.status==="working"?`⏳ ${L("PDF wird erstellt…","Creando el PDF del documento…","Creating the PDF…","Creazione del PDF…")}`
             :pdf.status==="ready"?(pdf.url?`✅ ${L("PDF bereit – der Link ist in der Nachricht","PDF listo: el enlace ya está en el mensaje","PDF ready – the link is in the message","PDF pronto – il link è nel messaggio")}`:`⚠️ ${L("PDF erstellt, Link nicht möglich – herunterladen und anhängen","PDF creado, sin enlace: descárgalo y adjúntalo","PDF created, no link – download and attach it","PDF creato, senza link – scaricalo e allegalo")}`)
             :`⚠️ ${L("PDF konnte nicht erstellt werden","No se pudo crear el PDF","Could not create the PDF","Impossibile creare il PDF")}`}</span>
-          {pdf.blob&&<button onClick={dl} style={{background:"rgba(255,255,255,.14)",border:"none",borderRadius:9,color:"#fff",padding:"6px 10px",cursor:"pointer",fontWeight:700,fontSize:12}}>⬇️ PDF</button>}
+          {pdf.blob&&<button onClick={dl} style={{background:"rgba(0,0,0,0.035)",border:"none",borderRadius:9,color:CP.textPrimary,padding:"6px 10px",cursor:"pointer",fontWeight:700,fontSize:12}}>⬇️ PDF</button>}
         </div>}
-        {!validTo&&<div style={{color:"#FFD43B",fontSize:12,margin:"8px 0"}}>⚠️ {L("Bitte eine gültige E-Mail-Adresse eingeben","Escribe un email válido del destinatario","Please enter a valid e-mail address","Inserisci un indirizzo e-mail valido")}</div>}
+        {!validTo&&<div style={{color:"#9a5b00",fontSize:12,margin:"8px 0"}}>⚠️ {L("Bitte eine gültige E-Mail-Adresse eingeben","Escribe un email válido del destinatario","Please enter a valid e-mail address","Inserisci un indirizzo e-mail valido")}</div>}
         <div style={{marginTop:10}}>
           <CompanyEmailButtons to={job.to.trim()} subject={job.subject} body={job.body} lang={lang} disabled={!validTo||pdf.status==="working"}/>
         </div>
@@ -1115,24 +1115,35 @@ const APPS = [
 
 // ─── CSS CONSTANTS ───────────────────────────────────────────
 const CP = {
-  // CarPlay palette
-  bg: "#0A0A0F",
-  surface: "rgba(28,28,38,0.95)",
-  surfaceHover: "rgba(40,40,55,0.98)",
-  border: "rgba(255,255,255,0.09)",
-  borderActive: "rgba(255,255,255,0.22)",
-  textPrimary: "#FFFFFF",
-  textSecondary: "rgba(255,255,255,0.55)",
-  textTertiary: "rgba(255,255,255,0.3)",
-  accent: "#1C7ED6",
-  accentGlow: "rgba(28,126,214,0.25)",
-  success: "#2F9E44",
-  warning: "#F08C00",
-  danger: "#C92A2A",
-  radius: "18px",
-  radiusSm: "12px",
-  font: "-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif",
+  // Windows 11 (Fluent) light palette
+  bg: "#f3f3f3",
+  surface: "#ffffff",
+  surfaceHover: "#f6f6f6",
+  border: "#e5e5e5",
+  borderActive: "#d1d1d1",
+  textPrimary: "#1a1a1a",
+  textSecondary: "#5d5d5d",
+  textTertiary: "#8a8a8a",
+  accent: "#0067c0",
+  accentGlow: "rgba(0,103,192,0.18)",
+  success: "#0f7b0f",
+  warning: "#c55a00",
+  danger: "#c42b1c",
+  radius: "10px",
+  radiusSm: "8px",
+  font: "'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
 };
+
+// Text colour that reads well on a given background (light theme)
+const lightBg = bg => typeof bg==="string" && (/^rgba\(0,\s*0,\s*0,\s*0?\.[0-2]/.test(bg) || /^#(f|e)[0-9a-f]{5}$/i.test(bg) || bg==="#fff" || bg==="white" || bg==="transparent");
+const fgOn = bg => lightBg(bg) ? CP.textPrimary : "#fff";
+// Phone-size screen?
+function useIsMobile(){
+  const q = () => typeof window!=="undefined" && window.innerWidth < 900;
+  const [m,setM] = useState(q);
+  useEffect(()=>{ const f=()=>setM(q()); window.addEventListener("resize",f); return ()=>window.removeEventListener("resize",f); },[]);
+  return m;
+}
 
 // ─── SHARED UI ───────────────────────────────────────────────
 function CPBtn({children, onClick, variant="primary", size="md", full=false, style:xs}){
@@ -1140,13 +1151,13 @@ function CPBtn({children, onClick, variant="primary", size="md", full=false, sty
     : variant==="success" ? CP.success
     : variant==="danger"  ? CP.danger
     : variant==="warning" ? CP.warning
-    : "rgba(255,255,255,0.1)";
+    : "#ffffff";
   const pd = size==="sm" ? "6px 14px" : size==="lg" ? "14px 28px" : "10px 20px";
   const fs = size==="sm" ? 13 : size==="lg" ? 17 : 14;
   return (
     <button onClick={onClick} style={{
-      background:bg, border:"none", borderRadius: CP.radiusSm,
-      color:"#fff", padding:pd, fontSize:fs, fontWeight:600,
+      background:bg, border:lightBg(bg)?`1px solid ${CP.borderActive}`:"1px solid transparent", borderRadius: CP.radiusSm,
+      color:fgOn(bg), padding:pd, fontSize:fs, fontWeight:600,
       cursor:"pointer", fontFamily:CP.font, transition:"opacity .15s, transform .1s",
       whiteSpace:"nowrap", display:"inline-flex", alignItems:"center", gap:6,
       width: full?"100%":"auto", justifyContent: full?"center":"flex-start",
@@ -1176,10 +1187,10 @@ function CPInput({value,onChange,placeholder,type="text",style:xs,min,max}){
   const input = (
     <input type={type} value={value??""} onChange={onChange} placeholder={placeholder} min={min} max={max}
       style={{
-        width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.07)",
-        border:`1px solid ${CP.border}`, borderRadius: CP.radiusSm,
+        width:"100%", padding:"12px 16px", background:"#fff",
+        border:`1px solid ${CP.border}`, borderBottom:"1px solid #8a8a8a", borderRadius: 6,
         color: CP.textPrimary, fontSize:15, fontFamily: CP.font,
-        outline:"none", boxSizing:"border-box", colorScheme:"dark", ...xs,
+        outline:"none", boxSizing:"border-box", colorScheme:"light", ...xs,
       }}
     />
   );
@@ -1192,7 +1203,7 @@ function CPInput({value,onChange,placeholder,type="text",style:xs,min,max}){
 function CPSelect({value,onChange,children,style:xs}){
   return (
     <select value={value} onChange={onChange} style={{
-      width:"100%", padding:"12px 16px", background:"rgba(20,20,30,0.95)",
+      width:"100%", padding:"12px 16px", background:"#ffffff",
       border:`1px solid ${CP.border}`, borderRadius: CP.radiusSm,
       color: CP.textPrimary, fontSize:15, fontFamily: CP.font, outline:"none", ...xs,
     }}>{children}</select>
@@ -1208,11 +1219,11 @@ function CPField({label,children}){
 }
 
 function CPBadge({text,color}){
-  const c = color==="green" ? {bg:"rgba(47,158,68,.2)",text:"#69DB7C"}
-    : color==="red"   ? {bg:"rgba(201,42,42,.2)",text:"#FF8787"}
-    : color==="yellow"? {bg:"rgba(240,140,0,.2)",text:"#FFD43B"}
+  const c = color==="green" ? {bg:"rgba(47,158,68,.2)",text:"#107c10"}
+    : color==="red"   ? {bg:"rgba(201,42,42,.2)",text:"#c42b1c"}
+    : color==="yellow"? {bg:"rgba(240,140,0,.2)",text:"#9a5b00"}
     : color==="purple"? {bg:"rgba(112,72,232,.2)",text:"#BE4BDB"}
-    : {bg:"rgba(255,255,255,.1)",text:"rgba(255,255,255,.65)"};
+    : {bg:"rgba(0,0,0,0.07)",text:"rgba(0,0,0,0.77)"};
   return (
     <span style={{background:c.bg,color:c.text,fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20}}>{text}</span>
   );
@@ -1222,7 +1233,7 @@ function CPStat({label,value,icon,accent}){
   return (
     <CPCard style={{display:"flex",flexDirection:"column",gap:8,minWidth:0}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{color:CP.textSecondary,fontSize:12,fontWeight:600,letterSpacing:.3,textTransform:"uppercase"}}>{label}</span>
+        <span style={{color:CP.textSecondary,fontSize:12.5,fontWeight:500}}>{label}</span>
         <span style={{fontSize:22}}>{icon}</span>
       </div>
       <div style={{color: accent||CP.textPrimary, fontSize:26,fontWeight:700,fontFamily:CP.font,lineHeight:1}}>{value}</div>
@@ -1233,12 +1244,12 @@ function CPStat({label,value,icon,accent}){
 function CPModal({title,onClose,children,width=520}){
   return (
     <div style={{
-      position:"fixed",inset:0,background:"rgba(0,0,0,.72)",
+      position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",
       display:"flex",alignItems:"center",justifyContent:"center",
       zIndex:9999,padding:16,backdropFilter:"blur(8px)"
     }} onClick={onClose}>
       <div style={{
-        background:"rgba(18,18,28,0.98)", border:`1px solid ${CP.borderActive}`,
+        background:"#ffffff", border:`1px solid ${CP.borderActive}`,
         borderRadius:24, width:Math.min(width,window.innerWidth-32),
         maxHeight:"88vh",overflow:"auto",
       }} onClick={e=>e.stopPropagation()}>
@@ -1248,7 +1259,7 @@ function CPModal({title,onClose,children,width=520}){
         }}>
           <span style={{color:CP.textPrimary,fontWeight:700,fontSize:17,fontFamily:CP.font}}>{title}</span>
           <button onClick={onClose} style={{
-            background:"rgba(255,255,255,.1)",border:"none",borderRadius:"50%",
+            background:"rgba(0,0,0,0.035)",border:"none",borderRadius:"50%",
             width:32,height:32,color:CP.textSecondary,cursor:"pointer",fontSize:16,
             display:"flex",alignItems:"center",justifyContent:"center"
           }}>✕</button>
@@ -1277,8 +1288,8 @@ function CPTable({headers,rows}){
         </thead>
         <tbody>
           {rows.map((row,i)=>(
-            <tr key={i} style={{borderBottom:`1px solid rgba(255,255,255,0.04)`}}
-              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.03)"}
+            <tr key={i} style={{borderBottom:`1px solid rgba(0,0,0,0.028)`}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(0,0,0,0.021)"}
               onMouseLeave={e=>e.currentTarget.style.background="transparent"}
             >
               {row.map((cell,j)=>(
@@ -1387,9 +1398,9 @@ function AttendanceBadge({job, lang}){
   const L = makeL(lang);
   const i = jobPaidInfo(job);
   const st = {fontSize:11.5,fontWeight:700,padding:"2px 8px",borderRadius:10,display:"inline-block",marginTop:4};
-  if(i.state==="absent") return <span style={{...st,background:"rgba(201,42,42,.2)",color:"#FF8787"}}>❌ {L("Nicht erschienen – 0 Std.","No se presentó – 0 h","Did not show up – 0 h","Non presentato – 0 h")}</span>;
-  if(i.state==="late") return <span style={{...st,background:"rgba(240,140,0,.18)",color:"#FFA94D"}}>⏰ {L("Ankunft","Llegó","Arrived","Arrivato")} {job.actualStart} (+{i.lateMin} min) · {i.hours} h {L("bezahlt","pagadas","paid","pagate")}</span>;
-  if(i.state==="ontime") return <span style={{...st,background:"rgba(47,158,68,.18)",color:"#69DB7C"}}>✅ {L("Pünktlich","Puntual","On time","Puntuale")} {job.actualStart} · {i.hours} h</span>;
+  if(i.state==="absent") return <span style={{...st,background:"rgba(201,42,42,.2)",color:"#c42b1c"}}>❌ {L("Nicht erschienen – 0 Std.","No se presentó – 0 h","Did not show up – 0 h","Non presentato – 0 h")}</span>;
+  if(i.state==="late") return <span style={{...st,background:"rgba(240,140,0,.18)",color:"#c55a00"}}>⏰ {L("Ankunft","Llegó","Arrived","Arrivato")} {job.actualStart} (+{i.lateMin} min) · {i.hours} h {L("bezahlt","pagadas","paid","pagate")}</span>;
+  if(i.state==="ontime") return <span style={{...st,background:"rgba(47,158,68,.18)",color:"#107c10"}}>✅ {L("Pünktlich","Puntual","On time","Puntuale")} {job.actualStart} · {i.hours} h</span>;
   return null;
 }
 // Hours billed to the client for a visit: the hours agreed with the client (client_hours) — separate from the employees' schedule.
@@ -1407,18 +1418,18 @@ function CPScreen({title,icon,onBack,actions,children,t}){
         padding:"12px 20px",display:"flex",alignItems:"center",
         justifyContent:"space-between",flexShrink:0,
         borderBottom:`1px solid ${CP.border}`,
-        background:"rgba(10,10,18,0.8)",backdropFilter:"blur(20px)",
+        background:"rgba(249,249,249,0.92)",backdropFilter:"blur(20px)",
       }}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           {onBack && (
             <button onClick={onBack} style={{
-              background:"rgba(255,255,255,.1)",border:"none",borderRadius:"50%",
-              width:34,height:34,color:"#fff",cursor:"pointer",fontSize:18,
+              background:"#fff",border:`1px solid ${CP.border}`,borderRadius:8,
+              width:34,height:34,color:CP.textPrimary,cursor:"pointer",fontSize:18,
               display:"flex",alignItems:"center",justifyContent:"center"
             }}>‹</button>
           )}
           <span style={{fontSize:20}}>{icon}</span>
-          <span style={{color:CP.textPrimary,fontWeight:700,fontSize:18}}>{title}</span>
+          <span style={{color:CP.textPrimary,fontWeight:600,fontSize:20}}>{title}</span>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{actions}</div>
       </div>
@@ -1432,6 +1443,7 @@ export default function PatjacCarPlay(){
   const [lang,setLangRaw] = useState(()=>localStorage.getItem('patjac_lang')||"ES");
   const setLang = (l) => { setLangRaw(l); try{lsSafeSet('patjac_lang',l);}catch(e){} };
   const t = T[lang];
+  const isMobile = useIsMobile();
 
   const [authState,setAuthState] = useState("login");
   const [authType,setAuthType] = useState("admin");
@@ -1949,7 +1961,7 @@ export default function PatjacCarPlay(){
   // ─── LOADING SCREEN ──────────────────────────────────────
   if(authState==="app" && !dbReady) return (
     <div style={{
-      width:"100vw",height:"100vh",background:"#0a0e18",
+      width:"100vw",height:"100vh",background:CP.bg,
       display:"flex",flexDirection:"column",
       alignItems:"center",justifyContent:"center",gap:20,
       fontFamily:CP.font,
@@ -1957,17 +1969,17 @@ export default function PatjacCarPlay(){
       <img src={PATJAC_LOGO} alt="Patjac" style={{height:60,objectFit:"contain",marginBottom:8}}/>
       <div style={{
         width:44,height:44,borderRadius:"50%",
-        border:"3px solid rgba(255,255,255,0.1)",
+        border:"3px solid rgba(0,0,0,0.07)",
         borderTopColor:"#1C7ED6",
         animation:"spin 0.8s linear infinite",
       }}/>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{color:"rgba(255,255,255,0.5)",fontSize:14}}>
+      <div style={{color:"rgba(0,0,0,0.62)",fontSize:14}}>
         Patjac Business Suite wird geladen...
       </div>
       {dbError&&(
         <div style={{
-          color:"#FFD43B",fontSize:12,
+          color:"#9a5b00",fontSize:12,
           background:"rgba(240,140,0,0.1)",
           border:"1px solid rgba(240,140,0,0.3)",
           borderRadius:10,padding:"8px 16px",marginTop:8,
@@ -1992,9 +2004,9 @@ export default function PatjacCarPlay(){
       <div style={{position:"absolute",top:20,right:24,display:"flex",gap:8}}>
         {["DE","ES","EN","IT"].map(l=>(
           <button key={l} onClick={()=>setLang(l)} style={{
-            background: lang===l?"rgba(28,126,214,0.7)":"rgba(255,255,255,0.08)",
+            background: lang===l?"rgba(28,126,214,0.7)":"rgba(0,0,0,0.056)",
             border:`1px solid ${lang===l?"rgba(28,126,214,0.8)":CP.border}`,
-            color:"#fff",padding:"5px 12px",borderRadius:20,cursor:"pointer",
+            color:(lang===l)?"#fff":CP.textPrimary,padding:"5px 12px",borderRadius:20,cursor:"pointer",
             fontSize:12,fontWeight:700,fontFamily:CP.font,
           }}>{l}</button>
         ))}
@@ -2009,25 +2021,25 @@ export default function PatjacCarPlay(){
             margin:"0 auto 16px",
           }}>
             <img src={PATJAC_LOGO} alt="Patjac"
-              style={{width:"100%",height:"100%",objectFit:"contain",filter:"drop-shadow(0 4px 16px rgba(0,0,0,0.5))"}}/>
+              style={{width:"100%",height:"100%",objectFit:"contain",borderRadius:6,filter:"drop-shadow(0 2px 8px rgba(0,0,0,0.12))"}}/>
           </div>
           <div style={{color:CP.textSecondary,fontSize:13,marginTop:4}}>{t.tagline}</div>
         </div>
 
         {/* Card */}
         <div style={{
-          background:"rgba(255,255,255,0.05)",
-          border:`1px solid ${CP.borderActive}`,
-          borderRadius:26,padding:"28px 28px 24px",
+          background:"#fff",
+          border:`1px solid ${CP.border}`,boxShadow:"0 8px 28px rgba(0,0,0,0.08)",
+          borderRadius:12,padding:"28px 28px 24px",
           backdropFilter:"blur(30px)",
         }}>
           {/* Tab */}
-          <div style={{display:"flex",background:"rgba(0,0,0,0.3)",borderRadius:14,padding:3,marginBottom:22}}>
+          <div style={{display:"flex",background:"rgba(0,0,0,0.035)",borderRadius:14,padding:3,marginBottom:22}}>
             {[["admin",t.administrator],["employee",t.employee]].map(([k,label])=>(
               <button key={k} onClick={()=>{setAuthType(k);setLoginErr("");}} style={{
                 flex:1,padding:"9px 0",
-                background: authType===k?"rgba(28,126,214,0.85)":"transparent",
-                border:"none",color:"#fff",borderRadius:12,cursor:"pointer",
+                background: authType===k?CP.accent:"transparent",
+                border:"none",color:authType===k?"#fff":CP.textPrimary,borderRadius:12,cursor:"pointer",
                 fontSize:13,fontWeight:700,fontFamily:CP.font,transition:"background .2s",
               }}>{label}</button>
             ))}
@@ -2046,7 +2058,7 @@ export default function PatjacCarPlay(){
             <>
               {(needActivation||!getDeviceKey())&&(
                 <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.35)",borderRadius:12,padding:"10px 12px",marginBottom:12}}>
-                  <div style={{color:"#74C0FC",fontWeight:700,fontSize:13,marginBottom:6}}>📲 {L("Dieses Telefon freischalten","Activar este teléfono","Activate this phone","Attiva questo telefono")}</div>
+                  <div style={{color:"#0067c0",fontWeight:700,fontSize:13,marginBottom:6}}>📲 {L("Dieses Telefon freischalten","Activar este teléfono","Activate this phone","Attiva questo telefono")}</div>
                   <div style={{display:"flex",gap:6}}>
                     <CPInput value={actCode} onChange={e=>setActCode(e.target.value.toUpperCase().slice(0,12))} placeholder="ABCD2345" autoComplete="off" style={{textAlign:"center",letterSpacing:3,fontWeight:700}}/>
                     <CPBtn onClick={activateDevice} size="sm">✓</CPBtn>
@@ -2054,7 +2066,7 @@ export default function PatjacCarPlay(){
                   <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:6}}>{L("Den Code sendet Ihnen der Administrator. Er gilt nur einmal und nur für dieses Telefon.","El código te lo envía el administrador. Sirve una sola vez y solo para este teléfono.","The administrator sends you the code. It works once and only for this phone.","Il codice te lo invia l'amministratore. Vale una volta e solo per questo telefono.")}</div>
                 </div>
               )}
-              {actMsg&&<div style={{color:"#69DB7C",fontSize:13,marginBottom:10}}>{actMsg}</div>}
+              {actMsg&&<div style={{color:"#107c10",fontSize:13,marginBottom:10}}>{actMsg}</div>}
               <CPField label={`${t.pin} (4 dígitos)`}>
                 <CPInput value={loginPin} onChange={e=>setLoginPin(e.target.value)} placeholder="••••" type="password" inputMode="numeric" autoComplete="off" maxLength={6} style={{textAlign:"center",fontSize:28,letterSpacing:10}}/>
               </CPField>
@@ -2062,7 +2074,7 @@ export default function PatjacCarPlay(){
           )}
 
           {loginErr && (
-            <div style={{background:"rgba(201,42,42,0.18)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:12,padding:"10px 14px",color:"#FF8787",fontSize:13,marginBottom:16}}>
+            <div style={{background:"rgba(201,42,42,0.18)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:12,padding:"10px 14px",color:"#c42b1c",fontSize:13,marginBottom:16}}>
               ⚠️ {loginErr}
             </div>
           )}
@@ -2077,70 +2089,54 @@ export default function PatjacCarPlay(){
     </div>
   );
 
-  // ─── MAIN CarPlay INTERFACE ─────────────────────────────
+  // ─── MAIN INTERFACE (Windows 11 style) ─────────────────
+  const unreadCount = (messages||[]).filter(m=>!m.read&&m.to===(currentUser?.id||"admin")).length;
+  const homeLabel = L("Start","Inicio","Home","Home");
+  const shortName = id => ({messaging:L("Nachrichten","Mensajes","Messages","Messaggi"),settings:L("Einstellungen","Ajustes","Settings","Impostazioni"),timeclock:L("Zeit","Fichaje","Clock","Presenze")})[id];
+  const mkItem = app => ({id:app.id,icon:app.icon,label:appName(app.id),short:shortName(app.id),badge:app.id==="messaging"&&unreadCount>0?unreadCount:null});
+  const homeItem = {id:null,icon:"🏠",label:homeLabel};
+  const navItems = currentUser?.role==="employee" ? [homeItem,...EMPLOYEE_APPS.map(mkItem)] : [homeItem,...APPS.map(mkItem)];
+  const tabIds = currentUser?.role==="employee" ? ["timeclock","jobs","messaging"] : ["jobs","messaging","settings"];
+  const tabItems = [homeItem,...tabIds.map(id=>mkItem((currentUser?.role==="employee"?EMPLOYEE_APPS:APPS).find(a=>a.id===id)||{id,icon:"•"}))];
+  const topIconBtn = {width:34,height:34,borderRadius:8,background:"transparent",border:"1px solid transparent",color:CP.textPrimary,cursor:"pointer",fontSize:15,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:CP.font,flexShrink:0};
   return (
     <div style={{
       width:"100vw",height:"100vh",background:CP.bg,
       fontFamily:CP.font,overflow:"hidden",display:"flex",flexDirection:"column",
       position:"relative",
     }}>
-      {/* ── STATUS BAR ── */}
+      {/* ── TOP BAR (Windows 11 style, logo centred) ── */}
       <div style={{
-        height:44,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(20px)",
-        borderBottom:`1px solid ${CP.border}`,
-        display:"flex",alignItems:"center",justifyContent:"space-between",
-        padding:"0 24px",flexShrink:0,
+        height:isMobile?54:50,background:"rgba(249,249,249,0.92)",backdropFilter:"blur(20px)",
+        borderBottom:`1px solid ${CP.border}`,flexShrink:0,
+        display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",
+        padding:isMobile?"0 10px":"0 16px",paddingTop:"env(safe-area-inset-top)",boxSizing:"content-box",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <img src={PATJAC_LOGO} alt="Patjac" style={{height:32,width:"auto",objectFit:"contain",filter:"drop-shadow(0 1px 4px rgba(0,0,0,0.3))"}}/>
-          {activeApp && (
-            <>
-              <span style={{color:CP.textTertiary,fontSize:12}}>›</span>
-              <span style={{color:CP.textSecondary,fontSize:13}}>{appName(activeApp)}</span>
-            </>
-          )}
-          {/* ── HELP BUTTON (admin only) ── */}
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          {!isMobile&&<span style={{color:CP.textSecondary,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{activeApp?appName(activeApp):"Patjac – Reinigung Garten & Services"}</span>}
           {currentUser?.role==="admin" && (
-            <button onClick={()=>setShowHelp(true)} title={t.help||"Help"} style={{
-              marginLeft:6,
-              width:26,height:26,borderRadius:"50%",
-              background:"linear-gradient(135deg,rgba(28,126,214,0.85),rgba(0,188,242,0.85))",
-              border:"1px solid rgba(255,255,255,0.25)",
-              color:"#fff",cursor:"pointer",fontSize:13,fontWeight:800,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              boxShadow:"0 0 10px rgba(28,126,214,0.4)",
-              transition:"all .18s",flexShrink:0,
-            }}
-              onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.15)";e.currentTarget.style.boxShadow="0 0 18px rgba(28,126,214,0.7)";}}
-              onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow="0 0 10px rgba(28,126,214,0.4)";}}
-            >?</button>
+            <button onClick={()=>setShowHelp(true)} title={t.help||"Help"} style={topIconBtn}>?</button>
           )}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:16}}>
-          {currentUser?.role==="admin"&&<button onClick={()=>setShowSearch(true)} title={L("Alles suchen","Buscar en toda la app","Search everything","Cerca ovunque")} style={{background:"rgba(28,126,214,0.25)",border:"1px solid rgba(28,126,214,0.5)",borderRadius:10,color:"#fff",padding:"4px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>🔍 {L("Suchen","Buscar","Search","Cerca")}</button>}
-          {currentUser?.role==="admin"&&<button onClick={openCompanyMailbox} title={L("Firmen-Postfach öffnen","Abrir mi correo de empresa","Open company mailbox","Apri la posta aziendale")+" · "+COMPANY_EMAIL} style={{background:"rgba(224,17,95,0.25)",border:"1px solid rgba(224,17,95,0.5)",borderRadius:10,color:"#fff",padding:"4px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>📬 {L("Post","Correo","Mail","Posta")}</button>}
-          {currentUser?.role==="admin"&&          <button onClick={()=>setShowShare(true)} title={L("App teilen","Compartir la app","Share the app","Condividi l'app")} style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:10,color:"#fff",padding:"4px 9px",cursor:"pointer",fontSize:14}}>📲</button>}
-          {/* Lang */}
-          <div style={{display:"flex",gap:4}}>
-            {["DE","ES","EN","IT"].map(l=>(
-              <button key={l} onClick={()=>setLang(l)} style={{
-                background: lang===l?"rgba(28,126,214,0.7)":"transparent",
-                border:"none",color: lang===l?"#fff":CP.textTertiary,
-                padding:"2px 7px",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,
-              }}>{l}</button>
-            ))}
-          </div>
-          <div style={{color:CP.textSecondary,fontSize:13,fontWeight:600}}>
-            {clock.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <span style={{fontSize:14}}>{currentUser?.role==="admin"?"👑":"👤"}</span>
-            <span style={{color:CP.textSecondary,fontSize:12}}>{currentUser?.name}</span>
-            <button onClick={handleLogout} style={{
-              background:"rgba(255,255,255,0.08)",border:"none",borderRadius:8,
-              color:CP.textTertiary,padding:"3px 8px",cursor:"pointer",fontSize:11,
-            }}>⏻</button>
-          </div>
+        <div style={{display:"flex",justifyContent:"center"}}>
+          <img src={PATJAC_LOGO} alt="Patjac" onClick={()=>setActiveApp(null)} style={{height:isMobile?34:32,width:"auto",objectFit:"contain",borderRadius:4,cursor:"pointer"}}/>
+        </div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:isMobile?4:8,minWidth:0}}>
+          {currentUser?.role==="admin"&&<button onClick={()=>setShowSearch(true)} title={L("Alles suchen","Buscar en toda la app","Search everything","Cerca ovunque")} style={topIconBtn}>🔍</button>}
+          {currentUser?.role==="admin"&&<button onClick={openCompanyMailbox} title={L("Firmen-Postfach öffnen","Abrir mi correo de empresa","Open company mailbox","Apri la posta aziendale")+" · "+COMPANY_EMAIL} style={topIconBtn}>📬</button>}
+          {currentUser?.role==="admin"&&!isMobile&&<button onClick={()=>setShowShare(true)} title={L("App teilen","Compartir la app","Share the app","Condividi l'app")} style={topIconBtn}>📲</button>}
+          {!isMobile&&(
+            <div style={{display:"flex",gap:2,background:"#fff",border:`1px solid ${CP.border}`,borderRadius:8,padding:2}}>
+              {["DE","ES","EN","IT"].map(l=>(
+                <button key={l} onClick={()=>setLang(l)} style={{
+                  background: lang===l?CP.accent:"transparent",border:"none",color: lang===l?"#fff":CP.textSecondary,
+                  padding:"3px 7px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:CP.font,
+                }}>{l}</button>
+              ))}
+            </div>
+          )}
+          {!isMobile&&<span style={{color:CP.textSecondary,fontSize:12.5,whiteSpace:"nowrap"}}>{currentUser?.role==="admin"?"👑":"👤"} {currentUser?.name}</span>}
+          <button onClick={handleLogout} title={L("Abmelden","Cerrar sesión","Log out","Esci")} style={topIconBtn}>⏻</button>
         </div>
       </div>
 
@@ -2148,50 +2144,65 @@ export default function PatjacCarPlay(){
         clients={clients} employees={employees} jobs={jobs} invoices={invoices} contracts={contracts} orders={orders} products={products} suppliers={suppliers}/>}
       {showShare&&currentUser?.role==="admin"&&<ShareAppModal lang={lang} onClose={()=>setShowShare(false)}/>}
       <EmailHost lang={lang}/>
-      {/* ── CONTENT ── */}
-      <div style={{flex:1,overflow:"hidden",position:"relative"}}>
-        {activeApp ? (
-          renderApp()
-        ) : currentUser?.role==="employee" ? (
-          <EmployeeHomeScreen t={t} openApp={openApp} clock={clock} lang={lang}
-            currentUser={currentUser} jobs={jobs} timeclock={timeclock}
-            messages={messages} employees={employees} notify={notify}/>
-        ) : (
-          <HomeScreen t={t} openApp={openApp} clock={clock} lang={lang} currentUser={currentUser}
-            jobs={jobs} invoices={invoices} clients={clients} employees={employees}
-            notify={notify} messages={messages} onIssueInvoice={g=>{setInvoicePrefill(g); openApp("invoices");}}
-            lastBackupAt={companySettings.lastBackupAt} onBackup={doBackup} backupBusy={backupBusy}/>
+      {/* ── BODY: navigation pane (computer) + content ── */}
+      <div style={{flex:1,display:"flex",minHeight:0}}>
+        {!isMobile&&(
+          <nav style={{width:236,flexShrink:0,overflowY:"auto",padding:"10px 6px 16px"}}>
+            {currentUser?.role==="admin"&&(
+              <button onClick={()=>setShowSearch(true)} style={{width:"calc(100% - 16px)",margin:"0 8px 10px",height:34,borderRadius:6,background:"#fff",border:`1px solid ${CP.border}`,borderBottom:"1px solid #8a8a8a",display:"flex",alignItems:"center",gap:8,padding:"0 10px",color:CP.textTertiary,fontSize:13,cursor:"pointer",fontFamily:CP.font,textAlign:"left"}}>🔍 {L("Kunden, Aufträge suchen…","Buscar clientes, trabajos…","Search clients, jobs…","Cerca clienti, lavori…")}</button>
+            )}
+            {navItems.map(it=>{
+              const on = (activeApp||null)===it.id;
+              return (
+                <div key={it.id||"home"} role="button" tabIndex={0} onClick={()=>it.id?openApp(it.id):setActiveApp(null)} onKeyDown={e=>{if(e.key==="Enter")(it.id?openApp(it.id):setActiveApp(null));}}
+                  style={{position:"relative",height:36,display:"flex",alignItems:"center",gap:12,padding:"0 12px",margin:"1px 4px",borderRadius:6,cursor:"pointer",
+                    background:on?"rgba(0,0,0,0.055)":"transparent",color:CP.textPrimary,fontSize:13.5,fontWeight:on?600:400}}
+                  onMouseEnter={e=>{if(!on)e.currentTarget.style.background="rgba(0,0,0,0.035)";}} onMouseLeave={e=>{if(!on)e.currentTarget.style.background="transparent";}}>
+                  {on&&<span style={{position:"absolute",left:0,top:9,bottom:9,width:3,borderRadius:3,background:CP.accent}}/>}
+                  <span style={{fontSize:16,width:20,textAlign:"center"}}>{it.icon}</span>
+                  <span style={{flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.label}</span>
+                  {it.badge?<span style={{background:CP.accent,color:"#fff",borderRadius:10,fontSize:10.5,fontWeight:700,padding:"1px 7px"}}>{it.badge}</span>:null}
+                </div>
+              );
+            })}
+          </nav>
         )}
+        {/* ── CONTENT ── */}
+        <div style={{flex:1,overflow:"hidden",position:"relative",background:"#f9f9f9",minWidth:0,
+          ...(isMobile?{}:{borderTopLeftRadius:10,borderTop:`1px solid ${CP.border}`,borderLeft:`1px solid ${CP.border}`})}}>
+          {activeApp ? (
+            renderApp()
+          ) : currentUser?.role==="employee" ? (
+            <EmployeeHomeScreen t={t} openApp={openApp} clock={clock} lang={lang}
+              currentUser={currentUser} jobs={jobs} timeclock={timeclock}
+              messages={messages} employees={employees} notify={notify}/>
+          ) : (
+            <HomeScreen t={t} openApp={openApp} clock={clock} lang={lang} currentUser={currentUser}
+              jobs={jobs} invoices={invoices} clients={clients} employees={employees}
+              notify={notify} messages={messages} onIssueInvoice={g=>{setInvoicePrefill(g); openApp("invoices");}}
+              lastBackupAt={companySettings.lastBackupAt} onBackup={doBackup} backupBusy={backupBusy}/>
+          )}
+        </div>
       </div>
 
-      {/* ── DOCK ── */}
-      {!activeApp && (
-        currentUser?.role==="employee" ? (
-          /* Employee dock — 4 apps only */
-          <div style={{
-            height:88,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(24px)",
-            borderTop:`1px solid rgba(255,255,255,0.07)`,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            gap:16,padding:"0 24px",flexShrink:0,
-          }}>
-            {EMPLOYEE_APPS.map(app=>(
-              <DockIcon key={app.id} app={app}
-                label={app.id==="payroll"?(t.payrollTitle||"Payroll"):t[app.id]||app.id}
-                onOpen={()=>openApp(app.id)}/>
-            ))}
-          </div>
-        ) : (
-          /* Admin dock — all apps */
-          <div style={{
-            height:88,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(24px)",
-            borderTop:`1px solid ${CP.border}`,display:"flex",alignItems:"center",
-            justifyContent:"center",gap:14,padding:"0 24px",flexShrink:0,
-          }}>
-            {APPS.slice(0,7).map(app=>(
-              <DockIcon key={app.id} app={app} label={appName(app.id)} onOpen={()=>openApp(app.id)}/>
-            ))}
-          </div>
-        )
+      {/* ── BOTTOM TAB BAR (phone) ── */}
+      {isMobile&&(
+        <div style={{flexShrink:0,background:"rgba(250,250,250,0.96)",backdropFilter:"blur(20px)",borderTop:`1px solid ${CP.border}`,
+          display:"flex",justifyContent:"space-around",padding:"6px 4px calc(6px + env(safe-area-inset-bottom))"}}>
+          {tabItems.map(it=>{
+            const on=(activeApp||null)===it.id;
+            return (
+              <button key={it.id||"home"} onClick={()=>it.id?openApp(it.id):setActiveApp(null)} style={{position:"relative",background:"none",border:"none",cursor:"pointer",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:2,width:72,padding:"4px 0",fontFamily:CP.font,
+                color:on?CP.accent:CP.textSecondary,fontSize:10.5,fontWeight:on?600:500}}>
+                {on&&<span style={{position:"absolute",top:-6,width:20,height:3,borderRadius:2,background:CP.accent}}/>}
+                <span style={{fontSize:21,lineHeight:1}}>{it.icon}</span>
+                <span style={{whiteSpace:"nowrap"}}>{it.short||it.label}</span>
+                {it.badge?<span style={{position:"absolute",top:0,right:14,background:CP.accent,color:"#fff",borderRadius:9,fontSize:9.5,fontWeight:700,padding:"0 5px",minWidth:16}}>{it.badge}</span>:null}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {/* ── HELP MODAL ── */}
@@ -2202,14 +2213,14 @@ export default function PatjacCarPlay(){
       {/* ── NOTIFICATION ── */}
       {notification && (
         <div style={{
-          position:"fixed",top:52,right:16,
+          position:"fixed",top:isMobile?64:58,right:16,left:isMobile?16:"auto",
           background: notification.type==="error"
             ? "rgba(201,42,42,0.95)"
             : notification.type==="warning"
             ? "rgba(240,140,0,0.95)"
             : "rgba(28,126,214,0.95)",
           backdropFilter:"blur(16px)",
-          border:`1px solid rgba(255,255,255,0.2)`,
+          border:`1px solid rgba(0,0,0,0.14)`,
           borderRadius:16,padding:"12px 18px",color:"#fff",fontSize:13,fontWeight:600,
           zIndex:99999,boxShadow:"0 8px 32px rgba(0,0,0,0.5)",
           animation:"cpSlideIn .3s ease",maxWidth:320,
@@ -2238,7 +2249,7 @@ function DockIcon({app,label,onOpen}){
         fontSize:28,transition:"all .18s",
         transform: hov?"scale(1.12) translateY(-4px)":"scale(1)",
         boxShadow: hov?`0 8px 24px ${app.color}55`:"none",
-        border:`1px solid rgba(255,255,255,${hov?.18:.08})`,
+        border:`1px solid rgba(0,0,0,${hov?.14:.06})`,
       }}>{app.icon}</div>
       <span style={{color:CP.textSecondary,fontSize:10,fontWeight:600,letterSpacing:.2,textAlign:"center",maxWidth:64,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</span>
     </div>
@@ -2264,24 +2275,26 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
   const pending = invoices.filter(i=>i.status==="overdue").length;
   const unreadMsg = messages.filter(m=>!m.read&&m.to===(currentUser?.id||"admin")).length;
   const allApps = APPS;
+  const mob = useIsMobile();
   return (
-    <div style={{height:"100%",overflow:"auto",padding:"20px 28px 10px"}}>
+    <div style={{height:"100%",overflow:"auto",padding:mob?"16px 14px 10px":"26px 34px 10px"}}>
       <div style={{margin:"-12px -16px 10px"}}><NotifyPermissionBanner lang={lang} admin/></div>
-      <div style={{textAlign:"center",marginBottom:24}}>
-        <div style={{color:CP.textPrimary,fontSize:42,fontWeight:700,letterSpacing:-1,lineHeight:1}}>
-          {clock.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+      <div style={{marginBottom:18}}>
+        <div style={{color:CP.textPrimary,fontSize:mob?24:28,fontWeight:600,lineHeight:1.2}}>
+          {(clock.getHours()<12?L("Guten Morgen","Buenos días","Good morning","Buongiorno"):clock.getHours()<19?L("Guten Tag","Buenas tardes","Good afternoon","Buon pomeriggio"):L("Guten Abend","Buenas noches","Good evening","Buonasera"))}, Jac
         </div>
-        <div style={{color:CP.textSecondary,fontSize:15,marginTop:4}}>{dayStr}</div>
+        <div style={{color:CP.textSecondary,fontSize:14,marginTop:4}}>{dayStr.charAt(0).toUpperCase()+dayStr.slice(1)} · {clock.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:mob?8:12,marginBottom:mob?14:22}}>
         <CPStat label={t.todayJobs} value={todayJobs.length} icon="📋" accent="#F08C00"/>
         <CPStat label={t.totalClients} value={clients.filter(c=>c.active).length} icon="👥" accent="#1C7ED6"/>
         <CPStat label={t.pendingInvoices} value={pending} icon="🧾" accent={pending>0?"#C92A2A":"#2F9E44"}/>
         <CPStat label={t.activeEmployees} value={employees.filter(e=>e.active).length} icon="👤" accent="#7048E8"/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:12,marginBottom:20}}>
+      <div style={{color:CP.textPrimary,fontSize:15,fontWeight:600,margin:"0 0 10px"}}>{L("Anwendungen","Aplicaciones","Apps","Applicazioni")}</div>
+      <div style={{display:"grid",gridTemplateColumns:mob?"repeat(4,1fr)":"repeat(auto-fill,minmax(124px,1fr))",gap:mob?8:10,marginBottom:20}}>
         {allApps.map(app=>(
-          <AppTile key={app.id} app={app} label={app.id==="payroll"?(t.payrollTitle||"Payroll"):t[app.id]||app.id} onOpen={()=>openApp(app.id)}
+          <AppTile key={app.id} app={app} label={mob&&app.id==="pricecalc"?L("Preise","Precios","Prices","Prezzi"):mob&&app.id==="inventory"?L("Lager","Almacén","Stock","Magazzino"):app.id==="payroll"?(t.payrollTitle||"Payroll"):t[app.id]||app.id} onOpen={()=>openApp(app.id)}
             badge={app.id==="messaging"&&unreadMsg>0?unreadMsg:app.id==="invoices"&&(pending+billingDue.length)>0?(pending+billingDue.length):null}
           />
         ))}
@@ -2291,7 +2304,7 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
         <CPCard style={{marginBottom:14,border:"1px solid rgba(28,126,214,.45)",background:"rgba(28,126,214,.08)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
             <div>
-              <div style={{color:"#74C0FC",fontWeight:700,fontSize:14}}>💾 {L("Monatliche Sicherung fällig","Toca hacer la copia de seguridad del mes","Monthly backup due","Backup mensile da fare")}</div>
+              <div style={{color:"#0067c0",fontWeight:700,fontSize:14}}>💾 {L("Monatliche Sicherung fällig","Toca hacer la copia de seguridad del mes","Monthly backup due","Backup mensile da fare")}</div>
               <div style={{color:CP.textSecondary,fontSize:12}}>{L("Letzte Kopie","Última copia","Last backup","Ultimo backup")}: {lastBackupAt?fmtDate(String(lastBackupAt).slice(0,10)):L("noch nie","nunca","never","mai")}</div>
             </div>
             <CPBtn size="sm" onClick={onBackup}>{backupBusy?"⏳":"💾"} {L("Jetzt sichern","Crear copia ahora","Back up now","Crea backup ora")}</CPBtn>
@@ -2322,23 +2335,16 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
 
 function AppTile({app,label,onOpen,badge}){
   const [hov,setHov]=useState(false);
+  const mob=useIsMobile();
   return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,cursor:"pointer",position:"relative"}}
-      onClick={onOpen} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}>
-      <div style={{
-        width:72,height:72,borderRadius:20,
-        background:hov?app.color:`${app.color}bb`,
-        display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,
-        transition:"all .18s",transform:hov?"scale(1.08)":"scale(1)",
-        boxShadow:hov?`0 6px 20px ${app.color}55`:"none",
-        border:`1px solid rgba(255,255,255,${hov?.2:.08})`,position:"relative",
-      }}>
-        {app.icon}
-        {badge&&(
-          <div style={{position:"absolute",top:-4,right:-4,background:"#C92A2A",color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid "+CP.bg}}>{badge}</div>
-        )}
-      </div>
-      <span style={{color:hov?CP.textPrimary:CP.textSecondary,fontSize:11,fontWeight:600,textAlign:"center",lineHeight:1.2,maxWidth:80,wordBreak:"break-word"}}>{label}</span>
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e=>{if(e.key==="Enter")onOpen();}}
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{position:"relative",background:hov?"#f6f6f6":"#fff",border:`1px solid ${hov?CP.borderActive:CP.border}`,borderRadius:10,
+        height:mob?80:104,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:mob?4:8,cursor:"pointer",
+        boxShadow:hov?"0 4px 12px rgba(0,0,0,0.08)":"0 1px 2px rgba(0,0,0,0.04)",transition:"all .15s",padding:"0 4px"}}>
+      <span style={{fontSize:mob?24:30,lineHeight:1}}>{app.icon}</span>
+      <span style={{color:CP.textPrimary,fontSize:mob?10.5:12.5,fontWeight:500,textAlign:"center",lineHeight:1.2,wordBreak:"break-word"}}>{label}</span>
+      {badge&&<span style={{position:"absolute",top:6,right:7,background:CP.accent,color:"#fff",borderRadius:10,minWidth:18,height:18,padding:"0 5px",fontSize:10.5,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{badge}</span>}
     </div>
   );
 }
@@ -2363,7 +2369,7 @@ function NotifyPermissionBanner({lang, admin}){
   if(!supported){
     if(isAppleMobile() && !isStandaloneApp()) return (
       <div style={box}><span style={{fontSize:20}}>📲</span>
-        <span style={{color:"#FFD43B",fontSize:13,flex:1,minWidth:180}}>{L("Für Benachrichtigungen auf dem iPhone: Teilen ⬆️ → «Zum Home-Bildschirm», dann Patjac von dort öffnen.","Para recibir avisos en iPhone: pulsa Compartir ⬆️ → «Añadir a pantalla de inicio» y abre Patjac desde ese icono.","For alerts on iPhone: Share ⬆️ → “Add to Home Screen”, then open Patjac from that icon.","Per gli avvisi su iPhone: Condividi ⬆️ → «Aggiungi a Home», poi apri Patjac da lì.")}</span></div>);
+        <span style={{color:"#9a5b00",fontSize:13,flex:1,minWidth:180}}>{L("Für Benachrichtigungen auf dem iPhone: Teilen ⬆️ → «Zum Home-Bildschirm», dann Patjac von dort öffnen.","Para recibir avisos en iPhone: pulsa Compartir ⬆️ → «Añadir a pantalla de inicio» y abre Patjac desde ese icono.","For alerts on iPhone: Share ⬆️ → “Add to Home Screen”, then open Patjac from that icon.","Per gli avvisi su iPhone: Condividi ⬆️ → «Aggiungi a Home», poi apri Patjac da lì.")}</span></div>);
     return null;
   }
   if(perm!=="default") return null;
@@ -2373,7 +2379,7 @@ function NotifyPermissionBanner({lang, admin}){
   return (
     <div style={box}>
       <span style={{fontSize:20}}>🔔</span>
-      <span style={{color:"#FFD43B",fontSize:13,flex:1,minWidth:180}}>{txt}</span>
+      <span style={{color:"#9a5b00",fontSize:13,flex:1,minWidth:180}}>{txt}</span>
       <CPBtn size="sm" onClick={async()=>{ if(busy) return; setBusy(true); try{ const p = await Notification.requestPermission(); setPerm(p); if(p==="granted"){ await enablePush(); localNotify("✅ Patjac",{body:L("Benachrichtigungen aktiviert","Avisos activados","Alerts enabled","Avvisi attivati"), tag:"patjac-enabled"}); } }catch(e){ setPerm("denied"); } finally{ setBusy(false); } }}>{busy?"⏳":L("Aktivieren","Activar avisos","Enable","Attiva")}</CPBtn>
     </div>
   );
@@ -2406,12 +2412,12 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
     <div style={{height:"100%",overflow:"auto",background:"linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0.15) 100%)"}}>
       <NotifyPermissionBanner lang={lang}/>
       {/* Hero */}
-      <div style={{textAlign:"center",padding:"28px 24px 20px",background:"linear-gradient(180deg,rgba(16,152,173,0.12),transparent)",borderBottom:`1px solid rgba(255,255,255,0.05)`}}>
-        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><Avatar photo={emp?.photo} size={safeImg(emp?.photo)?110:72} style={{boxShadow:"0 0 28px rgba(16,152,173,0.5)",border:"3px solid rgba(255,255,255,0.25)"}}/></div>
+      <div style={{textAlign:"center",padding:"28px 24px 20px",background:"linear-gradient(180deg,rgba(16,152,173,0.12),transparent)",borderBottom:`1px solid rgba(0,0,0,0.035)`}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><Avatar photo={emp?.photo} size={safeImg(emp?.photo)?110:72} style={{boxShadow:"0 0 28px rgba(16,152,173,0.5)",border:"3px solid rgba(0,0,0,0.175)"}}/></div>
         <div style={{color:CP.textSecondary,fontSize:14,marginBottom:4}}>{greet()},</div>
-        <div style={{color:"#fff",fontSize:24,fontWeight:700,letterSpacing:-.3}}>{emp?.firstName||currentUser?.name}</div>
+        <div style={{color:CP.textPrimary,fontSize:24,fontWeight:700,letterSpacing:-.3}}>{emp?.firstName||currentUser?.name}</div>
         <div style={{color:CP.textTertiary,fontSize:13,marginTop:4}}>{dayStr}</div>
-        <div style={{fontSize:48,fontWeight:700,color:"#fff",letterSpacing:-2,margin:"14px 0 4px",lineHeight:1}}>
+        <div style={{fontSize:48,fontWeight:700,color:CP.textPrimary,letterSpacing:-2,margin:"14px 0 4px",lineHeight:1}}>
           {clock.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
         </div>
         <div style={{color:CP.textSecondary,fontSize:13}}>{fmtDate(clock,lang)}</div>
@@ -2422,7 +2428,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
           <button onClick={()=>openApp("timeclock")} style={{
             padding:"18px 12px",background:isClockedIn?"rgba(16,152,173,0.15)":"rgba(16,152,173,0.85)",
-            border:`2px solid ${isClockedIn?"rgba(16,152,173,0.3)":"#1098AD"}`,borderRadius:18,color:"#fff",cursor:"pointer",
+            border:`2px solid ${isClockedIn?"rgba(16,152,173,0.3)":"#1098AD"}`,borderRadius:18,color:isClockedIn?CP.textPrimary:"#fff",cursor:"pointer",
             display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:CP.font,
             boxShadow:isClockedIn?"none":"0 8px 24px rgba(16,152,173,0.4)",
           }}>
@@ -2432,7 +2438,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
           </button>
           <button onClick={()=>openApp("timeclock")} style={{
             padding:"18px 12px",background:isClockedIn?"rgba(201,42,42,0.85)":"rgba(201,42,42,0.12)",
-            border:`2px solid ${isClockedIn?"#C92A2A":"rgba(201,42,42,0.25)"}`,borderRadius:18,color:"#fff",
+            border:`2px solid ${isClockedIn?"#C92A2A":"rgba(201,42,42,0.25)"}`,borderRadius:18,color:(isClockedIn)?"#fff":CP.textPrimary,
             cursor:isClockedIn?"pointer":"not-allowed",opacity:isClockedIn?1:.5,
             display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:CP.font,
             boxShadow:isClockedIn?"0 8px 24px rgba(201,42,42,0.4)":"none",
@@ -2445,15 +2451,15 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
 
         {/* Today summary */}
         {(todayClock||todayJobs.length>0)&&(
-          <CPCard style={{marginBottom:16,background:"rgba(0,0,0,0.25)",border:`1px solid rgba(255,255,255,0.06)`}}>
+          <CPCard style={{marginBottom:16,background:"rgba(0,0,0,0.035)",border:`1px solid rgba(0,0,0,0.042)`}}>
             <div style={{color:CP.textSecondary,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>
               {t.todaySummary||"Today's Summary"}
             </div>
             <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
-              {todayClock?.clockIn&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.clockIn}</div><div style={{color:"#69DB7C",fontWeight:700,fontSize:18}}>{todayClock.clockIn}</div></div>}
-              {todayClock?.clockOut&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.clockOut}</div><div style={{color:"#FF8787",fontWeight:700,fontSize:18}}>{todayClock.clockOut}</div></div>}
-              {todayClock?.hours&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.workHours||"Std."}</div><div style={{color:"#FFD43B",fontWeight:700,fontSize:18}}>{parseFloat(todayClock.hours).toFixed(1)}h</div></div>}
-              {todayJobs.length>0&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.todayJobs}</div><div style={{color:"#74C0FC",fontWeight:700,fontSize:18}}>{completedCount}/{todayJobs.length}</div></div>}
+              {todayClock?.clockIn&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.clockIn}</div><div style={{color:"#107c10",fontWeight:700,fontSize:18}}>{todayClock.clockIn}</div></div>}
+              {todayClock?.clockOut&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.clockOut}</div><div style={{color:"#c42b1c",fontWeight:700,fontSize:18}}>{todayClock.clockOut}</div></div>}
+              {todayClock?.hours&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.workHours||"Std."}</div><div style={{color:"#9a5b00",fontWeight:700,fontSize:18}}>{parseFloat(todayClock.hours).toFixed(1)}h</div></div>}
+              {todayJobs.length>0&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.todayJobs}</div><div style={{color:"#0067c0",fontWeight:700,fontSize:18}}>{completedCount}/{todayJobs.length}</div></div>}
               {unread>0&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{lang==="DE"?"Neu":lang==="ES"?"Nuevo":lang==="IT"?"Nuovo":"New"}</div><div style={{color:"#D6336C",fontWeight:700,fontSize:18}}>{unread} 💬</div></div>}
             </div>
           </CPCard>
@@ -2512,12 +2518,12 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
         </CPCard>
 
         {/* Access code */}
-        <CPCard style={{background:"rgba(0,0,0,0.2)",border:`1px solid rgba(255,255,255,0.05)`}}>
+        <CPCard style={{background:"rgba(0,0,0,0.035)",border:`1px solid rgba(0,0,0,0.035)`}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{fontSize:28}}>🔑</div>
             <div>
               <div style={{color:CP.textSecondary,fontSize:12,fontWeight:600}}>{lang==="DE"?"Ihr Zugangscode":lang==="ES"?"Su código de acceso":lang==="IT"?"Il vostro codice":"Your access code"}</div>
-              <span style={{color:CP.textTertiary,fontSize:12}}><span style={{color:"#69DB7C",fontWeight:700}}>{t.code}:</span> <span style={{fontFamily:"monospace",fontSize:13,color:CP.textPrimary,letterSpacing:1}}>{currentUser?.code||"—"}</span></span>
+              <span style={{color:CP.textTertiary,fontSize:12}}><span style={{color:"#107c10",fontWeight:700}}>{t.code}:</span> <span style={{fontFamily:"monospace",fontSize:13,color:CP.textPrimary,letterSpacing:1}}>{currentUser?.code||"—"}</span></span>
             </div>
           </div>
         </CPCard>
@@ -2528,15 +2534,15 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
 
 function EmployeeAppTile({app,label,sublabel,badge,isClockedIn,onOpen}){
   const [hov,setHov]=useState(false);
-  const bgColor=isClockedIn===true?"rgba(47,158,68,0.85)":isClockedIn===false?"rgba(201,42,42,0.15)":(hov?app.color:`${app.color}cc`);
   return (
-    <div onClick={onOpen} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
-      style={{background:bgColor,border:`2px solid ${hov||isClockedIn===true?app.color:"rgba(255,255,255,0.1)"}`,borderRadius:22,padding:"22px 16px",cursor:"pointer",transition:"all .18s",display:"flex",flexDirection:"column",alignItems:"center",gap:8,boxShadow:hov?`0 12px 32px ${app.color}55`:"none",transform:hov?"translateY(-2px) scale(1.01)":"scale(1)",position:"relative"}}>
-      {badge&&<div style={{position:"absolute",top:10,right:12,background:"#C92A2A",color:"#fff",borderRadius:"50%",width:22,height:22,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(10,14,24,0.9)"}}>{badge}</div>}
-      {isClockedIn!==undefined&&<div style={{position:"absolute",top:12,left:14,width:10,height:10,borderRadius:"50%",background:isClockedIn?"#2F9E44":"#C92A2A",boxShadow:`0 0 8px ${isClockedIn?"#2F9E44":"#C92A2A"}`,border:"2px solid rgba(255,255,255,0.3)"}}/>}
-      <span style={{fontSize:44}}>{app.icon}</span>
-      <span style={{color:"#fff",fontSize:15,fontWeight:700,textAlign:"center"}}>{label}</span>
-      {sublabel&&<span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600,textAlign:"center",marginTop:-2}}>{sublabel}</span>}
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e=>{if(e.key==="Enter")onOpen();}} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background:hov?"#f6f6f6":"#fff",border:`1px solid ${hov?CP.borderActive:CP.border}`,borderRadius:10,padding:"18px 12px",cursor:"pointer",transition:"all .15s",
+        display:"flex",flexDirection:"column",alignItems:"center",gap:6,position:"relative",boxShadow:hov?"0 4px 12px rgba(0,0,0,0.08)":"0 1px 2px rgba(0,0,0,0.04)"}}>
+      {badge&&<span style={{position:"absolute",top:8,right:10,background:CP.accent,color:"#fff",borderRadius:10,minWidth:20,height:20,padding:"0 6px",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{badge}</span>}
+      {isClockedIn!==undefined&&<span style={{position:"absolute",top:12,left:12,width:10,height:10,borderRadius:"50%",background:isClockedIn?"#0f7b0f":"#c42b1c"}}/>}
+      <span style={{fontSize:34,lineHeight:1}}>{app.icon}</span>
+      <span style={{color:CP.textPrimary,fontSize:14,fontWeight:600,textAlign:"center"}}>{label}</span>
+      {sublabel&&<span style={{color:isClockedIn===true?"#0f7b0f":isClockedIn===false?"#c42b1c":CP.textSecondary,fontSize:12,fontWeight:500,textAlign:"center"}}>{sublabel}</span>}
     </div>
   );
 }
@@ -2846,11 +2852,11 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:99999,padding:16,overflowY:"auto",display:"flex",justifyContent:"center",alignItems:"flex-start"}} onClick={onClose}>
-      <div style={{background:"rgba(8,12,24,0.99)",border:"1px solid rgba(28,126,214,0.5)",borderRadius:20,width:"min(1040px,97vw)"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:"#ffffff",border:"1px solid rgba(28,126,214,0.5)",borderRadius:20,width:"min(1040px,97vw)"}} onClick={e=>e.stopPropagation()}>
         <div style={{background:"linear-gradient(90deg,#1C7ED6,#0CA678)",borderRadius:"20px 20px 0 0",padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-          <div style={{color:"#fff",fontWeight:700}}>📋 {L("Arbeitsrapport","Hoja mensual de trabajo","Monthly work sheet","Rapporto mensile")} · {emp.name} · {monthName} {year}</div>
+          <div style={{color:CP.textPrimary,fontWeight:700}}>📋 {L("Arbeitsrapport","Hoja mensual de trabajo","Monthly work sheet","Rapporto mensile")} · {emp.name} · {monthName} {year}</div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <label style={{color:"#fff",fontSize:12,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+            <label style={{color:CP.textPrimary,fontSize:12,display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
               <input type="checkbox" checked={withMeals} onChange={e=>{setWithMeals(e.target.checked);lsSet("patjac_meals_on",e.target.checked);}}/>
               {L("Verpflegung CHF 16 (GAV)","Comida CHF 16 (GAV)","Meals CHF 16 (GAV)","Pasto CHF 16 (CCL)")}
             </label>
@@ -2861,13 +2867,13 @@ function WorkSheetModal({emp, month, year, jobs, clients, lang, onClose, company
               body:`${L("Guten Tag","Hola","Hello","Buongiorno")} ${emp.name},\n\n${L("Anbei Ihr Arbeitsrapport","Te enviamos tu hoja de trabajo de","Please find your work sheet for","In allegato il rapporto di lavoro di")} ${monthName} ${year}.\n\n${L("Freundliche Grüsse","Saludos cordiales","Kind regards","Cordiali saluti")}\nPatjac Reinigung Garten & Services\n${COMPANY_EMAIL}`,
               fileName:`${L("Arbeitsrapport","Hoja_de_trabajo","Work_sheet","Rapporto")}_${emp.name}_${monthName}_${year}`, getHtml:()=>download(true)})}
               style={{background:"#E0115F",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontWeight:700,fontFamily:CP.font}}>📧 E-mail</button>}
-            <button onClick={()=>download()} disabled={!rows} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontWeight:700}}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</button>
-            <button onClick={onClose} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer"}}>✕</button>
+            <button onClick={()=>download()} disabled={!rows} style={{background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.52)",borderRadius:10,color:CP.textPrimary,padding:"7px 14px",cursor:"pointer",fontWeight:700}}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</button>
+            <button onClick={onClose} style={{background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.14)",borderRadius:10,color:CP.textPrimary,padding:"7px 12px",cursor:"pointer"}}>✕</button>
           </div>
         </div>
         <div style={{padding:16}}>
           {!rows ? (
-            <div style={{color:"#74C0FC",textAlign:"center",padding:40}}>🗺️ {L("Distanzen werden berechnet…","Calculando distancias…","Calculating distances…","Calcolo distanze…")} {progress}</div>
+            <div style={{color:"#0067c0",textAlign:"center",padding:40}}>🗺️ {L("Distanzen werden berechnet…","Calculando distancias…","Calculating distances…","Calcolo distanze…")} {progress}</div>
           ) : (
           <div id="patjac-worksheet" style={{background:"#fff",color:"#000",borderRadius:8,padding:"24px 26px",fontFamily:"Arial,Helvetica,sans-serif"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"2.5px solid #1C7ED6",paddingBottom:10,marginBottom:12}}>
@@ -3095,7 +3101,7 @@ td:last-child{text-align:right;font-weight:600}
       zIndex:99999,padding:"16px",overflowY:"auto",
     }} onClick={onClose}>
       <div style={{
-        background:"rgba(8,12,24,0.99)",border:"1px solid rgba(28,126,214,0.5)",
+        background:"#ffffff",border:"1px solid rgba(28,126,214,0.5)",
         borderRadius:22,width:"min(840px,96vw)",marginTop:8,marginBottom:8,
         boxShadow:"0 32px 80px rgba(0,0,0,0.95)",
       }} onClick={e=>e.stopPropagation()}>
@@ -3109,8 +3115,8 @@ td:last-child{text-align:right;font-weight:600}
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:22}}>💵</span>
             <div>
-              <div style={{color:"#fff",fontWeight:700,fontSize:15}}>{emp.name}</div>
-              <div style={{color:"rgba(255,255,255,.75)",fontSize:12}}>{monthName} {year} · CHF {pay.net} {L("Netto","Neto","Net","Netto")}</div>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{emp.name}</div>
+              <div style={{color:"rgba(0,0,0,0.85)",fontSize:12}}>{monthName} {year} · CHF {pay.net} {L("Netto","Neto","Net","Netto")}</div>
             </div>
           </div>
           <div style={{display:"flex",gap:8}}>
@@ -3122,14 +3128,14 @@ td:last-child{text-align:right;font-weight:600}
               fileName:`${L("Lohnabrechnung","Nomina","Payslip","Busta_paga")}_${emp.name}_${monthName}_${year}`, getHtml:()=>generatePDF(true)})}
               style={{background:"#E0115F",border:"none",borderRadius:10,color:"#fff",padding:"8px 16px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>📧 E-mail</button>}
             <button onClick={()=>generatePDF()} style={{
-              background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",
-              borderRadius:10,color:"#fff",padding:"8px 16px",cursor:"pointer",
+              background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.52)",
+              borderRadius:10,color:CP.textPrimary,padding:"8px 16px",cursor:"pointer",
               fontSize:13,fontWeight:700,fontFamily:CP.font,
               display:"flex",alignItems:"center",gap:6,
             }}>⬇️ {L("PDF herunterladen","Descargar PDF","Download PDF","Scarica PDF")}</button>
             <button onClick={onClose} style={{
-              background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",
-              borderRadius:10,color:"#fff",padding:"8px 14px",cursor:"pointer",fontSize:13,
+              background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.14)",
+              borderRadius:10,color:CP.textPrimary,padding:"8px 14px",cursor:"pointer",fontSize:13,
             }}>✕</button>
           </div>
         </div>
@@ -3141,7 +3147,7 @@ td:last-child{text-align:right;font-weight:600}
           borderRadius:10,display:"flex",alignItems:"center",gap:8,
         }}>
           <span style={{fontSize:16}}>👁️</span>
-          <span style={{color:"#74C0FC",fontSize:12,fontWeight:600}}>
+          <span style={{color:"#0067c0",fontSize:12,fontWeight:600}}>
             {L(
               "Vorschau – Originalgetreue Darstellung vor dem PDF-Export",
               "Vista previa – Representación fiel antes de exportar PDF",
@@ -3419,14 +3425,14 @@ function AccessInviteModal({emp, lang, onClose}){
   const msg = accessMessage(emp, lang, code);
   if(!code) return (
     <CPModal title={`🔑 ${L("Zugang senden","Enviar acceso","Send access","Invia accesso")} – ${emp.name}`} onClose={onClose} width={420}>
-      <div style={{color:codeErr?"#FF8787":CP.textSecondary,fontSize:14,padding:"10px 0"}}>{codeErr?L("Code konnte nicht erstellt werden","No se pudo crear el código de activación","Could not create the code","Impossibile creare il codice"):`⏳ ${L("Aktivierungscode wird erstellt…","Creando código de activación…","Creating activation code…","Creazione codice…")}`}</div>
+      <div style={{color:codeErr?"#c42b1c":CP.textSecondary,fontSize:14,padding:"10px 0"}}>{codeErr?L("Code konnte nicht erstellt werden","No se pudo crear el código de activación","Could not create the code","Impossibile creare il codice"):`⏳ ${L("Aktivierungscode wird erstellt…","Creando código de activación…","Creating activation code…","Creazione codice…")}`}</div>
     </CPModal>);
-  const btn = (bg)=>({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"12px 14px",cursor:"pointer",fontWeight:700,fontSize:14,textAlign:"left",width:"100%"});
+  const btn = (bg)=>({background:bg,border:lightBg(bg)?`1px solid ${CP.borderActive}`:"none",borderRadius:12,color:fgOn(bg),padding:"12px 14px",cursor:"pointer",fontWeight:700,fontSize:14,textAlign:"left",width:"100%"});
   const wa = swissWa(emp.phone);
   return (
     <CPModal title={`🔑 ${L("Zugang senden","Enviar acceso","Send access","Invia accesso")} – ${emp.name}`} onClose={onClose} width={520}>
-      <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.35)",borderRadius:12,padding:"10px 12px",marginBottom:10,color:"#74C0FC",fontSize:13}}>
-        📲 {L("Aktivierungscode","Código de activación","Activation code","Codice di attivazione")}: <b style={{fontSize:18,letterSpacing:2,color:"#fff"}}>{code}</b>
+      <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.35)",borderRadius:12,padding:"10px 12px",marginBottom:10,color:"#0067c0",fontSize:13}}>
+        📲 {L("Aktivierungscode","Código de activación","Activation code","Codice di attivazione")}: <b style={{fontSize:18,letterSpacing:2,color:CP.textPrimary}}>{code}</b>
         <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:4}}>{L("Gilt 1× für 7 Tage. Das Telefon, das ihn eingibt, wird das einzige mit Zugang (ein früheres Telefon verliert den Zugang).","Sirve 1 vez durante 7 días. El teléfono donde se escriba será el único con acceso (si había otro, pierde el acceso).","Works once for 7 days. The phone that enters it becomes the only one with access.","Vale 1 volta per 7 giorni. Il telefono che lo inserisce sarà l'unico con accesso.")}</div>
       </div>
       <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10}}>{L("Wählen Sie, wie die Zugangsdaten gesendet werden sollen:","Elija cómo enviar los datos de acceso:","Choose how to send the access details:","Scegli come inviare i dati di accesso:")}</div>
@@ -3435,10 +3441,10 @@ function AccessInviteModal({emp, lang, onClose}){
         <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>📧 E-mail {emp.email?`→ ${emp.email}`:`(${L("keine E-Mail erfasst – bitte im Mitarbeiter speichern","sin e-mail guardado – agréguelo en la ficha del empleado","no email saved","nessuna e-mail")})`}</div>
         <CompanyEmailButtons to={emp.email||""} subject={msg.subject} body={msg.body} lang={lang} disabled={!emp.email}/>
         <a href={emp.phone?smsUrl(emp.phone,msg.body):undefined} onClick={e=>{if(!emp.phone)e.preventDefault();}} style={{...btn("#7048E8"),opacity:emp.phone?1:.4,textDecoration:"none",boxSizing:"border-box",marginTop:4}}>📱 SMS {emp.phone?`→ ${emp.phone}`:""}</a>
-        {!isMobile()&&<div style={{color:"#FAB005",fontSize:12}}>ℹ️ {L("SMS funktioniert nur vom Handy aus. Öffnen Sie die App auf dem Handy oder nutzen Sie WhatsApp / E-Mail.","El SMS solo funciona desde el móvil. Abra la app en su teléfono o use WhatsApp / e-mail.","SMS only works from a phone. Open the app on your phone or use WhatsApp / email.","L'SMS funziona solo dal telefono. Apri l'app sul telefono o usa WhatsApp / e-mail.")}</div>}
-        <button onClick={()=>{ try{ navigator.clipboard.writeText(msg.body); }catch(e){} }} style={btn("rgba(255,255,255,.12)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
+        {!isMobile()&&<div style={{color:"#9a5b00",fontSize:12}}>ℹ️ {L("SMS funktioniert nur vom Handy aus. Öffnen Sie die App auf dem Handy oder nutzen Sie WhatsApp / E-Mail.","El SMS solo funciona desde el móvil. Abra la app en su teléfono o use WhatsApp / e-mail.","SMS only works from a phone. Open the app on your phone or use WhatsApp / email.","L'SMS funziona solo dal telefono. Apri l'app sul telefono o usa WhatsApp / e-mail.")}</div>}
+        <button onClick={()=>{ try{ navigator.clipboard.writeText(msg.body); }catch(e){} }} style={btn("rgba(0,0,0,0.084)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
       </div>
-      <pre style={{whiteSpace:"pre-wrap",background:"rgba(0,0,0,.3)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 12px",color:CP.textSecondary,fontSize:12,maxHeight:220,overflow:"auto",fontFamily:"inherit"}}>{msg.body}</pre>
+      <pre style={{whiteSpace:"pre-wrap",background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 12px",color:CP.textSecondary,fontSize:12,maxHeight:220,overflow:"auto",fontFamily:"inherit"}}>{msg.body}</pre>
     </CPModal>
   );
 }
@@ -3518,19 +3524,19 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
             {t.selectMonth||"Monat"}:
           </span>
           <select value={selMonth} onChange={e=>setSelMonth(Number(e.target.value))} style={{
-            background:"rgba(255,255,255,0.08)",border:`1px solid ${CP.border}`,
-            borderRadius:10,color:"#fff",padding:"6px 12px",fontSize:13,outline:"none",cursor:"pointer",
+            background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,
+            borderRadius:10,color:CP.textPrimary,padding:"6px 12px",fontSize:13,outline:"none",cursor:"pointer",
           }}>
             {monthNames.map((m,i)=>(
-              <option key={i} value={i+1} style={{background:"#1a1a2e"}}>{m}</option>
+              <option key={i} value={i+1} style={{background:"#fff",color:"#1a1a1a"}}>{m}</option>
             ))}
           </select>
           <select value={selYear} onChange={e=>setSelYear(Number(e.target.value))} style={{
-            background:"rgba(255,255,255,0.08)",border:`1px solid ${CP.border}`,
-            borderRadius:10,color:"#fff",padding:"6px 12px",fontSize:13,outline:"none",cursor:"pointer",
+            background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,
+            borderRadius:10,color:CP.textPrimary,padding:"6px 12px",fontSize:13,outline:"none",cursor:"pointer",
           }}>
             {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y=>(
-              <option key={y} value={y} style={{background:"#1a1a2e"}}>{y}</option>
+              <option key={y} value={y} style={{background:"#fff",color:"#1a1a1a"}}>{y}</option>
             ))}
           </select>
           <span style={{color:"rgba(116,192,252,0.7)",fontSize:11}}>
@@ -3568,17 +3574,17 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
 
               {/* Access (admin only) */}
               {isAdmin&&(
-                <div style={{background:"rgba(0,0,0,.25)",borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{background:"rgba(0,0,0,0.035)",borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div style={{fontSize:12,color:CP.textSecondary}}>
-                    <span style={{fontWeight:700,color:"#69DB7C"}}>{t.code}:</span> {emp.code||emp.userCode} &nbsp;·&nbsp;
-                    <span style={{fontWeight:700,color:"#69DB7C"}}>{t.pin}:</span> {emp.pin}
+                    <span style={{fontWeight:700,color:"#107c10"}}>{t.code}:</span> {emp.code||emp.userCode} &nbsp;·&nbsp;
+                    <span style={{fontWeight:700,color:"#107c10"}}>{t.pin}:</span> {emp.pin}
                   </div>
                   <CPBtn onClick={()=>regen(emp.id)} variant="secondary" size="sm">🔄</CPBtn>
                 </div>
               )}
 
               {/* Payroll summary */}
-              <div style={{background:"rgba(0,0,0,0.2)",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+              <div style={{background:"rgba(0,0,0,0.035)",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
                 <div style={{color:CP.textSecondary,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:12}}>
                   💰 {t.payrollTitle||"Lohnabrechnung"} — {monthNames[selMonth-1]} {selYear}
                 </div>
@@ -3586,14 +3592,14 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                 {/* Gross / deductions / net grid */}
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
                   {emp.type==="hourly"&&(
-                    <div style={{background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"8px 10px"}}>
+                    <div style={{background:"rgba(0,0,0,0.035)",borderRadius:10,padding:"8px 10px"}}>
                       <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.hoursMonth||"Stunden"}</div>
                       <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{pay.hoursWorked}h</div>
                     </div>
                   )}
                   <div style={{background:"rgba(28,126,214,0.1)",border:"1px solid rgba(28,126,214,0.25)",borderRadius:10,padding:"8px 10px"}}>
                     <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.grossSalary||"Brutto"}</div>
-                    <div style={{color:"#74C0FC",fontWeight:700,fontSize:15}}>CHF {pay.grossTotal}</div>
+                    <div style={{color:"#0067c0",fontWeight:700,fontSize:15}}>CHF {pay.grossTotal}</div>
                   </div>
                   {[
                     ["AHV/AVS",pay.ahvEmp],["ALV/AD",pay.alvEmp],
@@ -3601,12 +3607,12 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                   ].map(([l,v])=>(
                     <div key={l} style={{background:"rgba(201,42,42,0.07)",border:"1px solid rgba(201,42,42,0.15)",borderRadius:10,padding:"8px 10px"}}>
                       <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>− {l}</div>
-                      <div style={{color:"#FF8787",fontWeight:700,fontSize:12}}>CHF {v}</div>
+                      <div style={{color:"#c42b1c",fontWeight:700,fontSize:12}}>CHF {v}</div>
                     </div>
                   ))}
                   <div style={{background:"rgba(12,166,120,0.18)",border:"1px solid rgba(12,166,120,0.4)",borderRadius:10,padding:"8px 10px",gridColumn:"span 2"}}>
                     <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2,fontWeight:700}}>{t.netSalary||"Nettolohn"}</div>
-                    <div style={{color:"#69DB7C",fontWeight:700,fontSize:22}}>CHF {pay.net}</div>
+                    <div style={{color:"#107c10",fontWeight:700,fontSize:22}}>CHF {pay.net}</div>
                   </div>
                 </div>
 
@@ -3622,7 +3628,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                       </span>
                     )}
                   </div>
-                  <div style={{height:6,background:"rgba(255,255,255,0.07)",borderRadius:20,overflow:"hidden"}}>
+                  <div style={{height:6,background:"rgba(0,0,0,0.035)",borderRadius:20,overflow:"hidden"}}>
                     <div style={{
                       height:"100%",
                       width:`${Math.round((parseFloat(pay.net)/Math.max(0.01,parseFloat(pay.grossTotal)))*100)}%`,
@@ -3648,7 +3654,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                   <>
                     {devices&&(devices[emp.id]?.label
                       ? <CPBtn onClick={async()=>{ if(!window.confirm(L("Telefon-Zugang entfernen?","¿Quitar el acceso de este teléfono?","Remove this phone's access?","Rimuovere l'accesso di questo telefono?"))) return; try{ await supaRpc("admin_revoke_device",{p_employee:emp.id}); notify(L("Telefon entfernt","Teléfono quitado","Phone removed","Telefono rimosso"),"success"); loadDevices(); }catch(e){ notify(t.error,"error"); } }} variant="secondary" size="sm" title={devices[emp.id].label}>📱✅ {devices[emp.id].label.split(" · ")[0]} ✕</CPBtn>
-                      : <span style={{fontSize:11.5,color:"#FFA94D",alignSelf:"center"}}>📵 {L("Kein Telefon freigeschaltet","Sin teléfono activado","No phone activated","Nessun telefono attivato")}</span>)}
+                      : <span style={{fontSize:11.5,color:"#c55a00",alignSelf:"center"}}>📵 {L("Kein Telefon freigeschaltet","Sin teléfono activado","No phone activated","Nessun telefono attivato")}</span>)}
                     <CPBtn onClick={()=>setInviteEmp(emp)} variant="secondary" size="sm">🔑 {L("Zugang senden","Enviar acceso","Send access","Invia accesso")}</CPBtn>
                     <CPBtn onClick={()=>{setForm(withNameParts({...emp}));setSelId(emp.id);setModal("form");}} variant="secondary" size="sm">
                       ✏️ {t.edit}
@@ -3744,7 +3750,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
             const cat = GAV_CATEGORIES.find(c=>c.id===form.gavCategory);
             if(!cat) return null;
             return(
-              <div style={{background:"rgba(12,166,120,.1)",border:"1px solid rgba(12,166,120,.3)",borderRadius:10,padding:"10px 14px",marginBottom:10,fontSize:12,color:"#69DB7C"}}>
+              <div style={{background:"rgba(12,166,120,.1)",border:"1px solid rgba(12,166,120,.3)",borderRadius:10,padding:"10px 14px",marginBottom:10,fontSize:12,color:"#107c10"}}>
                 <div style={{fontWeight:700,marginBottom:4}}>📋 {cat.label}</div>
                 <div>{cat.description[lang]||cat.description.DE}</div>
                 {cat.hourly&&<div style={{marginTop:4}}>💰 {L("Mindestlohn","Salario mínimo","Minimum wage","Salario minimo")}: CHF {cat.hourly.toFixed(2)}/h {cat.monthly?`(CHF ${cat.monthly.toLocaleString()}/M)`:""}</div>}
@@ -3763,13 +3769,13 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
             <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(12,166,120,0.1)",borderRadius:10,marginBottom:10,border:"1px solid rgba(12,166,120,0.25)"}}>
               <input type="checkbox" id="has_13thchk" checked={!!form.has_13th} onChange={e=>setForm(f=>({...f,has_13th:e.target.checked}))}
                 style={{width:16,height:16,accentColor:"#0CA678",cursor:"pointer"}}/>
-              <label htmlFor="has_13thchk" style={{color:"#69DB7C",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+              <label htmlFor="has_13thchk" style={{color:"#107c10",fontSize:13,fontWeight:600,cursor:"pointer"}}>
                 {t.thirteenthSalary||"13. Monatslohn einschliessen"}
               </label>
             </div>
           )}
           {/* ── Payroll, family & transport data ── */}
-          <div style={{marginTop:6,marginBottom:8,color:"#74C0FC",fontSize:12,fontWeight:700}}>👨‍👩‍👧 {L("Lohn-, Familien- und Transportdaten","Datos de nómina, familia y transporte","Payroll, family & transport data","Dati busta paga, famiglia e trasporto")}</div>
+          <div style={{marginTop:6,marginBottom:8,color:"#0067c0",fontSize:12,fontWeight:700}}>👨‍👩‍👧 {L("Lohn-, Familien- und Transportdaten","Datos de nómina, familia y transporte","Payroll, family & transport data","Dati busta paga, famiglia e trasporto")}</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={L("Geburtsdatum","Fecha de nacimiento","Date of birth","Data di nascita")}>
               <CPInput type="date" value={form.birthDate||""} onChange={e=>setForm(f=>({...f,birthDate:e.target.value}))}/>
@@ -3795,7 +3801,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
           </div>
           {qstSubject(form)&&(
             <div style={{background:"rgba(250,176,5,.08)",border:"1px solid rgba(250,176,5,.3)",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
-              <div style={{color:"#FFD43B",fontSize:12,fontWeight:700,marginBottom:6}}>🧾 {L("Quellensteuer (offizieller Tarif Kanton Zürich 2026)","Impuesto en la fuente (tarifa oficial del cantón de Zúrich 2026)","Withholding tax (official Canton Zurich 2026 tariff)","Imposta alla fonte (tariffa ufficiale ZH 2026)")}</div>
+              <div style={{color:"#9a5b00",fontSize:12,fontWeight:700,marginBottom:6}}>🧾 {L("Quellensteuer (offizieller Tarif Kanton Zürich 2026)","Impuesto en la fuente (tarifa oficial del cantón de Zúrich 2026)","Withholding tax (official Canton Zurich 2026 tariff)","Imposta alla fonte (tariffa ufficiale ZH 2026)")}</div>
               <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:"0 12px"}}>
                 <CPField label={L("Familiensituation","Situación familiar","Family situation","Situazione familiare")}>
                   <CPSelect value={form.maritalStatus||""} onChange={e=>setForm(f=>({...f,maritalStatus:e.target.value}))}>
@@ -3812,7 +3818,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
               </div>
               <div style={{color:CP.textSecondary,fontSize:11}}>
                 {qstCodeFor(form)
-                  ? <>✅ {L("Tarifcode","Código de tarifa","Tariff code","Codice tariffa")}: <b style={{color:"#FFD43B"}}>{qstCodeFor(form)}</b> — {L("Der Prozentsatz wird jeden Monat automatisch nach Lohn berechnet.","El porcentaje se calcula solo cada mes según el salario.","The rate is calculated automatically each month from the salary.","La percentuale è calcolata automaticamente ogni mese.")}</>
+                  ? <>✅ {L("Tarifcode","Código de tarifa","Tariff code","Codice tariffa")}: <b style={{color:"#9a5b00"}}>{qstCodeFor(form)}</b> — {L("Der Prozentsatz wird jeden Monat automatisch nach Lohn berechnet.","El porcentaje se calcula solo cada mes según el salario.","The rate is calculated automatically each month from the salary.","La percentuale è calcolata automaticamente ogni mese.")}</>
                   : L("Situation wählen – die Anzahl Kinder wird oben erfasst.","Elija la situación. El número de hijos se toma de los campos de arriba.","Choose the situation – children are taken from the fields above.","Scegliere la situazione – i figli dai campi sopra.")}
               </div>
             </div>
@@ -3831,7 +3837,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
             )}
           </div>
           {!selId&&(
-            <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#74C0FC"}}>
+            <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#0067c0"}}>
               ℹ️ {lang==="DE"?"Code & PIN werden automatisch generiert.":
                    lang==="ES"?"El código y el PIN se generan solos y se envían al empleado por e-mail, WhatsApp o SMS al guardar.":
                    lang==="IT"?"Codice e PIN vengono generati automaticamente.":
@@ -3865,7 +3871,7 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
                 background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",
                 borderRadius:12,padding:"12px 16px",marginBottom:16,textAlign:"center",
               }}>
-                <div style={{color:"#FF8787",fontWeight:700,fontSize:16}}>{emp?.name}</div>
+                <div style={{color:"#c42b1c",fontWeight:700,fontSize:16}}>{emp?.name}</div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>
                   {emp?.type==="fixed"
                     ? `${L("Festanstellung","Fijo","Fixed","Fisso")} · CHF ${Number(emp?.fixedSalary||0).toLocaleString("de-CH")}/M`
@@ -3944,23 +3950,23 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
       {/* Period selector */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <select value={selMonth} onChange={e=>setSelMonth(Number(e.target.value))} style={{
-          background:"rgba(255,255,255,0.08)",border:`1px solid ${CP.border}`,
-          borderRadius:10,color:"#fff",padding:"8px 14px",fontSize:14,outline:"none",cursor:"pointer",
+          background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,
+          borderRadius:10,color:CP.textPrimary,padding:"8px 14px",fontSize:14,outline:"none",cursor:"pointer",
         }}>
-          {monthNames.map((m,i)=><option key={i} value={i+1} style={{background:"#1a1a2e"}}>{m}</option>)}
+          {monthNames.map((m,i)=><option key={i} value={i+1} style={{background:"#fff",color:"#1a1a1a"}}>{m}</option>)}
         </select>
         <select value={selYear} onChange={e=>setSelYear(Number(e.target.value))} style={{
-          background:"rgba(255,255,255,0.08)",border:`1px solid ${CP.border}`,
-          borderRadius:10,color:"#fff",padding:"8px 14px",fontSize:14,outline:"none",cursor:"pointer",
+          background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,
+          borderRadius:10,color:CP.textPrimary,padding:"8px 14px",fontSize:14,outline:"none",cursor:"pointer",
         }}>
-          {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y=><option key={y} value={y} style={{background:"#1a1a2e"}}>{y}</option>)}
+          {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y=><option key={y} value={y} style={{background:"#fff",color:"#1a1a1a"}}>{y}</option>)}
         </select>
 
         {isAdmin&&(
           <div style={{display:"flex",gap:8,marginLeft:"auto",flexWrap:"wrap"}}>
             {[
-              {l:t.grossSalary||"Brutto", v:`CHF ${totals.gross.toFixed(2)}`, c:"#74C0FC", bg:"rgba(28,126,214,0.12)", bc:"rgba(28,126,214,0.3)"},
-              {l:t.netSalary||"Netto", v:`CHF ${totals.net.toFixed(2)}`, c:"#69DB7C", bg:"rgba(12,166,120,0.12)", bc:"rgba(12,166,120,0.3)"},
+              {l:t.grossSalary||"Brutto", v:`CHF ${totals.gross.toFixed(2)}`, c:"#0067c0", bg:"rgba(28,126,214,0.12)", bc:"rgba(28,126,214,0.3)"},
+              {l:t.netSalary||"Netto", v:`CHF ${totals.net.toFixed(2)}`, c:"#107c10", bg:"rgba(12,166,120,0.12)", bc:"rgba(12,166,120,0.3)"},
               {l:t.totalCost||"AG Total", v:`CHF ${totals.cost.toFixed(2)}`, c:"#aab0b8", bg:"rgba(134,142,150,0.1)", bc:"rgba(134,142,150,0.25)"},
             ].map(item=>(
               <div key={item.l} style={{background:item.bg,border:`1px solid ${item.bc}`,borderRadius:12,padding:"8px 14px",textAlign:"center",minWidth:110}}>
@@ -3974,7 +3980,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
 
       {/* Swiss norms bar */}
       <CPCard style={{marginBottom:14,background:"rgba(28,126,214,0.07)",border:"1px solid rgba(28,126,214,0.18)"}}>
-        <div style={{color:"#74C0FC",fontSize:12}}>
+        <div style={{color:"#0067c0",fontSize:12}}>
           🇨🇭 <strong>Swiss Payroll 2024</strong> · AHV 5.25+5.30% · ALV 1.1+1.1% · NBUV 1.2% · BVG ~7+7% · KTG 0.5+0.5%
         </div>
       </CPCard>
@@ -4010,15 +4016,15 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                 <div style={{background:"rgba(28,126,214,0.1)",border:"1px solid rgba(28,126,214,0.2)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
                   <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.grossSalary||"Brutto"}</div>
-                  <div style={{color:"#74C0FC",fontWeight:700,fontSize:14}}>CHF {pay.grossTotal}</div>
+                  <div style={{color:"#0067c0",fontWeight:700,fontSize:14}}>CHF {pay.grossTotal}</div>
                 </div>
                 <div style={{background:"rgba(201,42,42,0.08)",border:"1px solid rgba(201,42,42,0.2)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
                   <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.totalDeductionsEmployee||"Abzüge AN"}</div>
-                  <div style={{color:"#FF8787",fontWeight:700,fontSize:14}}>−CHF {pay.totalDeductEmp}</div>
+                  <div style={{color:"#c42b1c",fontWeight:700,fontSize:14}}>−CHF {pay.totalDeductEmp}</div>
                 </div>
                 <div style={{background:"rgba(12,166,120,0.15)",border:"1px solid rgba(12,166,120,0.35)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
                   <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.netSalary||"Netto"}</div>
-                  <div style={{color:"#69DB7C",fontWeight:700,fontSize:18}}>CHF {pay.net}</div>
+                  <div style={{color:"#107c10",fontWeight:700,fontSize:18}}>CHF {pay.net}</div>
                 </div>
               </div>
               {isAdmin&&(
@@ -4087,16 +4093,16 @@ function DashApp({t,clients,jobs,invoices,employees,timeclock,notify,openApp,onB
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <CPCard>
             <div style={{color:CP.textSecondary,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>⚠️ {t.alerts}</div>
-            {overdue.length>0&&<div onClick={()=>openApp("invoices")} style={{background:"rgba(201,42,42,.12)",border:"1px solid rgba(201,42,42,.3)",borderRadius:10,padding:"8px 12px",cursor:"pointer",marginBottom:6}}><div style={{color:"#FF8787",fontSize:13,fontWeight:600}}>🧾 {overdue.length} {t.overdueInvoices}</div></div>}
-            {notClockedIn>0&&<div onClick={()=>openApp("timeclock")} style={{background:"rgba(240,140,0,.12)",border:"1px solid rgba(240,140,0,.3)",borderRadius:10,padding:"8px 12px",cursor:"pointer",marginBottom:6}}><div style={{color:"#FFD43B",fontSize:13,fontWeight:600}}>⏱️ {notClockedIn} {t.employeesNotClockedIn}</div></div>}
-            {incompleteJobs.length>0&&<div onClick={()=>openApp("jobs")} style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"8px 12px",cursor:"pointer"}}><div style={{color:"#74C0FC",fontSize:13,fontWeight:600}}>📋 {incompleteJobs.length} {t.incompleteJobs}</div></div>}
-            {overdue.length===0&&notClockedIn===0&&incompleteJobs.length===0&&<div style={{color:"#69DB7C",fontSize:13,textAlign:"center"}}>✅ {L("Alles OK","Todo bien","All good","Tutto OK")}</div>}
+            {overdue.length>0&&<div onClick={()=>openApp("invoices")} style={{background:"rgba(201,42,42,.12)",border:"1px solid rgba(201,42,42,.3)",borderRadius:10,padding:"8px 12px",cursor:"pointer",marginBottom:6}}><div style={{color:"#c42b1c",fontSize:13,fontWeight:600}}>🧾 {overdue.length} {t.overdueInvoices}</div></div>}
+            {notClockedIn>0&&<div onClick={()=>openApp("timeclock")} style={{background:"rgba(240,140,0,.12)",border:"1px solid rgba(240,140,0,.3)",borderRadius:10,padding:"8px 12px",cursor:"pointer",marginBottom:6}}><div style={{color:"#9a5b00",fontSize:13,fontWeight:600}}>⏱️ {notClockedIn} {t.employeesNotClockedIn}</div></div>}
+            {incompleteJobs.length>0&&<div onClick={()=>openApp("jobs")} style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"8px 12px",cursor:"pointer"}}><div style={{color:"#0067c0",fontSize:13,fontWeight:600}}>📋 {incompleteJobs.length} {t.incompleteJobs}</div></div>}
+            {overdue.length===0&&notClockedIn===0&&incompleteJobs.length===0&&<div style={{color:"#107c10",fontSize:13,textAlign:"center"}}>✅ {L("Alles OK","Todo bien","All good","Tutto OK")}</div>}
           </CPCard>
           <CPCard>
             <div style={{color:CP.textSecondary,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>⚡ {t.quickActions||"Quick"}</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
               {[{l:t.newJob||"Neu",i:"📋",a:"jobs"},{l:t.addClient||"Kunde",i:"👥",a:"clients"},{l:t.generateInvoice||"Rechnung",i:"🧾",a:"invoices"},{l:t.optimizeRoute||"Route",i:"🗺️",a:"routes"}].map(q=>(
-                <button key={q.a} onClick={()=>openApp(q.a)} style={{background:"rgba(28,126,214,.15)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"8px 6px",color:"#fff",cursor:"pointer",fontSize:11,fontWeight:600,display:"flex",alignItems:"center",gap:4,transition:"background .15s"}}
+                <button key={q.a} onClick={()=>openApp(q.a)} style={{background:"rgba(28,126,214,.15)",border:"1px solid rgba(28,126,214,.3)",borderRadius:10,padding:"8px 6px",color:CP.textPrimary,cursor:"pointer",fontSize:11,fontWeight:600,display:"flex",alignItems:"center",gap:4,transition:"background .15s"}}
                   onMouseEnter={e=>e.currentTarget.style.background="rgba(28,126,214,.3)"}
                   onMouseLeave={e=>e.currentTarget.style.background="rgba(28,126,214,.15)"}
                 >{q.i} {q.l}</button>
@@ -4387,7 +4393,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
               <button key={s} onClick={()=>setFilter(s)} style={{
                 padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",
                 fontSize:12,fontWeight:700,
-                background:filter===s?CP.accent:"rgba(255,255,255,.1)",color:"#fff",
+                background:filter===s?CP.accent:"rgba(0,0,0,0.07)",color:(filter===s)?"#fff":CP.textPrimary,
               }}>
                 {s==="all"?L("Alle","Todos","All","Tutti"):statusLabel(s)}
               </button>
@@ -4399,13 +4405,13 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
         {/* Summary bar */}
         <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
           {[
-            [L("Heute","Hoy","Today","Oggi"), visibleJobs.filter(j=>j.date===todayStr).length, "#74C0FC"],
-            [t.pending, visibleJobs.filter(j=>j.status==="pending").length, "#FFD43B"],
+            [L("Heute","Hoy","Today","Oggi"), visibleJobs.filter(j=>j.date===todayStr).length, "#0067c0"],
+            [t.pending, visibleJobs.filter(j=>j.status==="pending").length, "#9a5b00"],
             [t.inProgress, visibleJobs.filter(j=>j.status==="inProgress").length, "#1C7ED6"],
             [t.completed, visibleJobs.filter(j=>j.status==="completed").length, "#2F9E44"],
           ].map(([label,val,color])=>(
             <div key={label} style={{
-              background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
+              background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.056)",
               borderRadius:12,padding:"10px 16px",flex:1,minWidth:80,textAlign:"center",
             }}>
               <div style={{color,fontWeight:700,fontSize:20}}>{val}</div>
@@ -4430,15 +4436,15 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
 
             return (
               <CPCard key={job.id} style={{
-                border:job.date===todayStr?"2px solid rgba(28,126,214,0.4)":"1px solid rgba(255,255,255,0.06)",
-                background:job.date===todayStr?"rgba(28,126,214,0.06)":"rgba(255,255,255,0.03)",
+                border:job.date===todayStr?"2px solid rgba(28,126,214,0.4)":"1px solid rgba(0,0,0,0.042)",
+                background:job.date===todayStr?"rgba(28,126,214,0.06)":"rgba(0,0,0,0.021)",
               }}>
                 {/* Today badge */}
                 {job.date===todayStr&&(
                   <div style={{
                     display:"inline-block",marginBottom:8,
                     background:"rgba(28,126,214,0.25)",border:"1px solid rgba(28,126,214,0.4)",
-                    borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700,color:"#74C0FC",
+                    borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700,color:"#0067c0",
                   }}>
                     📅 {L("Heute","Hoy","Today","Oggi")}
                   </div>
@@ -4465,12 +4471,12 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                       }}>
                         <span style={{fontSize:16,flexShrink:0}}>📍</span>
                         <div>
-                          <div style={{color:"#74C0FC",fontWeight:600,fontSize:13}}>{addr}</div>
+                          <div style={{color:"#0067c0",fontWeight:600,fontSize:13}}>{addr}</div>
                           <button onClick={()=>{
                             window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`,"_blank");
                           }} style={{
                             marginTop:4,background:"rgba(28,126,214,0.3)",border:"none",
-                            borderRadius:8,color:"#fff",padding:"3px 10px",cursor:"pointer",
+                            borderRadius:8,color:CP.textPrimary,padding:"3px 10px",cursor:"pointer",
                             fontSize:11,fontWeight:700,fontFamily:CP.font,
                           }}>
                             🗺️ {L("Navigation","Navegar","Navigate","Naviga")}
@@ -4487,7 +4493,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                       }}>
                         <span style={{fontSize:14}}>🕐</span>
                         <div>
-                          <div style={{color:"#FFD43B",fontWeight:700,fontSize:14}}>
+                          <div style={{color:"#9a5b00",fontWeight:700,fontSize:14}}>
                             {job.timeStart} – {job.timeEnd}
                           </div>
                           {duration&&(
@@ -4498,15 +4504,15 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                         </div>
                       </div>
                       <div style={{
-                        background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
+                        background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.056)",
                         borderRadius:10,padding:"6px 12px",display:"flex",alignItems:"center",gap:6,
                       }}>
                         <span style={{fontSize:14}}>📅</span>
                         <div style={{color:CP.textSecondary,fontSize:13}}>{fmtDate(job.date)}</div>
                       </div>
-                      {job.date>=todayStr&&!job.actualStart&&<button onClick={()=>setDayEdit({job,start:job.timeStart||"",end:job.timeEnd||"",reason:""})} style={{background:"rgba(177,151,252,.15)",border:"1px solid rgba(177,151,252,.35)",borderRadius:10,color:"#D0BFFF",padding:"6px 12px",cursor:"pointer",fontSize:12.5,fontWeight:700,fontFamily:CP.font}}>🕒 {L("Zeitänderung anfragen","Pedir cambio de horario","Request schedule change","Richiedi cambio orario")}</button>}
+                      {job.date>=todayStr&&!job.actualStart&&<button onClick={()=>setDayEdit({job,start:job.timeStart||"",end:job.timeEnd||"",reason:""})} style={{background:"rgba(177,151,252,.15)",border:"1px solid rgba(177,151,252,.35)",borderRadius:10,color:"#6b3fbf",padding:"6px 12px",cursor:"pointer",fontSize:12.5,fontWeight:700,fontFamily:CP.font}}>🕒 {L("Zeitänderung anfragen","Pedir cambio de horario","Request schedule change","Richiedi cambio orario")}</button>}
                     </div>
-                    {(job.notes||"").startsWith("🕒")&&<div style={{color:"#B197FC",fontSize:12,marginTop:6}}>{(job.notes||"").split("\n")[0]}</div>}
+                    {(job.notes||"").startsWith("🕒")&&<div style={{color:"#6b3fbf",fontSize:12,marginTop:6}}>{(job.notes||"").split("\n")[0]}</div>}
                     <div style={{color:CP.textTertiary,fontSize:11.5,marginTop:6}}>ℹ️ {L("Bezahlt wird ab Ihrer Ankunft beim Kunden bis zum geplanten Ende","Se pagan las horas desde tu llegada al cliente hasta la hora de fin programada","Paid from your arrival at the client until the planned end","Pagato dal tuo arrivo dal cliente fino alla fine prevista")} ({job.timeEnd}).</div>
                   </div>
                 </div>
@@ -4531,7 +4537,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
       actions={<>
         <div style={{display:"flex",gap:4}}>
           {["all","pending","inProgress","completed"].map(s=>(
-            <button key={s} onClick={()=>setFilter(s)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filter===s?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{s==="all"?"All":statusLabel(s)}</button>
+            <button key={s} onClick={()=>setFilter(s)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filter===s?CP.accent:"rgba(0,0,0,0.07)",color:(filter===s)?"#fff":CP.textPrimary}}>{s==="all"?"All":statusLabel(s)}</button>
           ))}
         </div>
         {<CPBtn onClick={()=>{setForm(withAutoAmount({clientId:clients[0]?.id||"",employeeId:employees[0]?.id||"",employeeIds:employees[0]?[employees[0].id]:[],totalHours:2,serviceType:"cleaning",description:"",date:ymd(new Date()),timeStart:"08:00",timeEnd:"10:00",amount:"",notes:"",status:"pending",recurrence:"once",recurWeekdays:[]}));setModal("form");}} size="sm">＋ {t.newJob||"Neu"}</CPBtn>}
@@ -4554,22 +4560,22 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:13}}>{job.employeeName} · {fmtDate(job.date)} · {job.timeStart}–{job.timeEnd}</div>
                 <AttendanceBadge job={job} lang={lang}/>
-                {(job.notes||"").startsWith("🕒")&&<div style={{color:"#B197FC",fontSize:11.5,marginTop:3}}>{(job.notes||"").split("\n")[0]}</div>}
+                {(job.notes||"").startsWith("🕒")&&<div style={{color:"#6b3fbf",fontSize:11.5,marginTop:3}}>{(job.notes||"").split("\n")[0]}</div>}
                 {(()=>{const c=clients.find(x=>x.id===job.clientId); const addr=c?fmtAddr(c):(job.clientAddress||""); return addr?(
                   <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                    style={{display:"inline-block",color:"#74C0FC",fontSize:12.5,marginTop:3,textDecoration:"none"}}>📍 {addr}</a>
-                ):<div style={{color:"#FF8787",fontSize:12,marginTop:3}}>📍 {L("Keine Adresse beim Kunden","El cliente no tiene dirección guardada","Client has no address","Cliente senza indirizzo")}</div>;})()}
+                    style={{display:"inline-block",color:"#0067c0",fontSize:12.5,marginTop:3,textDecoration:"none"}}>📍 {addr}</a>
+                ):<div style={{color:"#c42b1c",fontSize:12,marginTop:3}}>📍 {L("Keine Adresse beim Kunden","El cliente no tiene dirección guardada","Client has no address","Cliente senza indirizzo")}</div>;})()}
                 {job.teamId&&(()=>{const team=teamOf(job);return team.length>1?(
-                  <div style={{color:"#69DB7C",fontSize:12,marginTop:2}}>👥 {L("Team","Equipo","Team","Squadra")} ({team.length}): {team.map(m=>m.employeeName).join(", ")}</div>
+                  <div style={{color:"#107c10",fontSize:12,marginTop:2}}>👥 {L("Team","Equipo","Team","Squadra")} ({team.length}): {team.map(m=>m.employeeName).join(", ")}</div>
                 ):null;})()}
                 {job.description&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{job.description}</div>}
                 {(()=>{ const team=teamOf(job); const ch=visitClientHours(team); const rate=parseFloat(clients.find(c=>c.id===job.clientId)?.price)||0; return (
                   <div style={{fontSize:12.5,marginTop:4}}>
-                    <span style={{color:"#FFD43B",fontWeight:700}}>🧾 {L("Kunde","Cliente","Client","Cliente")}: {Math.round(ch*100)/100} h · CHF {(ch*rate).toFixed(2)}</span>
+                    <span style={{color:"#9a5b00",fontWeight:700}}>🧾 {L("Kunde","Cliente","Client","Cliente")}: {Math.round(ch*100)/100} h · CHF {(ch*rate).toFixed(2)}</span>
                     <span style={{color:CP.textTertiary}}> · 👷 {L("Mitarbeiter","Empleado","Employee","Dipendente")}: {hoursBetween(job.timeStart,job.timeEnd)} h</span>
                   </div>); })()}
                 {bulk.selectMode&&job.recurringId&&(
-                  <button type="button" onClick={e=>{e.stopPropagation();const ids=ff.filter(j=>j.recurringId===job.recurringId).map(j=>j.id);bulk.setSelected(prev=>new Set([...prev,...ids]));}} style={{marginTop:6,padding:"3px 10px",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,border:"1px dashed rgba(116,192,252,0.6)",background:"transparent",color:"#74C0FC"}}>
+                  <button type="button" onClick={e=>{e.stopPropagation();const ids=ff.filter(j=>j.recurringId===job.recurringId).map(j=>j.id);bulk.setSelected(prev=>new Set([...prev,...ids]));}} style={{marginTop:6,padding:"3px 10px",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,border:"1px dashed rgba(116,192,252,0.6)",background:"transparent",color:"#0067c0"}}>
                     🔁 {L("Ganze Serie auswählen","Seleccionar toda la serie","Select whole series","Seleziona tutta la serie")}
                   </button>
                 )}
@@ -4602,7 +4608,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                     <button key={e.id} type="button" onClick={()=>setForm(f=>{const cur=f.employeeIds||[];const next=on?cur.filter(x=>x!==e.id):[...cur,e.id];return splitHours({...f,employeeIds:next,employeeId:next[0]||""});})}
                       style={{padding:"6px 10px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,
                         border:on?"1px solid rgba(12,166,120,0.7)":`1px solid ${CP.border}`,
-                        background:on?"rgba(12,166,120,0.22)":"rgba(255,255,255,0.05)",color:on?"#69DB7C":CP.textSecondary}}>
+                        background:on?"rgba(12,166,120,0.22)":"rgba(0,0,0,0.035)",color:on?"#107c10":CP.textSecondary}}>
                       {on?"✓ ":""}{e.name}
                     </button>
                   );
@@ -4620,7 +4626,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             <CPField label={L("Arbeitsstunden total","Horas de trabajo totales","Total work hours","Ore di lavoro totali")}>
               <CPInput type="number" value={form.totalHours??""} onChange={e=>{const v=parseFloat(String(e.target.value).replace(",","."));setForm(f=>splitHours({...f,totalHours:isNaN(v)?"":v}));}}/>
             </CPField>
-            <div style={{color:"#74C0FC",fontSize:12,marginBottom:14,lineHeight:1.5}}>
+            <div style={{color:"#0067c0",fontSize:12,marginBottom:14,lineHeight:1.5}}>
               {(()=>{const n=teamSize(form);const per=hoursBetween(form.timeStart,form.timeEnd);
                 return n>1
                   ? <>👥 {form.totalHours||0} h ÷ {n} {L("Personen","personas","people","persone")} = <b>{per} h {L("pro Person","cada una","each","a testa")}</b> · {L("fertig um","terminan a las","done at","finito alle")} <b>{form.timeEnd}</b></>
@@ -4634,10 +4640,10 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                 placeholder={String(Math.round(hoursBetween(form.timeStart,form.timeEnd)*teamSize(form)*100)/100)}/>
               {(()=>{const c=clients.find(x=>x.id===form.clientId);const rate=parseFloat(c?.price)||0;const n=teamSize(form);const ch=Number(form.clientHours)>0?Number(form.clientHours):Math.round(hoursBetween(form.timeStart,form.timeEnd)*n*100)/100;
                 return rate
-                  ? <div style={{color:"#FFD43B",fontSize:11.5,marginTop:4,fontWeight:700}}>{L("Kunde","Cliente","Client","Cliente")}: {ch} h × CHF {rate.toFixed(2)} = CHF {(ch*rate).toFixed(2)}
+                  ? <div style={{color:"#9a5b00",fontSize:11.5,marginTop:4,fontWeight:700}}>{L("Kunde","Cliente","Client","Cliente")}: {ch} h × CHF {rate.toFixed(2)} = CHF {(ch*rate).toFixed(2)}
                       <div style={{color:CP.textTertiary,fontWeight:500}}>👷 {L("Mitarbeiter","Empleados","Employees","Dipendenti")}: {Math.round(hoursBetween(form.timeStart,form.timeEnd)*n*100)/100} h ({n} × {hoursBetween(form.timeStart,form.timeEnd)} h)</div>
                     </div>
-                  : <div style={{color:"#FFA94D",fontSize:11,marginTop:4}}>{L("Kunde hat keinen Stundensatz","El cliente no tiene precio por hora","Client has no hourly rate","Il cliente non ha tariffa oraria")}</div>;})()}
+                  : <div style={{color:"#c55a00",fontSize:11,marginTop:4}}>{L("Kunde hat keinen Stundensatz","El cliente no tiene precio por hora","Client has no hourly rate","Il cliente non ha tariffa oraria")}</div>;})()}
             </CPField>
           </div>
           <CPField label={t.description}><CPInput value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></CPField>
@@ -4668,8 +4674,8 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                         })} style={{
                           padding:"6px 12px",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:700,
                           border:active?"1px solid rgba(28,126,214,0.6)":`1px solid ${CP.border}`,
-                          background:active?"rgba(28,126,214,0.25)":"rgba(255,255,255,0.05)",
-                          color:active?"#74C0FC":CP.textSecondary,
+                          background:active?"rgba(28,126,214,0.25)":"rgba(0,0,0,0.035)",
+                          color:active?"#0067c0":CP.textSecondary,
                         }}>{dayLabels[idx]}</button>
                       );
                     })}
@@ -4687,7 +4693,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
                       }}>{p.label}</button>
                     ))}
                   </div>
-                  <div style={{color:(form.recurWeekdays||[]).length?"#74C0FC":"#FFA94D",fontSize:12,fontWeight:600,marginTop:8}}>
+                  <div style={{color:(form.recurWeekdays||[]).length?"#0067c0":"#c55a00",fontSize:12,fontWeight:600,marginTop:8}}>
                     {(form.recurWeekdays||[]).length
                       ? L(`${form.recurWeekdays.length} Tag(e) pro Woche ausgewählt`,`${form.recurWeekdays.length} día(s) por semana seleccionados`,`${form.recurWeekdays.length} day(s) per week selected`,`${form.recurWeekdays.length} giorno/i a settimana selezionati`)
                       : L("Wähle mindestens einen Tag","Elige al menos un día","Pick at least one day","Scegli almeno un giorno")}
@@ -4719,7 +4725,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
             <div style={{padding:"8px 0 20px"}}>
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
-                <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>{job?.serviceType==="cleaning"?"🧹":"🌿"} {job?.clientName}</div>
+                <div style={{color:"#c42b1c",fontWeight:700,fontSize:15}}>{job?.serviceType==="cleaning"?"🧹":"🌿"} {job?.clientName}</div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{fmtDate(job?.date)} · {job?.timeStart}–{job?.timeEnd} · CHF {(job?.amount||0).toFixed(2)}</div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
@@ -4755,7 +4761,7 @@ function SearchBox({value, onChange, placeholder, lang}){
   return (
     <div style={{position:"relative",marginBottom:14}}>
       <CPInput value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder||`🔍 ${L("Suchen (Name, Datum …)","Buscar (nombre, fecha …)","Search (name, date …)","Cerca (nome, data …)")}`}/>
-      {value&&<button onClick={()=>onChange("")} style={{position:"absolute",right:10,top:9,background:"rgba(255,255,255,.12)",border:"none",borderRadius:8,color:"#fff",cursor:"pointer",padding:"4px 9px"}}>✕</button>}
+      {value&&<button onClick={()=>onChange("")} style={{position:"absolute",right:10,top:9,background:"rgba(0,0,0,0.035)",border:"none",borderRadius:8,color:CP.textPrimary,cursor:"pointer",padding:"4px 9px"}}>✕</button>}
     </div>
   );
 }
@@ -4811,13 +4817,13 @@ function GlobalSearch({lang, onClose, openApp, clients, employees, jobs, invoice
   const go = (g,it) => { if(it.search) pendingSectionSearch={app:g.app,q:it.search}; openApp(g.app); onClose(); };
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",backdropFilter:"blur(10px)",zIndex:99990,display:"flex",justifyContent:"center",alignItems:"flex-start",padding:"16px"}} onClick={onClose}>
-      <div style={{width:"min(720px,100%)",maxHeight:"92vh",display:"flex",flexDirection:"column",fontFamily:CP.font,background:"rgba(10,14,26,.98)",border:`1px solid ${CP.border}`,borderRadius:18,overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+      <div style={{width:"min(720px,100%)",maxHeight:"92vh",display:"flex",flexDirection:"column",fontFamily:CP.font,background:"#ffffff",border:`1px solid ${CP.border}`,borderRadius:18,overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
         <div style={{padding:"14px 14px 4px",display:"flex",gap:8,alignItems:"flex-start"}}>
           <div style={{flex:1}}>
             <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 ${L("Alles suchen: Name, Rechnung, Datum (z.B. 28 September 2026)…","Buscar todo: nombre, factura, fecha (ej. 28 septiembre 2026)…","Search everything: name, invoice, date (e.g. 28 September 2026)…","Cerca tutto: nome, fattura, data (es. 28 settembre 2026)…")}`}
-              style={{width:"100%",boxSizing:"border-box",padding:"14px 16px",borderRadius:12,border:`1px solid ${CP.border}`,background:"rgba(255,255,255,.08)",color:"#fff",fontSize:16,outline:"none",fontFamily:CP.font}}/>
+              style={{width:"100%",boxSizing:"border-box",padding:"14px 16px",borderRadius:12,border:`1px solid ${CP.border}`,background:"rgba(0,0,0,0.035)",color:CP.textPrimary,fontSize:16,outline:"none",fontFamily:CP.font}}/>
           </div>
-          <button onClick={onClose} style={{background:"rgba(255,255,255,.1)",border:"none",borderRadius:10,color:"#fff",padding:"12px 14px",cursor:"pointer",fontSize:15}}>✕</button>
+          <button onClick={onClose} style={{background:"rgba(0,0,0,0.035)",border:"none",borderRadius:10,color:CP.textPrimary,padding:"12px 14px",cursor:"pointer",fontSize:15}}>✕</button>
         </div>
         <div style={{padding:"4px 16px 8px",color:CP.textTertiary,fontSize:12}}>
           {normTxt(q).trim().length<2 ? L("Mindestens 2 Zeichen eingeben. Beispiele: «Müller», «2026-014», «septiembre 2026», «28.09.2026».","Escribe al menos 2 letras. Ejemplos: «Müller», «2026-014», «septiembre 2026», «28.09.2026».","Type at least 2 characters. Examples: «Müller», «2026-014», «September 2026», «28.09.2026».","Scrivi almeno 2 caratteri. Esempi: «Müller», «2026-014», «settembre 2026», «28.09.2026».")
@@ -4827,9 +4833,9 @@ function GlobalSearch({lang, onClose, openApp, clients, employees, jobs, invoice
           {normTxt(q).trim().length>=2&&!groups.length&&<div style={{color:CP.textSecondary,textAlign:"center",padding:30}}>😕 {L("Nichts gefunden","No se encontró nada","Nothing found","Nessun risultato")}</div>}
           {groups.map(g=>(
             <div key={g.key} style={{marginBottom:12}}>
-              <div style={{color:"#74C0FC",fontWeight:700,fontSize:13,margin:"6px 2px"}}>{g.icon} {g.title} ({g.count})</div>
+              <div style={{color:"#0067c0",fontWeight:700,fontSize:13,margin:"6px 2px"}}>{g.icon} {g.title} ({g.count})</div>
               {g.items.map(it=>(
-                <button key={it.id} onClick={()=>go(g,it)} style={{display:"block",width:"100%",textAlign:"left",background:"rgba(255,255,255,.04)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"9px 12px",marginBottom:5,cursor:"pointer",fontFamily:CP.font}}>
+                <button key={it.id} onClick={()=>go(g,it)} style={{display:"block",width:"100%",textAlign:"left",background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"9px 12px",marginBottom:5,cursor:"pointer",fontFamily:CP.font}}>
                   <div style={{color:CP.textPrimary,fontWeight:600,fontSize:14}}>{it.title}</div>
                   {it.sub&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{it.sub}</div>}
                 </button>
@@ -4849,18 +4855,18 @@ function ShareAppModal({lang, onClose}){
   const url = APP_PUBLIC_URL;
   const text = L("Patjac Reinigung Garten & Services – App","Patjac Reinigung Garten & Services – App","Patjac Reinigung Garten & Services – App","Patjac Reinigung Garten & Services – App");
   const [copied,setCopied] = useState(false);
-  const btn = bg => ({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"12px 14px",cursor:"pointer",fontWeight:700,fontSize:14,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
+  const btn = bg => ({background:bg,border:lightBg(bg)?`1px solid ${CP.borderActive}`:"none",borderRadius:12,color:fgOn(bg),padding:"12px 14px",cursor:"pointer",fontWeight:700,fontSize:14,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
   return (
     <CPModal title={`📲 ${L("App teilen","Compartir la app","Share the app","Condividi l'app")}`} onClose={onClose} width={460}>
       <div style={{color:CP.textSecondary,fontSize:13,marginBottom:10,lineHeight:1.5}}>
         {L("Teilen Sie immer diesen Link. Er öffnet direkt die App (nicht GitHub oder Vercel).","Comparte siempre este enlace: abre directamente la app (no GitHub ni Vercel).","Always share this link – it opens the app directly (not GitHub or Vercel).","Condividi sempre questo link: apre direttamente l'app (non GitHub o Vercel).")}
       </div>
-      <div style={{background:"rgba(0,0,0,.3)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 12px",color:"#74C0FC",fontWeight:700,fontSize:15,marginBottom:12,wordBreak:"break-all"}}>{url}</div>
+      <div style={{background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,padding:"10px 12px",color:"#0067c0",fontWeight:700,fontSize:15,marginBottom:12,wordBreak:"break-all"}}>{url}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
         {typeof navigator!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"Patjac App",text,url}).catch(()=>{})} style={{...btn("#7048E8"),gridColumn:"span 2"}}>📱 {L("Teilen …","Compartir …","Share …","Condividi …")}</button>}
         <a href={`https://wa.me/?text=${encodeURIComponent(text+"\n"+url)}`} target="_blank" rel="noopener noreferrer" style={btn("#25D366")}>💬 WhatsApp</a>
         <a href={`mailto:?subject=${encodeURIComponent("Patjac App")}&body=${encodeURIComponent(text+"\n"+url)}`} style={btn("#1C7ED6")}>📧 E-mail</a>
-        <button onClick={()=>{ try{ navigator.clipboard.writeText(url); setCopied(true); setTimeout(()=>setCopied(false),2000); }catch(e){} }} style={{...btn("rgba(255,255,255,.12)"),gridColumn:"span 2"}}>{copied?"✅ "+L("Kopiert","Copiado","Copied","Copiato"):"📋 "+L("Link kopieren","Copiar enlace","Copy link","Copia link")}</button>
+        <button onClick={()=>{ try{ navigator.clipboard.writeText(url); setCopied(true); setTimeout(()=>setCopied(false),2000); }catch(e){} }} style={{...btn("rgba(0,0,0,0.084)"),gridColumn:"span 2"}}>{copied?"✅ "+L("Kopiert","Copiado","Copied","Copiato"):"📋 "+L("Link kopieren","Copiar enlace","Copy link","Copia link")}</button>
       </div>
       <div style={{color:CP.textTertiary,fontSize:12,marginTop:12,lineHeight:1.5}}>
         💡 {L("Auf dem Handy: Link öffnen → «Zum Home-Bildschirm» – dann startet die App wie jede andere App.","En el móvil: abre el enlace → «Añadir a pantalla de inicio» y la app se abrirá como cualquier otra.","On the phone: open the link → «Add to Home Screen» – the app then starts like any other app.","Sul telefono: apri il link → «Aggiungi a Home» e l'app si avvia come le altre.")}
@@ -4908,12 +4914,12 @@ function BillingDuePanel({due, lang, onIssue, compact}){
   const list = compact ? due.slice(0,5) : due;
   return (
     <CPCard style={{marginBottom:14,border:"1px solid rgba(250,176,5,.45)",background:"rgba(250,176,5,.08)"}}>
-      <div style={{color:"#FFD43B",fontWeight:700,fontSize:14,marginBottom:10}}>🔔 {L("Rechnungen zu erstellen","Facturas por emitir","Invoices to issue","Fatture da emettere")} ({due.length})</div>
+      <div style={{color:"#9a5b00",fontWeight:700,fontSize:14,marginBottom:10}}>🔔 {L("Rechnungen zu erstellen","Facturas por emitir","Invoices to issue","Fatture da emettere")} ({due.length})</div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {list.map(g=>(
-          <div key={g.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",padding:"8px 10px",borderRadius:10,background:"rgba(0,0,0,.2)"}}>
+          <div key={g.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",padding:"8px 10px",borderRadius:10,background:"rgba(0,0,0,0.035)"}}>
             <div style={{minWidth:0}}>
-              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{g.clientName} {g.today&&<span style={{color:"#FF8787",fontSize:11,fontWeight:700}}>● {L("HEUTE","HOY","TODAY","OGGI")}</span>}</div>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{g.clientName} {g.today&&<span style={{color:"#c42b1c",fontSize:11,fontWeight:700}}>● {L("HEUTE","HOY","TODAY","OGGI")}</span>}</div>
               <div style={{color:CP.textSecondary,fontSize:12}}>{modeTxt(g.mode)} · {g.mode==="job"?invFmtDate(g.from):`${invFmtDate(g.from)} – ${invFmtDate(g.to)}`} · {g.hours} h · CHF {g.amount.toFixed(2)}</div>
             </div>
             <div style={{display:"flex",gap:6}}>
@@ -5185,7 +5191,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
 
   const modeBtn = (id,icon,label,sub) => (
     <button key={id} onClick={()=>pickMode(id)} style={{flex:1,minWidth:120,padding:"12px 10px",borderRadius:14,cursor:"pointer",fontFamily:CP.font,
-      border:`2px solid ${form.billingMode===id?"#1C7ED6":"rgba(255,255,255,.12)"}`,background:form.billingMode===id?"rgba(28,126,214,.25)":"rgba(255,255,255,.05)",color:"#fff",textAlign:"center"}}>
+      border:`2px solid ${form.billingMode===id?"#1C7ED6":"rgba(0,0,0,0.084)"}`,background:form.billingMode===id?"rgba(28,126,214,.25)":"rgba(0,0,0,0.035)",color:CP.textPrimary,textAlign:"center"}}>
       <div style={{fontSize:24}}>{icon}</div><div style={{fontWeight:700,fontSize:14}}>{label}</div><div style={{fontSize:11,color:CP.textSecondary}}>{sub}</div>
     </button>);
 
@@ -5204,14 +5210,14 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
             {bulk.selectMode&&<SelBox checked={bulk.selected.has(inv.id)} onChange={()=>bulk.toggle(inv.id)}/>}
             <div style={{flex:1,minWidth:180}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                <span style={{color:"#74C0FC",fontWeight:700,fontSize:15}}>{inv.invoiceNumber}</span>
+                <span style={{color:"#0067c0",fontWeight:700,fontSize:15}}>{inv.invoiceNumber}</span>
                 <CPBadge text={sl(inv.status)} color={sc(inv.status)}/>
-                {inv.pdfUrl&&<span style={{fontSize:11,color:"#69DB7C"}}>📄 PDF</span>}
+                {inv.pdfUrl&&<span style={{fontSize:11,color:"#107c10"}}>📄 PDF</span>}
               </div>
               <div style={{color:CP.textPrimary,fontWeight:600,fontSize:14}}>{inv.clientName}</div>
-              {(()=>{ const a=clientAddr(clientOf(inv)); return a?<div style={{color:"#8CE99A",fontSize:12}}>📍 {a}</div>:<div style={{color:"#FF8787",fontSize:12}}>📍 {L("Adresse fehlt – im Kunden ergänzen","Falta la dirección: complétala en Clientes","Address missing – add it in Clients","Indirizzo mancante – aggiungilo nei Clienti")}</div>; })()}
+              {(()=>{ const a=clientAddr(clientOf(inv)); return a?<div style={{color:"#107c10",fontSize:12}}>📍 {a}</div>:<div style={{color:"#c42b1c",fontSize:12}}>📍 {L("Adresse fehlt – im Kunden ergänzen","Falta la dirección: complétala en Clientes","Address missing – add it in Clients","Indirizzo mancante – aggiungilo nei Clienti")}</div>; })()}
               <div style={{color:CP.textSecondary,fontSize:12}}>{invFmtDate(inv.date)} → {invFmtDate(inv.dueDate)}{inv.periodFrom?` · ${L("Zeitraum","Periodo","Period","Periodo")} ${invFmtDate(inv.periodFrom)}–${invFmtDate(inv.periodTo)}`:""}</div>
-              <div style={{color:"#FFD43B",fontWeight:700,fontSize:14,marginTop:4}}>CHF {(Number(inv.total)||0).toFixed(2)}</div>
+              <div style={{color:"#9a5b00",fontWeight:700,fontSize:14,marginTop:4}}>CHF {(Number(inv.total)||0).toFixed(2)}</div>
             </div>
             {!bulk.selectMode&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <CPBtn onClick={()=>openPreview(inv)} variant="primary" size="sm">📤 {L("Senden","Enviar","Send","Invia")}</CPBtn>
@@ -5233,9 +5239,9 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
               {clients.map(c=><option key={c.id} value={c.id}>{c.name}{clientAddr(c)?` — ${clientAddr(c)}`:""}</option>)}
             </CPSelect>
           </CPField>
-          {client&&<div style={{color:clientAddr(client)?CP.textSecondary:"#FF8787",fontSize:12,margin:"-4px 0 4px"}}>📍 {L("Adresse","Dirección","Address","Indirizzo")}: <strong style={{color:clientAddr(client)?"#8CE99A":"#FF8787"}}>{clientAddr(client)||L("fehlt – im Kunden ergänzen","falta: complétala en Clientes","missing – add it in Clients","mancante – aggiungilo nei Clienti")}</strong></div>}
-          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 4px"}}>🧾 {L("Abrechnung des Kunden","Facturación del cliente","Client billing","Fatturazione del cliente")}: <strong style={{color:"#74C0FC"}}>{clientBillingMode(client)==="job"?L("Pro Auftrag","Por trabajo","Per job","Per lavoro"):clientBillingMode(client)==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile")}</strong></div>}
-          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 10px"}}>💶 {L("Preis pro Stunde","Precio por hora","Price per hour","Prezzo orario")}: <strong style={{color:rate?"#69DB7C":"#FF8787"}}>CHF {rate.toFixed(2)}</strong>{!rate&&` — ${L("im Kunden erfassen","añádalo en la ficha del cliente","set it on the client","impostalo nel cliente")}`}</div>}
+          {client&&<div style={{color:clientAddr(client)?CP.textSecondary:"#c42b1c",fontSize:12,margin:"-4px 0 4px"}}>📍 {L("Adresse","Dirección","Address","Indirizzo")}: <strong style={{color:clientAddr(client)?"#107c10":"#c42b1c"}}>{clientAddr(client)||L("fehlt – im Kunden ergänzen","falta: complétala en Clientes","missing – add it in Clients","mancante – aggiungilo nei Clienti")}</strong></div>}
+          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 4px"}}>🧾 {L("Abrechnung des Kunden","Facturación del cliente","Client billing","Fatturazione del cliente")}: <strong style={{color:"#0067c0"}}>{clientBillingMode(client)==="job"?L("Pro Auftrag","Por trabajo","Per job","Per lavoro"):clientBillingMode(client)==="week"?L("Wöchentlich","Semanal","Weekly","Settimanale"):L("Monatlich","Mensual","Monthly","Mensile")}</strong></div>}
+          {client&&<div style={{color:CP.textSecondary,fontSize:12,margin:"0 0 10px"}}>💶 {L("Preis pro Stunde","Precio por hora","Price per hour","Prezzo orario")}: <strong style={{color:rate?"#107c10":"#c42b1c"}}>CHF {rate.toFixed(2)}</strong>{!rate&&` — ${L("im Kunden erfassen","añádalo en la ficha del cliente","set it on the client","impostalo nel cliente")}`}</div>}
 
           {/* 2. Billing mode */}
           {form.clientId&&(<>
@@ -5260,7 +5266,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
                   </CPField>
                   {(()=>{ const days=[...new Set((jobs||[]).filter(j=>j.clientId===form.clientId&&j.date).map(j=>j.date))].sort().reverse().slice(0,12); return days.length?(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",margin:"-4px 0 10px"}}>
-                      {days.map(d=><button key={d} onClick={()=>setForm(f=>({...f,periodFrom:d,periodTo:d,_sel:[],_selTouched:false,_manual:false}))} style={{padding:"4px 10px",borderRadius:14,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:CP.font,background:form.periodFrom===d?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{invFmtDate(d)}</button>)}
+                      {days.map(d=><button key={d} onClick={()=>setForm(f=>({...f,periodFrom:d,periodTo:d,_sel:[],_selTouched:false,_manual:false}))} style={{padding:"4px 10px",borderRadius:14,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:CP.font,background:form.periodFrom===d?CP.accent:"rgba(0,0,0,0.07)",color:(form.periodFrom===d)?"#fff":CP.textPrimary}}>{invFmtDate(d)}</button>)}
                     </div>):null; })()}
                 </div>);
               if(form.billingMode==="week") return (
@@ -5277,18 +5283,18 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
                 </div>);
             })()}
             {/* Job list */}
-            <div style={{background:"rgba(0,0,0,.2)",borderRadius:12,padding:"8px 10px",marginBottom:12,maxHeight:220,overflowY:"auto"}}>
+            <div style={{background:"rgba(0,0,0,0.035)",borderRadius:12,padding:"8px 10px",marginBottom:12,maxHeight:220,overflowY:"auto"}}>
               {jobGroups.length===0&&<div style={{color:CP.textSecondary,fontSize:12,padding:6}}>ℹ️ {L("Keine Einsätze in diesem Zeitraum.","No hay trabajos de este cliente en ese periodo.","No jobs in this period.","Nessun intervento nel periodo.")}</div>}
               {jobGroups.map(g=>{
                 const checked = form.billingMode==="job" ? (form._sel||[]).includes(g.key) : !g.billed;
                 return (
-                  <label key={g.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:"1px solid rgba(255,255,255,.05)",cursor:form.billingMode==="job"?"pointer":"default",fontSize:13,color:CP.textPrimary,opacity:g.billed&&!checked?.55:1}}>
+                  <label key={g.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:"1px solid rgba(0,0,0,0.035)",cursor:form.billingMode==="job"?"pointer":"default",fontSize:13,color:CP.textPrimary,opacity:g.billed&&!checked?.55:1}}>
                     {form.billingMode==="job"&&<input type="checkbox" checked={checked} onChange={()=>setForm(f=>{const s=new Set(f._sel||[]); s.has(g.key)?s.delete(g.key):s.add(g.key); return {...f,_sel:[...s],_selTouched:true,_manual:false};})}/>}
                     <span>{INV_SERVICES.find(s=>s.id===g.service)?.icon}</span>
                     <span style={{flex:1}}>{invFmtDate(g.date)} · {g.start}–{g.end}{g.people>1?` · 👥 ${g.people}`:""}</span>
-                    <span style={{color:"#74C0FC",fontWeight:700}}>{g.hours} h</span>
-                    <span style={{color:"#FFD43B",minWidth:80,textAlign:"right"}}>CHF {(g.hours*rate).toFixed(2)}</span>
-                    {g.billed&&<span style={{fontSize:10,color:"#FAB005"}}>{L("bereits verrechnet","ya facturado","already billed","già fatturato")}</span>}
+                    <span style={{color:"#0067c0",fontWeight:700}}>{g.hours} h</span>
+                    <span style={{color:"#9a5b00",minWidth:80,textAlign:"right"}}>CHF {(g.hours*rate).toFixed(2)}</span>
+                    {g.billed&&<span style={{fontSize:10,color:"#9a5b00"}}>{L("bereits verrechnet","ya facturado","already billed","già fatturato")}</span>}
                   </label>);
               })}
             </div>
@@ -5298,7 +5304,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
           {form.clientId&&(<>
             <div style={{color:CP.textSecondary,fontSize:12,fontWeight:700,margin:"4px 0 8px",textTransform:"uppercase",letterSpacing:.5}}>4. {L("Beschreibung","Descripción","Description","Descrizione")}</div>
             {(form.items||[]).map((item,idx)=>(
-              <div key={item._k||idx} style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:10,padding:8,marginBottom:6}}>
+              <div key={item._k||idx} style={{background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.042)",borderRadius:10,padding:8,marginBottom:6}}>
                 <div style={{display:"grid",gridTemplateColumns:"1.3fr 2fr auto",gap:6,marginBottom:6}}>
                   <CPSelect value={item.service||"cleaning"} onChange={e=>setItem(idx,{service:e.target.value})}>
                     {INV_SERVICES.map(s=><option key={s.id} value={s.id}>{s.icon} {s.L[li]}</option>)}
@@ -5309,7 +5315,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center"}}>
                   <div><div style={{color:CP.textTertiary,fontSize:10}}>{L("Stunden","Horas","Hours","Ore")}</div><CPInput type="number" value={item.qty} onChange={e=>setItem(idx,{qty:parseFloat(e.target.value)||0})}/></div>
                   <div><div style={{color:CP.textTertiary,fontSize:10}}>CHF / {L("Std.","hora","h","ora")}</div><CPInput type="number" value={item.price} onChange={e=>setItem(idx,{price:parseFloat(e.target.value)||0})}/></div>
-                  <div style={{color:"#FFD43B",fontSize:15,fontWeight:700,textAlign:"right"}}>CHF {(Number(item.total)||0).toFixed(2)}</div>
+                  <div style={{color:"#9a5b00",fontSize:15,fontWeight:700,textAlign:"right"}}>CHF {(Number(item.total)||0).toFixed(2)}</div>
                 </div>
               </div>
             ))}
@@ -5327,10 +5333,10 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
               <CPField label={t.dueDate}><CPInput type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/></CPField>
             </div>
             {(()=>{const{t:tot}=calc(form.items||[]); const hrs=(form.items||[]).reduce((a,i)=>a+(Number(i.qty)||0),0); return(
-              <div style={{background:"rgba(0,0,0,.25)",borderRadius:12,padding:"12px 16px",marginTop:4}}>
+              <div style={{background:"rgba(0,0,0,0.035)",borderRadius:12,padding:"12px 16px",marginTop:4}}>
                 <div style={{display:"flex",justifyContent:"space-between",color:CP.textSecondary,fontSize:13,marginBottom:4}}><span>{L("Total Stunden","Total horas","Total hours","Totale ore")}</span><span>{r2(hrs)} h</span></div>
                 <div style={{color:CP.textTertiary,fontSize:11,marginBottom:6}}>{L("Ohne MWST – nicht MWST-pflichtig","Sin IVA – empresa no sujeta a IVA","No VAT – not VAT-registered","Senza IVA – non assoggettato IVA")}</div>
-                <div style={{display:"flex",justifyContent:"space-between",color:"#FFD43B",fontSize:18,fontWeight:700,borderTop:`1px solid ${CP.border}`,paddingTop:8}}><span>Total</span><span>CHF {tot}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",color:"#9a5b00",fontSize:18,fontWeight:700,borderTop:`1px solid ${CP.border}`,paddingTop:8}}><span>Total</span><span>CHF {tot}</span></div>
               </div>);})()}
           </>)}
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:12}}>
@@ -5348,12 +5354,12 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
         const msg = msgFor(inv, sendState.url);
         const subj = `${L("Rechnung","Factura","Invoice","Fattura")} ${inv.invoiceNumber} — ${cs.name}`;
         const canShareFile = ready && sendState.blob && typeof navigator!=="undefined" && navigator.canShare && (()=>{ try{ return navigator.canShare({files:[new File([sendState.blob],pdfName(inv),{type:"application/pdf"})]}); }catch(e){ return false; } })();
-        const aBtn = (bg)=>({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"11px 12px",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
+        const aBtn = (bg)=>({background:bg,border:lightBg(bg)?`1px solid ${CP.borderActive}`:"none",borderRadius:12,color:fgOn(bg),padding:"11px 12px",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
         return (
           <CPModal title={`🧾 ${inv.invoiceNumber} · ${inv.clientName}`} onClose={()=>setModal(null)} width={720}>
             {/* SEND PANEL */}
             <div style={{background:"rgba(28,126,214,.1)",border:"1px solid rgba(28,126,214,.3)",borderRadius:14,padding:12,marginBottom:12}}>
-              <div style={{color:"#74C0FC",fontWeight:700,fontSize:14,marginBottom:8}}>📤 {L("Rechnung als PDF an den Kunden senden","Enviar la factura en PDF al cliente","Send the invoice PDF to the client","Invia la fattura in PDF al cliente")}</div>
+              <div style={{color:"#0067c0",fontWeight:700,fontSize:14,marginBottom:8}}>📤 {L("Rechnung als PDF an den Kunden senden","Enviar la factura en PDF al cliente","Send the invoice PDF to the client","Invia la fattura in PDF al cliente")}</div>
               {!ready&&(
                 <CPBtn onClick={()=>preparePdf(inv)} full>{sendState.status==="working"?`⏳ ${L("PDF wird erstellt…","Creando PDF…","Creating PDF…","Creazione PDF…")}`:`📄 ${L("PDF erstellen","Crear PDF para enviar","Create PDF to send","Crea PDF da inviare")}`}</CPBtn>
               )}
@@ -5361,7 +5367,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8}}>
                   <a href={wa?`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`:undefined} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!wa){e.preventDefault();notify(L("Kunde hat keine Telefonnummer","El cliente no tiene teléfono","Client has no phone","Il cliente non ha telefono"),"error");}}} style={{...aBtn("#25D366"),opacity:wa?1:.45}}>💬 WhatsApp</a>
                   {canShareFile&&<button onClick={async()=>{ try{ await navigator.share({files:[new File([sendState.blob],pdfName(inv),{type:"application/pdf"})],title:subj,text:msg}); }catch(e){} }} style={aBtn("#7048E8")}>📱 {L("PDF teilen","Compartir PDF","Share PDF","Condividi PDF")}</button>}
-                  <button onClick={async()=>{ if(sendState.blob) downloadBlob(sendState.blob,pdfName(inv)); else if(sendState.url) window.open(sendState.url,"_blank"); }} style={aBtn("rgba(255,255,255,.15)")}>⬇️ {L("PDF herunterladen","Descargar PDF","Download PDF","Scarica PDF")}</button>
+                  <button onClick={async()=>{ if(sendState.blob) downloadBlob(sendState.blob,pdfName(inv)); else if(sendState.url) window.open(sendState.url,"_blank"); }} style={aBtn("rgba(0,0,0,0.105)")}>⬇️ {L("PDF herunterladen","Descargar PDF","Download PDF","Scarica PDF")}</button>
                 </div>
               )}
               {ready&&<div style={{marginTop:8}}><CompanyEmailButtons to={c?.email||""} subject={subj} body={msg} lang={lang} disabled={!c?.email}/></div>}
@@ -5370,12 +5376,12 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
                   ? L("Die Nachricht enthält einen Link zum PDF. Der Kunde öffnet ihn mit einem Tipp.","El mensaje lleva un enlace al PDF: el cliente lo abre con un toque.","The message contains a link to the PDF – the client opens it with one tap.","Il messaggio contiene un link al PDF: il cliente lo apre con un tocco.")
                   : L("Kein Link verfügbar: PDF herunterladen und im WhatsApp/E-Mail anhängen.","Sin enlace: descargue el PDF y adjúntelo en WhatsApp o en el e-mail.","No link: download the PDF and attach it in WhatsApp/email.","Nessun link: scarica il PDF e allegalo in WhatsApp/e-mail.")}
                 {!c?.email&&` ${L("(Kunde ohne E-Mail)","(el cliente no tiene e-mail guardado)","(client has no email)","(cliente senza e-mail)")}`}
-                {ready&&<button onClick={()=>setSendState({status:"idle",url:"",blob:null})} style={{background:"none",border:"none",color:"#74C0FC",cursor:"pointer",fontSize:11.5,textDecoration:"underline",marginLeft:6}}>{L("PDF neu erstellen","Volver a crear PDF","Recreate PDF","Ricrea PDF")}</button>}
+                {ready&&<button onClick={()=>setSendState({status:"idle",url:"",blob:null})} style={{background:"none",border:"none",color:"#0067c0",cursor:"pointer",fontSize:11.5,textDecoration:"underline",marginLeft:6}}>{L("PDF neu erstellen","Volver a crear PDF","Recreate PDF","Ricrea PDF")}</button>}
               </div>}
             </div>
 
             {/* INVOICE */}
-            <div style={{borderRadius:14,overflow:"hidden",border:"1px solid rgba(255,255,255,.1)"}}>
+            <div style={{borderRadius:14,overflow:"hidden",border:"1px solid rgba(0,0,0,0.07)"}}>
               <div ref={previewRef}><InvoiceDocument inv={inv} client={c} cs={cs} lang={lang}/></div>
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14,flexWrap:"wrap"}}>
@@ -5394,7 +5400,7 @@ function InvoicesApp({t,invoices,setInvoices,clients,jobs,companySettings,notify
             <div style={{padding:"8px 0 20px"}}>
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
-                <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>🧾 {inv?.invoiceNumber} — {inv?.clientName}</div>
+                <div style={{color:"#c42b1c",fontWeight:700,fontSize:15}}>🧾 {inv?.invoiceNumber} — {inv?.clientName}</div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>CHF {(Number(inv?.total)||0).toFixed(2)} · {invFmtDate(inv?.date)}</div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
@@ -5507,16 +5513,16 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
             <div key={row.label}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                 <span style={{color:CP.textSecondary,fontSize:13}}>{row.label}</span>
-                <span style={{color:"#fff",fontWeight:700,fontSize:13}}>CHF {row.val.toFixed(2)} <span style={{color:CP.textTertiary,fontSize:11,fontWeight:400}}>({row.pct.toFixed(1)}%)</span></span>
+                <span style={{color:CP.textPrimary,fontWeight:700,fontSize:13}}>CHF {row.val.toFixed(2)} <span style={{color:CP.textTertiary,fontSize:11,fontWeight:400}}>({row.pct.toFixed(1)}%)</span></span>
               </div>
-              <div style={{height:7,background:"rgba(255,255,255,0.07)",borderRadius:20,overflow:"hidden"}}>
+              <div style={{height:7,background:"rgba(0,0,0,0.035)",borderRadius:20,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${row.pct}%`,background:row.color,borderRadius:20,transition:"width .5s"}}/>
               </div>
             </div>
           ))}
           <div style={{borderTop:`1px solid ${CP.border}`,paddingTop:10,marginTop:4,display:"flex",justifyContent:"space-between"}}>
             <span style={{color:CP.textSecondary,fontWeight:700,fontSize:14}}>{t.totalExpenses}</span>
-            <span style={{color:"#FF8787",fontWeight:700,fontSize:16}}>CHF {totalExpenses.toFixed(2)}</span>
+            <span style={{color:"#c42b1c",fontWeight:700,fontSize:16}}>CHF {totalExpenses.toFixed(2)}</span>
           </div>
         </div>
 
@@ -5532,7 +5538,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
               CHF {income.toFixed(2)} − CHF {totalExpenses.toFixed(2)}
             </div>
           </div>
-          <div style={{color:profit>=0?"#69DB7C":"#FF8787",fontWeight:700,fontSize:24}}>
+          <div style={{color:profit>=0?"#107c10":"#c42b1c",fontWeight:700,fontSize:24}}>
             {profit>=0?"":"−"}CHF {Math.abs(profit).toFixed(2)}
           </div>
         </div>
@@ -5578,7 +5584,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
           ].map(([lbl,val])=>(
             <div key={lbl} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${CP.border}`,fontSize:12}}>
               <span style={{color:CP.textSecondary,lineHeight:1.4}}>{lbl}</span>
-              <span style={{color:"#FFD43B",fontWeight:700,flexShrink:0,marginLeft:8}}>{val}</span>
+              <span style={{color:"#9a5b00",fontWeight:700,flexShrink:0,marginLeft:8}}>{val}</span>
             </div>
           ))}
           <div style={{marginTop:10}}>
@@ -5596,11 +5602,11 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
           <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
             <div style={{background:"rgba(47,158,68,0.12)",border:"1px solid rgba(47,158,68,0.3)",borderRadius:10,padding:"8px 14px"}}>
               <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.orderDelivered}</div>
-              <div style={{color:"#69DB7C",fontWeight:700,fontSize:15}}>CHF {warehouseCostDelivered.toFixed(2)}</div>
+              <div style={{color:"#107c10",fontWeight:700,fontSize:15}}>CHF {warehouseCostDelivered.toFixed(2)}</div>
             </div>
             <div style={{background:"rgba(240,140,0,0.12)",border:"1px solid rgba(240,140,0,0.3)",borderRadius:10,padding:"8px 14px"}}>
               <div style={{color:CP.textTertiary,fontSize:10,marginBottom:2}}>{t.orderPending}</div>
-              <div style={{color:"#FFD43B",fontWeight:700,fontSize:15}}>CHF {warehouseCostPending.toFixed(2)}</div>
+              <div style={{color:"#9a5b00",fontWeight:700,fontSize:15}}>CHF {warehouseCostPending.toFixed(2)}</div>
             </div>
           </div>
           <CPTable
@@ -5609,7 +5615,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
               fmtDate(o.date)||"—",
               o.supplierName||"—",
               <div style={{fontSize:11,color:CP.textSecondary}}>{(o.items||[]).map(i=>i.productName).join(", ")}</div>,
-              <span style={{fontWeight:700,color:o.status==="delivered"?"#69DB7C":o.status==="pending"?"#FFD43B":"#FF8787"}}>CHF {(o.total||0).toFixed(2)}</span>,
+              <span style={{fontWeight:700,color:o.status==="delivered"?"#107c10":o.status==="pending"?"#9a5b00":"#c42b1c"}}>CHF {(o.total||0).toFixed(2)}</span>,
               <CPBadge text={o.status==="delivered"?t.orderDelivered:o.status==="pending"?t.orderPending:t.orderCancelled}
                 color={o.status==="delivered"?"green":o.status==="pending"?"yellow":"red"}/>,
             ])}
@@ -5694,9 +5700,9 @@ function DistBadge({m,lang}){
   const L = makeL(lang);
   if(m===null||m===undefined||m==="") return <span style={{fontSize:11,color:"#888"}}>—</span>;
   const d=Number(m);
-  const [bg,fg,txt] = d<=300 ? ["rgba(47,158,68,.18)","#69DB7C",L("beim Kunden","en el cliente","at client","dal cliente")]
-    : d<=1000 ? ["rgba(240,140,0,.18)","#FFA94D",L("in der Nähe","cerca","nearby","vicino")]
-    : ["rgba(201,42,42,.2)","#FF8787",L("⚠️ weit entfernt","⚠️ lejos del cliente","⚠️ far away","⚠️ lontano")];
+  const [bg,fg,txt] = d<=300 ? ["rgba(47,158,68,.18)","#107c10",L("beim Kunden","en el cliente","at client","dal cliente")]
+    : d<=1000 ? ["rgba(240,140,0,.18)","#c55a00",L("in der Nähe","cerca","nearby","vicino")]
+    : ["rgba(201,42,42,.2)","#c42b1c",L("⚠️ weit entfernt","⚠️ lejos del cliente","⚠️ far away","⚠️ lontano")];
   return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10,background:bg,color:fg}}>{txt} · {d<1000?`${d} m`:`${(d/1000).toFixed(1)} km`}</span>;
 }
 function ClockLocationsView({jobs,employees,isAdmin,selEmp,lang}){
@@ -5718,7 +5724,7 @@ function ClockLocationsView({jobs,employees,isAdmin,selEmp,lang}){
         <CPSelect value={days} onChange={e=>setDays(Number(e.target.value))} style={{maxWidth:200}}>
           {[7,30,90].map(d=><option key={d} value={d}>{L(`Letzte ${d} Tage`,`Últimos ${d} días`,`Last ${d} days`,`Ultimi ${d} giorni`)}</option>)}
         </CPSelect>
-        {suspicious>0&&<span style={{alignSelf:"center",color:"#FF8787",fontWeight:700,fontSize:13}}>⚠️ {suspicious} {L("auffällige Stempelungen","fichajes sospechosos","suspicious clock-ins","timbrature sospette")}</span>}
+        {suspicious>0&&<span style={{alignSelf:"center",color:"#c42b1c",fontWeight:700,fontSize:13}}>⚠️ {suspicious} {L("auffällige Stempelungen","fichajes sospechosos","suspicious clock-ins","timbrature sospette")}</span>}
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {rows.map(j=>(
@@ -5730,10 +5736,10 @@ function ClockLocationsView({jobs,employees,isAdmin,selEmp,lang}){
             {[["▶",L("Eingang","Entrada","In","Entrata"),j.actualStart,j.startLocation,j.startDistM,j.startLat,j.startLon],
               ["■",L("Ausgang","Salida","Out","Uscita"),j.actualEnd,j.endLocation,j.endDistM,j.endLat,j.endLon]].map(([ic,lbl,time,loc,dist,lat,lon])=>(
               <div key={lbl} style={{display:"flex",gap:8,alignItems:"flex-start",flexWrap:"wrap",padding:"4px 0",borderTop:`1px solid ${CP.border}`}}>
-                <span style={{color:ic==="▶"?"#69DB7C":"#FF8787",fontWeight:700,minWidth:90,fontSize:13}}>{ic} {lbl} {time||"—"}</span>
+                <span style={{color:ic==="▶"?"#107c10":"#c42b1c",fontWeight:700,minWidth:90,fontSize:13}}>{ic} {lbl} {time||"—"}</span>
                 <span style={{color:CP.textSecondary,fontSize:12,flex:1,minWidth:180}}>📍 {loc || (time?L("Keine Position","Sin ubicación","No location","Nessuna posizione"):"—")}</span>
                 <DistBadge m={dist} lang={lang}/>
-                {mapLink(lat,lon)&&<a href={mapLink(lat,lon)} target="_blank" rel="noreferrer" style={{fontSize:12,color:"#74C0FC"}}>🗺️ {L("Karte","Mapa","Map","Mappa")}</a>}
+                {mapLink(lat,lon)&&<a href={mapLink(lat,lon)} target="_blank" rel="noreferrer" style={{fontSize:12,color:"#0067c0"}}>🗺️ {L("Karte","Mapa","Map","Mappa")}</a>}
               </div>
             ))}
           </CPCard>
@@ -5852,7 +5858,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         {[["clock","⏱️ "+L("Stempeln","Fichar","Clock","Timbrare")],["locations","📍 "+L("Standorte","Ubicaciones","Locations","Posizioni")]].map(([k,lbl])=>(
           <button key={k} onClick={()=>setTab(k)} style={{padding:"7px 16px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,
-            background:tab===k?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{lbl}</button>
+            background:tab===k?CP.accent:"rgba(0,0,0,0.07)",color:(tab===k)?"#fff":CP.textPrimary}}>{lbl}</button>
         ))}
       </div>
       {tab==="locations" ? <ClockLocationsView jobs={jobs} employees={employees} isAdmin={currentUser?.role==="admin"} selEmp={selEmp} lang={lang}/> : (<>
@@ -5873,10 +5879,10 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
         <CPCard style={{marginBottom:14,background:"rgba(12,166,120,0.08)",border:"1px solid rgba(12,166,120,0.22)"}}>
           <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
             {[
-              [L("Erster Einsatz","Primera entrada","First clock-in","Prima entrata"), tc.clockIn||"—", "#69DB7C"],
-              [L("Letzter Abschluss","Última salida","Last clock-out","Ultima uscita"), tc.clockOut||"—", "#FF8787"],
-              [L("Total heute","Total hoy","Total today","Totale oggi"), totalActualHrsToday>0?`${totalActualHrsToday.toFixed(1)}h`:(tc.hours?`${Number(tc.hours).toFixed(1)}h`:"—"), "#FFD43B"],
-              [L("Aufträge","Trabajos","Jobs","Lavori"), `${todayJobs.filter(j=>j.status==="completed").length}/${todayJobs.length}`, "#74C0FC"],
+              [L("Erster Einsatz","Primera entrada","First clock-in","Prima entrata"), tc.clockIn||"—", "#107c10"],
+              [L("Letzter Abschluss","Última salida","Last clock-out","Ultima uscita"), tc.clockOut||"—", "#c42b1c"],
+              [L("Total heute","Total hoy","Total today","Totale oggi"), totalActualHrsToday>0?`${totalActualHrsToday.toFixed(1)}h`:(tc.hours?`${Number(tc.hours).toFixed(1)}h`:"—"), "#9a5b00"],
+              [L("Aufträge","Trabajos","Jobs","Lavori"), `${todayJobs.filter(j=>j.status==="completed").length}/${todayJobs.length}`, "#0067c0"],
               [L("Monat","Mes","Month","Mese"), `${totalHrsMonth.toFixed(1)}h`, "#a78bfa"],
             ].map(([l,v,c])=>(
               <div key={l}>
@@ -5925,8 +5931,8 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
 
               return (
                 <div key={job.id} style={{
-                  background: isDone?"rgba(47,158,68,0.08)":isActive?"rgba(28,126,214,0.12)":"rgba(255,255,255,0.03)",
-                  border:`2px solid ${isDone?"rgba(47,158,68,0.35)":isActive?"rgba(28,126,214,0.5)":"rgba(255,255,255,0.08)"}`,
+                  background: isDone?"rgba(47,158,68,0.08)":isActive?"rgba(28,126,214,0.12)":"rgba(0,0,0,0.021)",
+                  border:`2px solid ${isDone?"rgba(47,158,68,0.35)":isActive?"rgba(28,126,214,0.5)":"rgba(0,0,0,0.056)"}`,
                   borderRadius:18,padding:"16px 18px",
                   transition:"all .2s",
                 }}>
@@ -5936,7 +5942,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                       {/* Status dot */}
                       <div style={{
                         width:14,height:14,borderRadius:"50%",flexShrink:0,
-                        background:isDone?"#2F9E44":isActive?"#1C7ED6":"rgba(255,255,255,0.2)",
+                        background:isDone?"#2F9E44":isActive?"#1C7ED6":"rgba(0,0,0,0.14)",
                         boxShadow:isActive?"0 0 10px rgba(28,126,214,0.6)":isDone?"0 0 8px rgba(47,158,68,0.5)":"none",
                       }}/>
                       <div>
@@ -5944,7 +5950,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                         <div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>
                           {job.serviceType==="cleaning"?t.cleaning:t.gardening}
                           {" · "}
-                          <span style={{color:"#74C0FC"}}>
+                          <span style={{color:"#0067c0"}}>
                             {L("Geplant","Planificado","Scheduled","Pianificato")}: {job.timeStart}–{job.timeEnd}
                           </span>
                         </div>
@@ -5966,7 +5972,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                       <div style={{color:CP.textTertiary,fontSize:10,fontWeight:700,marginBottom:4}}>
                         🟢 {t.clockIn}
                       </div>
-                      <div style={{color:jc.in?"#69DB7C":CP.textTertiary,fontWeight:700,fontSize:jc.in?20:14}}>
+                      <div style={{color:jc.in?"#107c10":CP.textTertiary,fontWeight:700,fontSize:jc.in?20:14}}>
                         {jc.in||"—"}
                       </div>
                     </div>
@@ -5978,7 +5984,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                       <div style={{color:CP.textTertiary,fontSize:10,fontWeight:700,marginBottom:4}}>
                         🔴 {t.clockOut}
                       </div>
-                      <div style={{color:jc.out?"#FF8787":CP.textTertiary,fontWeight:700,fontSize:jc.out?20:14}}>
+                      <div style={{color:jc.out?"#c42b1c":CP.textTertiary,fontWeight:700,fontSize:jc.out?20:14}}>
                         {jc.out||"—"}
                       </div>
                     </div>
@@ -5991,7 +5997,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                         <div style={{color:CP.textTertiary,fontSize:10,fontWeight:700,marginBottom:4}}>
                           ⏱️ {L("Zeit","Tiempo","Time","Tempo")}
                         </div>
-                        <div style={{color:"#FFD43B",fontWeight:700,fontSize:20}}>{elapsed}</div>
+                        <div style={{color:"#9a5b00",fontWeight:700,fontSize:20}}>{elapsed}</div>
                       </div>
                     )}
                   </div>
@@ -6006,7 +6012,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                         flex:1,padding:"12px 10px",
                         background:isDone||isActive?"rgba(47,158,68,0.1)":"rgba(47,158,68,0.85)",
                         border:`2px solid ${isDone||isActive?"rgba(47,158,68,0.25)":"#2F9E44"}`,
-                        borderRadius:14,color:"#fff",fontWeight:700,fontSize:15,
+                        borderRadius:14,color:isDone||isActive?CP.textPrimary:"#fff",fontWeight:700,fontSize:15,
                         cursor:isDone||isActive?"not-allowed":"pointer",
                         opacity:isDone||isActive?0.5:1,
                         display:"flex",alignItems:"center",justifyContent:"center",gap:8,
@@ -6025,7 +6031,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                         flex:1,padding:"12px 10px",
                         background:isActive?"rgba(201,42,42,0.85)":"rgba(201,42,42,0.1)",
                         border:`2px solid ${isActive?"#C92A2A":"rgba(201,42,42,0.25)"}`,
-                        borderRadius:14,color:"#fff",fontWeight:700,fontSize:15,
+                        borderRadius:14,color:(isActive)?"#fff":CP.textPrimary,fontWeight:700,fontSize:15,
                         cursor:isActive?"pointer":"not-allowed",
                         opacity:isActive?1:0.5,
                         display:"flex",alignItems:"center",justifyContent:"center",gap:8,
@@ -6037,7 +6043,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
                     </button>
                   </div>
                   {(()=>{ const pi=jobPaidInfo(job); return (
-                    <div style={{color:pi.state==="late"?"#FFA94D":pi.state==="absent"?"#FF8787":CP.textTertiary,fontSize:12,marginTop:8,lineHeight:1.45}}>
+                    <div style={{color:pi.state==="late"?"#c55a00":pi.state==="absent"?"#c42b1c":CP.textTertiary,fontSize:12,marginTop:8,lineHeight:1.45}}>
                       {pi.state==="late"?`⏰ ${L("Verspätung","Retraso","Late","Ritardo")}: ${pi.lateMin} min · `:pi.state==="absent"?`❌ ${L("Nicht eingestempelt","Sin fichar","Not clocked in","Non timbrato")} · `:""}
                       💶 {L("Bezahlt","Horas pagadas","Paid","Pagate")}: <b>{pi.hours} h</b> {L("von","de","of","di")} {pi.planned} h · 📍 {L("Einstempeln nur beim Kunden; Ende automatisch um","Fichar solo en el cliente; fin automático a las","Clock in at the client only; ends automatically at","Timbra solo dal cliente; fine automatica alle")} {job.timeEnd}
                     </div>); })()}
@@ -6057,7 +6063,7 @@ function TimeclockApp({t,timeclock,setTimeclock,employees,currentUser,notify,onB
               <div style={{color:CP.textSecondary,fontWeight:700,fontSize:14}}>
                 ⏱️ {L("Gesamte Arbeitszeit heute","Total tiempo trabajado hoy","Total worked time today","Totale ore lavorate oggi")}
               </div>
-              <div style={{color:"#69DB7C",fontWeight:700,fontSize:22}}>
+              <div style={{color:"#107c10",fontWeight:700,fontSize:22}}>
                 {totalActualHrsToday.toFixed(1)}h
               </div>
             </div>
@@ -6182,9 +6188,9 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
       <div style={{height:"calc(100% - 10px)",display:"flex",flexDirection:"column"}}>
         {selConv ? (
           /* ── CHAT VIEW ── */
-          <div style={{flex:1,display:"flex",flexDirection:"column",background:"rgba(0,0,0,.15)",borderRadius:16,border:`1px solid ${CP.border}`,overflow:"hidden"}}>
+          <div style={{flex:1,display:"flex",flexDirection:"column",background:"rgba(0,0,0,0.035)",borderRadius:16,border:`1px solid ${CP.border}`,overflow:"hidden"}}>
             {/* Sub-header */}
-            <div style={{padding:"8px 14px",borderBottom:`1px solid ${CP.border}`,background:"rgba(0,0,0,.2)",display:"flex",alignItems:"center",gap:10}}>
+            <div style={{padding:"8px 14px",borderBottom:`1px solid ${CP.border}`,background:"rgba(0,0,0,0.035)",display:"flex",alignItems:"center",gap:10}}>
               <div style={{width:36,height:36,borderRadius:"50%",background:`linear-gradient(135deg,${CP.accent},#00bcf2)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:"#fff",flexShrink:0}}>
                 {(convs.find(c=>c.id===selConv)?.name||"A").charAt(0).toUpperCase()}
               </div>
@@ -6192,7 +6198,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
                 <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14}}>{convs.find(c=>c.id===selConv)?.name||selConv}</div>
                 <div style={{color:CP.textTertiary,fontSize:10}}>{L("Auto-Löschung jeden Sonntag 12:00","Se borran solos cada domingo a las 12:00","Auto-deleted every Sunday 12:00","Eliminati ogni domenica alle 12:00")}</div>
               </div>
-              {isAdmin&&<button onClick={cleanToday} style={{background:"rgba(255,0,0,.15)",border:"1px solid rgba(255,0,0,.3)",borderRadius:8,padding:"5px 8px",color:"#FF8787",cursor:"pointer",fontSize:12}}>🗑️</button>}
+              {isAdmin&&<button onClick={cleanToday} style={{background:"rgba(255,0,0,.15)",border:"1px solid rgba(255,0,0,.3)",borderRadius:8,padding:"5px 8px",color:"#c42b1c",cursor:"pointer",fontSize:12}}>🗑️</button>}
             </div>
             {/* Messages */}
             <div ref={chatRef} style={{flex:1,overflow:"auto",padding:"12px 10px",display:"flex",flexDirection:"column",gap:5}}>
@@ -6202,50 +6208,50 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
                 return(
                   <div key={msg.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start",alignItems:"flex-end",gap:6}}>
                     {!isMe&&<div style={{width:26,height:26,borderRadius:"50%",background:`linear-gradient(135deg,${CP.accent},#00bcf2)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{(convs.find(c=>c.id===selConv)?.name||"?").charAt(0).toUpperCase()}</div>}
-                    <div style={{maxWidth:"78%",background:isMe?"linear-gradient(135deg,rgba(28,126,214,.9),rgba(0,100,200,.85))":"rgba(255,255,255,.1)",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"9px 13px",boxShadow:"0 2px 6px rgba(0,0,0,.2)"}}>
+                    <div style={{maxWidth:"78%",background:isMe?"linear-gradient(135deg,rgba(28,126,214,.9),rgba(0,100,200,.85))":"rgba(0,0,0,0.07)",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"9px 13px",boxShadow:"0 2px 6px rgba(0,0,0,.2)"}}>
                       {msg.image&&<img src={msg.image} alt="img" style={{maxWidth:"100%",borderRadius:10,marginBottom:msg.content?6:0,display:"block",cursor:"pointer"}} onClick={()=>{ const src=String(msg.image||""); if(/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(src)){ try{ const [h,b]=src.split(","); const bin=atob(b); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); const u=URL.createObjectURL(new Blob([a],{type:h.slice(5).split(";")[0]})); window.open(u,"_blank","noopener"); setTimeout(()=>URL.revokeObjectURL(u),60000);}catch(e){} } else if(/^https:\/\//i.test(src)) window.open(src,"_blank","noopener"); }}/>}
                       {typeof msg.video==="string"&&msg.video.startsWith(CHAT_MEDIA_PREFIX)&&<video src={msg.video} controls playsInline preload="metadata" style={{maxWidth:"100%",maxHeight:320,borderRadius:10,marginBottom:msg.content?6:0,display:"block",background:"#000"}}/>}
-                      {msg.content&&<div style={{color:"#fff",fontSize:14,lineHeight:1.4}}>{msg.content}</div>}
-                      <div style={{color:"rgba(255,255,255,.4)",fontSize:10,marginTop:3,textAlign:"right"}}>{formatTime(msg.timestamp)}</div>
+                      {msg.content&&<div style={{color:CP.textPrimary,fontSize:14,lineHeight:1.4}}>{msg.content}</div>}
+                      <div style={{color:"rgba(0,0,0,0.52)",fontSize:10,marginTop:3,textAlign:"right"}}>{formatTime(msg.timestamp)}</div>
                     </div>
                   </div>
                 );
               })}
             </div>
             {/* Image preview */}
-            {mediaBusy&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,background:"rgba(0,0,0,.3)",color:"#74C0FC",fontSize:12.5}}>⏳ {mediaBusy.label}{mediaBusy.pct!=null?` ${mediaBusy.pct}%`:""}
-              {mediaBusy.pct!=null&&<div style={{height:4,borderRadius:2,background:"rgba(255,255,255,.1)",marginTop:5}}><div style={{height:4,borderRadius:2,background:"#1C7ED6",width:`${mediaBusy.pct}%`}}/></div>}</div>}
-            {vidPreview&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,display:"flex",alignItems:"center",gap:8,background:"rgba(0,0,0,.3)"}}>
+            {mediaBusy&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,background:"rgba(0,0,0,0.035)",color:"#0067c0",fontSize:12.5}}>⏳ {mediaBusy.label}{mediaBusy.pct!=null?` ${mediaBusy.pct}%`:""}
+              {mediaBusy.pct!=null&&<div style={{height:4,borderRadius:2,background:"rgba(0,0,0,0.035)",marginTop:5}}><div style={{height:4,borderRadius:2,background:"#1C7ED6",width:`${mediaBusy.pct}%`}}/></div>}</div>}
+            {vidPreview&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,display:"flex",alignItems:"center",gap:8,background:"rgba(0,0,0,0.035)"}}>
               <video src={vidPreview.url} muted playsInline style={{height:52,borderRadius:8,background:"#000"}}/>
               <span style={{color:CP.textTertiary,fontSize:12,flex:1}}>🎬 {L("Video bereit","Vídeo listo","Video ready","Video pronto")} · {(vidPreview.blob.size/1048576).toFixed(1)} MB</span>
               <button onClick={()=>{URL.revokeObjectURL(vidPreview.url);setVidPreview(null);}} style={{background:"rgba(255,0,0,.5)",border:"none",borderRadius:"50%",width:20,height:20,color:"#fff",cursor:"pointer",fontSize:11}}>✕</button>
             </div>}
-            {imgPreview&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,display:"flex",alignItems:"center",gap:8,background:"rgba(0,0,0,.3)"}}>
+            {imgPreview&&<div style={{padding:"8px 12px",borderTop:`1px solid ${CP.border}`,display:"flex",alignItems:"center",gap:8,background:"rgba(0,0,0,0.035)"}}>
               <img src={imgPreview} alt="preview" style={{height:52,borderRadius:8,objectFit:"cover"}}/>
               <span style={{color:CP.textTertiary,fontSize:12,flex:1}}>{L("Bild bereit zum Senden","Imagen lista","Image ready","Immagine pronta")}</span>
               <button onClick={()=>setImgPreview(null)} style={{background:"rgba(255,0,0,.5)",border:"none",borderRadius:"50%",width:20,height:20,color:"#fff",cursor:"pointer",fontSize:11}}>✕</button>
             </div>}
             {/* Input */}
-            <div style={{padding:"10px 10px",borderTop:`1px solid ${CP.border}`,display:"flex",gap:7,alignItems:"center",background:"rgba(0,0,0,.15)"}}>
+            <div style={{padding:"10px 10px",borderTop:`1px solid ${CP.border}`,display:"flex",gap:7,alignItems:"center",background:"rgba(0,0,0,0.035)"}}>
               <input ref={fileRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={handleImage}/>
               <input ref={videoRef} type="file" accept="video/*" capture="environment" style={{display:"none"}} onChange={handleImage}/>
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleImage}/>
-              <button onClick={()=>fileRef.current.click()} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🖼️</button>
-              <button onClick={()=>cameraRef.current.click()} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>📷</button>
-              <button onClick={()=>videoRef.current.click()} title={L("Video aufnehmen","Grabar vídeo","Record video","Registra video")} style={{background:"rgba(255,255,255,.1)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🎬</button>
+              <button onClick={()=>fileRef.current.click()} style={{background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🖼️</button>
+              <button onClick={()=>cameraRef.current.click()} style={{background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>📷</button>
+              <button onClick={()=>videoRef.current.click()} title={L("Video aufnehmen","Grabar vídeo","Record video","Registra video")} style={{background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:10,width:38,height:38,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🎬</button>
               <input value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
-                placeholder={makeL(lang)("Nachricht schreiben…","Escribe un mensaje…","Write a message…","Scrivi un messaggio…")} style={{flex:1,padding:"10px 14px",background:"rgba(255,255,255,.08)",border:`1px solid ${CP.border}`,borderRadius:22,color:"#fff",fontSize:14,outline:"none",fontFamily:CP.font}}/>
+                placeholder={makeL(lang)("Nachricht schreiben…","Escribe un mensaje…","Write a message…","Scrivi un messaggio…")} style={{flex:1,padding:"10px 14px",background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:22,color:CP.textPrimary,fontSize:14,outline:"none",fontFamily:CP.font}}/>
               <button onClick={send} disabled={(!newMsg.trim()&&!imgPreview&&!vidPreview)||!!mediaBusy}
-                style={{width:38,height:38,borderRadius:"50%",background:(!newMsg.trim()&&!imgPreview&&!vidPreview)||mediaBusy?"rgba(255,255,255,.1)":`linear-gradient(135deg,${CP.accent},#00bcf2)`,border:"none",color:"#fff",cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>➤</button>
+                style={{width:38,height:38,borderRadius:"50%",background:(!newMsg.trim()&&!imgPreview&&!vidPreview)||mediaBusy?"rgba(0,0,0,0.07)":`linear-gradient(135deg,${CP.accent},#00bcf2)`,border:"none",color:"#fff",cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>➤</button>
             </div>
           </div>
         ) : (
           /* ── CONTACT LIST ── */
           <div style={{display:"flex",flexDirection:"column",borderRadius:16,overflow:"hidden",border:`1px solid ${CP.border}`,flex:1}}>
             {/* Search */}
-            {isAdmin&&<div style={{padding:"10px 12px",background:"rgba(0,0,0,.2)",borderBottom:`1px solid ${CP.border}`}}>
+            {isAdmin&&<div style={{padding:"10px 12px",background:"rgba(0,0,0,0.035)",borderBottom:`1px solid ${CP.border}`}}>
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={`🔍 ${L("Mitarbeiter suchen...","Buscar empleado...","Search employee...","Cerca dipendente...")}`}
-                style={{width:"100%",padding:"8px 14px",background:"rgba(255,255,255,.07)",border:`1px solid ${CP.border}`,borderRadius:20,color:"#fff",fontSize:13,outline:"none",fontFamily:CP.font,boxSizing:"border-box"}}/>
+                style={{width:"100%",padding:"8px 14px",background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:20,color:CP.textPrimary,fontSize:13,outline:"none",fontFamily:CP.font,boxSizing:"border-box"}}/>
             </div>}
             <div style={{flex:1,overflowY:"auto"}}>
               {convs.length===0&&<div style={{textAlign:"center",color:CP.textTertiary,fontSize:13,padding:"40px 20px"}}><div style={{fontSize:36,marginBottom:10}}>👥</div>{L("Keine Mitarbeiter","Sin empleados","No employees","Nessun dipendente")}</div>}
@@ -6254,7 +6260,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
                 return(
                   <div key={conv.id} onClick={()=>setSelConv(conv.id)}
                     style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",cursor:"pointer",borderBottom:`1px solid ${CP.border}`,background:"transparent",transition:"background .15s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.04)"}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(0,0,0,0.028)"}
                     onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <div style={{width:46,height:46,borderRadius:"50%",background:`linear-gradient(135deg,${CP.accent},#00bcf2)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,fontWeight:700,color:"#fff",flexShrink:0}}>
                       {(conv.name||"?").charAt(0).toUpperCase()}
@@ -6264,7 +6270,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
                         <span style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{conv.name}</span>
                         {last&&<span style={{color:u>0?CP.accent:CP.textTertiary,fontSize:11,flexShrink:0,marginLeft:6}}>{formatTime(last.timestamp)}</span>}
                       </div>
-                      <div style={{color:last?.image?"#00bcf2":CP.textTertiary,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      <div style={{color:last?.image?"#0078a8":CP.textTertiary,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                         {last?(last.video?"🎬 "+L("Video","Vídeo","Video","Video"):last.image?"📷 "+L("Bild","Imagen","Image","Immagine"):last.content):L("Noch keine Nachrichten","Sin mensajes","No messages","Nessun messaggio")}
                       </div>
                     </div>
@@ -6348,7 +6354,7 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
         borderRadius:14,padding:"12px 16px",marginBottom:16,
         display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,
       }}>
-        <div style={{color:"#74C0FC",fontSize:13}}>
+        <div style={{color:"#0067c0",fontSize:13}}>
           📍 <strong>Industriestrasse 14, 8004 Zürich</strong>
           <span style={{color:CP.textSecondary,marginLeft:8}}>→ {tj.length} Stops</span>
         </div>
@@ -6375,16 +6381,16 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
           const isNav = navigating===job.id;
           return (
             <CPCard key={job.id} style={{
-              border:isNav?"2px solid rgba(28,126,214,0.6)":"1px solid rgba(255,255,255,0.06)",
-              background:isNav?"rgba(28,126,214,0.08)":"rgba(255,255,255,0.03)",
+              border:isNav?"2px solid rgba(28,126,214,0.6)":"1px solid rgba(0,0,0,0.042)",
+              background:isNav?"rgba(28,126,214,0.08)":"rgba(0,0,0,0.021)",
             }}>
               {/* Stop number + client info */}
               <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
                 <div style={{
                   width:38,height:38,borderRadius:"50%",flexShrink:0,
-                  background:job.status==="completed"?"#2F9E44":job.status==="inProgress"?CP.accent:"rgba(255,255,255,0.15)",
+                  background:job.status==="completed"?"#2F9E44":job.status==="inProgress"?CP.accent:"rgba(0,0,0,0.105)",
                   display:"flex",alignItems:"center",justifyContent:"center",
-                  color:"#fff",fontWeight:700,fontSize:16,
+                  color:(job.status==="completed"?"#2F9E44":job.status==="inProgress")?"#fff":CP.textPrimary,fontWeight:700,fontSize:16,
                   boxShadow:job.status==="inProgress"?`0 0 12px rgba(28,126,214,0.5)`:"none",
                 }}>{idx+1}</div>
 
@@ -6393,7 +6399,7 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
                     <div>
                       <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16}}>{job.clientName}</div>
                       <div style={{
-                        color:"#74C0FC",fontSize:13,marginTop:3,
+                        color:"#0067c0",fontSize:13,marginTop:3,
                         display:"flex",alignItems:"center",gap:4,
                       }}>
                         📍 {addr}
@@ -6440,14 +6446,14 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
                   window.open(url,"_blank");
                 }} style={{
                   padding:"11px 14px",
-                  background:"rgba(255,255,255,0.07)",
-                  border:"1px solid rgba(255,255,255,0.15)",
+                  background:"rgba(0,0,0,0.035)",
+                  border:"1px solid rgba(0,0,0,0.105)",
                   borderRadius:12,color:CP.textSecondary,fontWeight:600,fontSize:13,
                   cursor:"pointer",display:"flex",alignItems:"center",gap:6,
                   transition:"all .2s",fontFamily:CP.font,
                 }}
-                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.14)";e.currentTarget.style.color="#fff";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.07)";e.currentTarget.style.color=CP.textSecondary;}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(0,0,0,0.098)";e.currentTarget.style.color="#fff";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(0,0,0,0.049)";e.currentTarget.style.color=CP.textSecondary;}}
                   title={L("Adresse in Google Maps anzeigen","Ver dirección en Google Maps","View address in Google Maps","Visualizza indirizzo in Google Maps")}
                 >
                   🗺️ Maps
@@ -6462,14 +6468,14 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
                   );
                 }} style={{
                   padding:"11px 14px",
-                  background:"rgba(255,255,255,0.07)",
-                  border:"1px solid rgba(255,255,255,0.15)",
+                  background:"rgba(0,0,0,0.035)",
+                  border:"1px solid rgba(0,0,0,0.105)",
                   borderRadius:12,color:CP.textSecondary,fontWeight:600,fontSize:13,
                   cursor:"pointer",display:"flex",alignItems:"center",gap:6,
                   transition:"all .2s",fontFamily:CP.font,
                 }}
-                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.14)";e.currentTarget.style.color="#fff";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.07)";e.currentTarget.style.color=CP.textSecondary;}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(0,0,0,0.098)";e.currentTarget.style.color="#fff";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(0,0,0,0.049)";e.currentTarget.style.color=CP.textSecondary;}}
                   title={L("Adresse kopieren","Copiar dirección","Copy address","Copia indirizzo")}
                 >
                   📋
@@ -6488,7 +6494,7 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
                     boxShadow:"0 0 8px rgba(12,166,120,0.8)",
                     animation:"pulse 1s infinite",
                   }}/>
-                  <span style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>
+                  <span style={{color:"#107c10",fontSize:12,fontWeight:600}}>
                     {L("Google Maps geöffnet – Navigation läuft","Google Maps abierto – Navegando","Google Maps opened – Navigating","Google Maps aperto – Navigazione attiva")}
                   </span>
                   <button onClick={()=>setNavigating(null)} style={{
@@ -6506,7 +6512,7 @@ function RoutesApp({t,jobs,clients,notify,onBack,lang,currentUser}){
       {tj.length>0&&(
         <div style={{
           background:"rgba(240,140,0,0.08)",border:"1px solid rgba(240,140,0,0.2)",
-          borderRadius:12,padding:"10px 14px",fontSize:12,color:"#FFD43B",
+          borderRadius:12,padding:"10px 14px",fontSize:12,color:"#9a5b00",
         }}>
           💡 {L(
             "Tipp: '🚗 Navigation starten' öffnet Google Maps mit Echtzeit-Navigation direkt zum Kundenstandort.",
@@ -6574,16 +6580,16 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
         <h3 style={{color:CP.textPrimary,fontWeight:700,fontSize:17,marginBottom:16}}>{title} — {period}</h3>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
           {[
-            [L("Einnahmen (bezahlt)","Ingresos (pagado)","Income (paid)","Entrate (pagate)"), `CHF ${income.toLocaleString("de-CH",{minimumFractionDigits:2})}`, "#69DB7C"],
-            [L("Ausstehend","Pendiente","Pending","In sospeso"), `CHF ${pending.toFixed(2)}`, "#FFD43B"],
-            [L("Personalkosten (AG)","Costes personal (empresa)","Payroll cost (employer)","Costi personale (azienda)"), `CHF ${salaries.toFixed(2)}`, "#FF8787"],
-            [L("Betriebsergebnis","Resultado operativo","Operating result","Risultato operativo"), `CHF ${profit.toFixed(2)}`, profit>=0?"#69DB7C":"#FF8787"],
-            [L("Aufträge gesamt","Trabajos total","Total jobs","Lavori totale"), jobs.length.toString(), "#74C0FC"],
-            [L("Abgeschlossen","Completado","Completed","Completati"), jobs.filter(j=>j.status==="completed").length.toString(), "#74C0FC"],
-            [L("Aktive Kunden","Clientes activos","Active clients","Clienti attivi"), clients.filter(c=>c.active).length.toString(), "#74C0FC"],
-            [L("Überfällige Rechnungen","Facturas vencidas","Overdue invoices","Fatture scadute"), overdue.toString(), overdue>0?"#FF8787":"#74C0FC"],
+            [L("Einnahmen (bezahlt)","Ingresos (pagado)","Income (paid)","Entrate (pagate)"), `CHF ${income.toLocaleString("de-CH",{minimumFractionDigits:2})}`, "#107c10"],
+            [L("Ausstehend","Pendiente","Pending","In sospeso"), `CHF ${pending.toFixed(2)}`, "#9a5b00"],
+            [L("Personalkosten (AG)","Costes personal (empresa)","Payroll cost (employer)","Costi personale (azienda)"), `CHF ${salaries.toFixed(2)}`, "#c42b1c"],
+            [L("Betriebsergebnis","Resultado operativo","Operating result","Risultato operativo"), `CHF ${profit.toFixed(2)}`, profit>=0?"#107c10":"#c42b1c"],
+            [L("Aufträge gesamt","Trabajos total","Total jobs","Lavori totale"), jobs.length.toString(), "#0067c0"],
+            [L("Abgeschlossen","Completado","Completed","Completati"), jobs.filter(j=>j.status==="completed").length.toString(), "#0067c0"],
+            [L("Aktive Kunden","Clientes activos","Active clients","Clienti attivi"), clients.filter(c=>c.active).length.toString(), "#0067c0"],
+            [L("Überfällige Rechnungen","Facturas vencidas","Overdue invoices","Fatture scadute"), overdue.toString(), overdue>0?"#c42b1c":"#0067c0"],
           ].map(([l,v,c])=>(
-            <div key={l} style={{background:"rgba(255,255,255,0.04)",border:`1px solid rgba(255,255,255,0.08)`,borderRadius:12,padding:"12px 14px"}}>
+            <div key={l} style={{background:"rgba(0,0,0,0.035)",border:`1px solid rgba(0,0,0,0.056)`,borderRadius:12,padding:"12px 14px"}}>
               <div style={{color:CP.textSecondary,fontSize:11,marginBottom:4}}>{l}</div>
               <div style={{color:c,fontWeight:700,fontSize:18}}>{v}</div>
             </div>
@@ -6613,7 +6619,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
                   <span style={{color:CP.textSecondary}}>{s==="completed"?t.completed:s==="inProgress"?t.inProgress:t.pending}</span>
                   <span style={{color:CP.textPrimary,fontWeight:700}}>{count} ({pct}%)</span>
                 </div>
-                <div style={{height:6,background:"rgba(255,255,255,0.07)",borderRadius:20,overflow:"hidden"}}>
+                <div style={{height:6,background:"rgba(0,0,0,0.035)",borderRadius:20,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${pct}%`,background:s==="completed"?"#2F9E44":s==="inProgress"?"#1C7ED6":"#F08C00",borderRadius:20}}/>
                 </div>
               </div>
@@ -6635,7 +6641,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
             [L("MWST zahlbar","IVA a pagar","VAT payable","IVA da pagare"), `CHF ${(mwst*0.7).toFixed(2)}`],
           ].map(([l,v])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${CP.border}`,fontSize:13}}>
-              <span style={{color:CP.textSecondary}}>{l}</span><span style={{color:"#FF8787",fontWeight:700}}>{v}</span>
+              <span style={{color:CP.textSecondary}}>{l}</span><span style={{color:"#c42b1c",fontWeight:700}}>{v}</span>
             </div>
           ))}
         </CPCard>
@@ -6648,11 +6654,11 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
             [L("Total Steuerbelastung","Total carga fiscal","Total tax burden","Totale carico fiscale"), `CHF ${Math.max(0,profit*0.205).toFixed(2)}`],
           ].map(([l,v])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${CP.border}`,fontSize:13}}>
-              <span style={{color:CP.textSecondary}}>{l}</span><span style={{color:"#FFD43B",fontWeight:700}}>{v}</span>
+              <span style={{color:CP.textSecondary}}>{l}</span><span style={{color:"#9a5b00",fontWeight:700}}>{v}</span>
             </div>
           ))}
         </CPCard>
-        <div style={{background:"rgba(28,126,214,0.1)",border:"1px solid rgba(28,126,214,0.25)",borderRadius:12,padding:"10px 14px",fontSize:12,color:"#74C0FC"}}>
+        <div style={{background:"rgba(28,126,214,0.1)",border:"1px solid rgba(28,126,214,0.25)",borderRadius:12,padding:"10px 14px",fontSize:12,color:"#0067c0"}}>
           ℹ️ {L("Angaben sind Schätzungen. Wenden Sie sich an Ihren Treuhänder für die offizielle Steuererklärung.","Las cifras son estimaciones. Consulte a su asesor fiscal para la declaración oficial.","Figures are estimates. Consult your tax advisor for the official return.","I dati sono stime. Consultare il proprio consulente fiscale per la dichiarazione ufficiale.")}
         </div>
       </div>
@@ -6677,8 +6683,8 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{color:CP.textTertiary,fontSize:11}}>{L("Brutto","Bruto","Gross","Lordo")}: CHF {gross.toFixed(2)}</div>
-                    <div style={{color:"#FF8787",fontSize:11}}>{L("Abzüge","Deducciones","Deductions","Deduzioni")}: − CHF {(ahv+alv+nbuv+bvg+ktg).toFixed(2)}</div>
-                    <div style={{color:"#69DB7C",fontWeight:700,fontSize:16}}>CHF {net.toFixed(2)}</div>
+                    <div style={{color:"#c42b1c",fontSize:11}}>{L("Abzüge","Deducciones","Deductions","Deduzioni")}: − CHF {(ahv+alv+nbuv+bvg+ktg).toFixed(2)}</div>
+                    <div style={{color:"#107c10",fontWeight:700,fontSize:16}}>CHF {net.toFixed(2)}</div>
                   </div>
                 </div>
               </CPCard>
@@ -6687,7 +6693,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
           <CPCard style={{background:"rgba(12,166,120,0.1)",border:"1px solid rgba(12,166,120,0.3)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{color:CP.textSecondary,fontWeight:700}}>{L("Total Lohnaufwand AG","Total coste laboral empresa","Total employer payroll cost","Totale costo lavoro azienda")}</span>
-              <span style={{color:"#69DB7C",fontWeight:700,fontSize:18}}>CHF {salaries.toFixed(2)}</span>
+              <span style={{color:"#107c10",fontWeight:700,fontSize:18}}>CHF {salaries.toFixed(2)}</span>
             </div>
           </CPCard>
         </div>
@@ -6790,7 +6796,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
           <CPStat label={t.totalClients||L("Kunden","Clientes","Clients","Clienti")} value={clients.length} icon="👥" accent="#1C7ED6"/>
           <CPStat label={t.jobs||L("Aufträge","Trabajos","Jobs","Lavori")} value={jobs.length} icon="📋" accent="#F08C00"/>
           <CPStat label={t.completed||L("Erledigt","Completado","Completed","Completati")} value={jobs.filter(j=>j.status==="completed").length} icon="✅" accent="#2F9E44"/>
-          <CPStat label={t.income||L("Einnahmen","Ingresos","Income","Entrate")} value={`CHF ${income.toFixed(0)}`} icon="💰" accent="#FFD43B"/>
+          <CPStat label={t.income||L("Einnahmen","Ingresos","Income","Entrate")} value={`CHF ${income.toFixed(0)}`} icon="💰" accent="#9a5b00"/>
           <CPStat label={t.activeEmployees||L("Mitarbeiter","Empleados","Employees","Dipendenti")} value={employees.filter(e=>e.active).length} icon="👤" accent="#7048E8"/>
         </div>
       </CPCard>
@@ -6814,7 +6820,7 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
               borderRadius:"20px 20px 0 0",padding:"13px 20px",
               display:"flex",justifyContent:"space-between",alignItems:"center",
             }}>
-              <div style={{color:"#fff",fontWeight:700,fontSize:15}}>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>
                 📊 {reps.find(r=>r.type===preview)?.l}
               </div>
               <div style={{display:"flex",gap:8}}>
@@ -6839,13 +6845,13 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
                   document.body.appendChild(a);a.click();
                   setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},3000);
                 }} style={{
-                  background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.3)",
-                  borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",
+                  background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.42)",
+                  borderRadius:10,color:CP.textPrimary,padding:"7px 14px",cursor:"pointer",
                   fontSize:13,fontWeight:700,fontFamily:CP.font,
                 }}>⬇️ {L("Herunterladen","Descargar","Download","Scarica")}</button>
                 <button onClick={()=>setPreview(null)} style={{
-                  background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",
-                  borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer",fontSize:13,
+                  background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.14)",
+                  borderRadius:10,color:CP.textPrimary,padding:"7px 12px",cursor:"pointer",fontSize:13,
                 }}>✕</button>
               </div>
             </div>
@@ -6974,7 +6980,7 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
           <button key={tb.id} onClick={()=>{setTab(tb.id);setEditing(false);setForm({...companySettings});}} style={{
             padding:"9px 18px",borderRadius:24,border:"none",cursor:"pointer",
             fontSize:14,fontWeight:700,fontFamily:CP.font,transition:"background .15s",
-            background:tab===tb.id?CP.accent:"rgba(255,255,255,.1)",color:"#fff",
+            background:tab===tb.id?CP.accent:"rgba(0,0,0,0.07)",color:(tab===tb.id)?"#fff":CP.textPrimary,
             display:"flex",alignItems:"center",gap:6,
           }}>{tb.i} {tb.l}</button>
         ))}
@@ -6993,7 +6999,7 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
             <div style={{display:"flex",alignItems:"center",gap:14}}>
               <div style={{fontSize:44}}>{companySettings.logo||"🌿"}</div>
               <div>
-                <div style={{color:"#fff",fontWeight:700,fontSize:18}}>{companySettings.name}</div>
+                <div style={{color:CP.textPrimary,fontWeight:700,fontSize:18}}>{companySettings.name}</div>
                 <div style={{color:CP.textSecondary,fontSize:13,marginTop:2}}>
                   {companySettings.street} {companySettings.number}, {companySettings.postalCode} {companySettings.city}
                 </div>
@@ -7016,13 +7022,13 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
           </div>
 
           {saved&&(
-            <div style={{background:"rgba(47,158,68,0.15)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:12,padding:"10px 16px",marginBottom:14,color:"#69DB7C",fontWeight:600,fontSize:14}}>
+            <div style={{background:"rgba(47,158,68,0.15)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:12,padding:"10px 16px",marginBottom:14,color:"#107c10",fontWeight:600,fontSize:14}}>
               ✅ {lang==="DE"?"Firmendaten erfolgreich gespeichert!":lang==="ES"?"¡Datos de empresa guardados correctamente!":lang==="IT"?"Dati azienda salvati con successo!":"Company data saved successfully!"}
             </div>
           )}
 
           {!isAdmin && (
-            <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"10px 16px",marginBottom:14,color:"#FF8787",fontSize:13,fontWeight:600}}>
+            <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"10px 16px",marginBottom:14,color:"#c42b1c",fontSize:13,fontWeight:600}}>
               🔒 {lang==="DE"?"Nur der Administrator kann Firmendaten bearbeiten.":lang==="ES"?"Solo el administrador puede editar los datos de empresa.":lang==="IT"?"Solo l'amministratore può modificare i dati aziendali.":"Only the administrator can edit company data."}
             </div>
           )}
@@ -7042,16 +7048,16 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
                     placeholder={f.ph}
                     style={{
                       width:"100%",padding:"10px 14px",
-                      background:"rgba(255,255,255,0.08)",
+                      background:"rgba(0,0,0,0.035)",
                       border:`1px solid ${CP.accent}`,
-                      borderRadius:10,color:"#fff",fontSize:14,
+                      borderRadius:10,color:CP.textPrimary,fontSize:14,
                       fontFamily:CP.font,outline:"none",boxSizing:"border-box",
                     }}
                   />
                 ) : (
                   <div style={{
                     padding:"10px 14px",
-                    background:"rgba(255,255,255,0.04)",
+                    background:"rgba(0,0,0,0.035)",
                     border:`1px solid ${CP.border}`,
                     borderRadius:10,color:CP.textPrimary,fontSize:14,fontWeight:600,
                     minHeight:42,display:"flex",alignItems:"center",
@@ -7064,8 +7070,8 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
           </div>
 
           {/* Swiss QR / legal note */}
-          <div style={{background:"rgba(0,0,0,0.2)",border:`1px solid ${CP.border}`,borderRadius:14,padding:"14px 18px",marginTop:20}}>
-            <div style={{color:"#74C0FC",fontSize:12,fontWeight:700,marginBottom:8}}>
+          <div style={{background:"rgba(0,0,0,0.035)",border:`1px solid ${CP.border}`,borderRadius:14,padding:"14px 18px",marginTop:20}}>
+            <div style={{color:"#0067c0",fontSize:12,fontWeight:700,marginBottom:8}}>
               🇨🇭 {t.swissLegalNotes||"Swiss Legal Notes"}
             </div>
             {[
@@ -7085,7 +7091,7 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
               "IBAN for Swiss QR invoice (PostFinance or Swiss bank accounts)",
             ].map((note,i)=>(
               <div key={i} style={{color:CP.textSecondary,fontSize:12,marginBottom:5,display:"flex",gap:8}}>
-                <span style={{color:"#74C0FC",flexShrink:0}}>•</span>{note}
+                <span style={{color:"#0067c0",flexShrink:0}}>•</span>{note}
               </div>
             ))}
           </div>
@@ -7103,7 +7109,7 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
               }}>
               <div style={{fontSize:28,marginBottom:8}}>{label.split(" ")[0]}</div>
               <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{label.split(" ").slice(1).join(" ")}</div>
-              {lang===code&&<div style={{color:"#74C0FC",fontSize:12,marginTop:6}}>✓ {t.active||"Active"}</div>}
+              {lang===code&&<div style={{color:"#0067c0",fontSize:12,marginTop:6}}>✓ {t.active||"Active"}</div>}
             </CPCard>
           ))}
         </div>
@@ -7132,7 +7138,7 @@ function SettingsApp({t,lang,setLang,notify,onBack,companySettings,setCompanySet
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <CPCard>
             <div style={{color:CP.textSecondary,fontSize:13,lineHeight:1.6}}>
-              💾 {L("Letzte Sicherung","Última copia de seguridad","Last backup","Ultimo backup")}: <b style={{color:backupIsDue(companySettings.lastBackupAt)?"#FFD43B":"#8CE99A"}}>{companySettings.lastBackupAt?fmtDate(String(companySettings.lastBackupAt).slice(0,10)):L("noch nie","nunca","never","mai")}</b><br/>
+              💾 {L("Letzte Sicherung","Última copia de seguridad","Last backup","Ultimo backup")}: <b style={{color:backupIsDue(companySettings.lastBackupAt)?"#9a5b00":"#107c10"}}>{companySettings.lastBackupAt?fmtDate(String(companySettings.lastBackupAt).slice(0,10)):L("noch nie","nunca","never","mai")}</b><br/>
               {L("Enthält Kunden, Mitarbeiter, Aufträge, Stempelungen, Rechnungen, Verträge, Ausgaben, Bestellungen, Produkte, Lieferanten, Nachrichten und Mitarbeiter-Dokumente. Sicher aufbewahren (enthält PIN, AHV, Löhne).","Incluye clientes, empleados, trabajos, fichajes, facturas, contratos, gastos, pedidos, productos, proveedores, mensajes y documentos de empleados. Guárdala en un lugar seguro (contiene PIN, AVS y sueldos).","Includes clients, employees, jobs, clock-ins, invoices, contracts, expenses, orders, products, suppliers, messages and employee documents. Keep it safe (contains PINs, AHV, salaries).","Include clienti, dipendenti, lavori, timbrature, fatture, contratti, spese, ordini, prodotti, fornitori, messaggi e documenti. Conservalo al sicuro (contiene PIN, AVS, stipendi).")}
             </div>
           </CPCard>
@@ -8582,8 +8588,8 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
       {["DE","ES","EN","IT"].map(l=>(
         <button key={l} onClick={()=>setLang(l)} style={{
           padding:"4px 10px",borderRadius:16,border:"none",cursor:"pointer",
-          background:lang===l?"rgba(230,119,0,0.85)":"rgba(255,255,255,0.1)",
-          color:"#fff",fontSize:11,fontWeight:700,fontFamily:CP.font,
+          background:lang===l?"rgba(230,119,0,0.85)":"rgba(0,0,0,0.07)",
+          color:(lang===l)?"#fff":CP.textPrimary,fontSize:11,fontWeight:700,fontFamily:CP.font,
         }}>{l}</button>
       ))}
     </div>
@@ -8600,13 +8606,13 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
         display:"flex",alignItems:"center",gap:20,flexWrap:"wrap",
       }}>
         <div style={{flex:1,minWidth:200}}>
-          <div style={{color:"#fff",fontWeight:700,fontSize:20,marginBottom:6}}>{t.academyWelcome||"Patjac Academy"}</div>
-          <div style={{color:"rgba(255,255,255,0.65)",fontSize:13,lineHeight:1.6}}>{t.academyDesc}</div>
+          <div style={{color:CP.textPrimary,fontWeight:700,fontSize:20,marginBottom:6}}>{t.academyWelcome||"Patjac Academy"}</div>
+          <div style={{color:"rgba(0,0,0,0.77)",fontSize:13,lineHeight:1.6}}>{t.academyDesc}</div>
           <div style={{marginTop:10,display:"flex",gap:8,flexWrap:"wrap"}}>
-            <span style={{background:"rgba(230,119,0,0.2)",border:"1px solid rgba(230,119,0,0.4)",borderRadius:20,padding:"3px 10px",color:"#FFD43B",fontSize:11,fontWeight:700}}>✓ Allpura CH</span>
-            <span style={{background:"rgba(47,158,68,0.2)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:20,padding:"3px 10px",color:"#69DB7C",fontSize:11,fontWeight:700}}>✓ JardinSuisse CH</span>
-            <span style={{background:"rgba(201,42,42,0.2)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:20,padding:"3px 10px",color:"#FF8787",fontSize:11,fontWeight:700}}>✓ SUVA/VUV</span>
-            <span style={{background:"rgba(28,126,214,0.2)",border:"1px solid rgba(28,126,214,0.4)",borderRadius:20,padding:"3px 10px",color:"#74C0FC",fontSize:11,fontWeight:700}}>✓ ChemV/REACH</span>
+            <span style={{background:"rgba(230,119,0,0.2)",border:"1px solid rgba(230,119,0,0.4)",borderRadius:20,padding:"3px 10px",color:"#9a5b00",fontSize:11,fontWeight:700}}>✓ Allpura CH</span>
+            <span style={{background:"rgba(47,158,68,0.2)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:20,padding:"3px 10px",color:"#107c10",fontSize:11,fontWeight:700}}>✓ JardinSuisse CH</span>
+            <span style={{background:"rgba(201,42,42,0.2)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:20,padding:"3px 10px",color:"#c42b1c",fontSize:11,fontWeight:700}}>✓ SUVA/VUV</span>
+            <span style={{background:"rgba(28,126,214,0.2)",border:"1px solid rgba(28,126,214,0.4)",borderRadius:20,padding:"3px 10px",color:"#0067c0",fontSize:11,fontWeight:700}}>✓ ChemV/REACH</span>
           </div>
         </div>
         <div style={{fontSize:56}}>🎓</div>
@@ -8626,7 +8632,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
           <span style={{color:CP.textSecondary,fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:.4}}>{t.yourProgress||"Progress"}</span>
           <span style={{color:"#E67700",fontWeight:700,fontSize:18}}>{avgProgress}%</span>
         </div>
-        <div style={{height:10,background:"rgba(255,255,255,0.07)",borderRadius:20,overflow:"hidden"}}>
+        <div style={{height:10,background:"rgba(0,0,0,0.035)",borderRadius:20,overflow:"hidden"}}>
           <div style={{height:"100%",width:`${avgProgress}%`,background:"linear-gradient(90deg,#E67700,#FFD43B)",borderRadius:20}}/>
         </div>
       </CPCard>
@@ -8639,8 +8645,8 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
         {cats.map(cat=>(
           <button key={cat.id} onClick={()=>setFilter(cat.id)} style={{
             padding:"7px 15px",borderRadius:24,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
-            background:filter===cat.id?"rgba(230,119,0,0.75)":"rgba(255,255,255,0.08)",
-            color:"#fff",display:"flex",alignItems:"center",gap:5,fontFamily:CP.font,transition:"background .15s",
+            background:filter===cat.id?"rgba(230,119,0,0.75)":"rgba(0,0,0,0.056)",
+            color:(filter===cat.id)?"#fff":CP.textPrimary,display:"flex",alignItems:"center",gap:5,fontFamily:CP.font,transition:"background .15s",
           }}>{cat.emoji} {cat.labelKey[lang]||cat.labelKey.EN}</button>
         ))}
       </div>
@@ -8669,7 +8675,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                 </div>
               )}
               <div style={{padding:"14px 16px"}}>
-                <div style={{color:"#fff",fontWeight:700,fontSize:14,marginBottom:6,lineHeight:1.4}}>{title}</div>
+                <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14,marginBottom:6,lineHeight:1.4}}>{title}</div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginBottom:10,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{desc}</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                   <CPBadge text={levelLabel(course.level)} color={levelColor(course.level)}/>
@@ -8677,10 +8683,10 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                   <CPBadge text={dur} color="gray"/>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                  <div style={{flex:1,height:5,background:"rgba(255,255,255,0.07)",borderRadius:10,overflow:"hidden"}}>
+                  <div style={{flex:1,height:5,background:"rgba(0,0,0,0.035)",borderRadius:10,overflow:"hidden"}}>
                     <div style={{height:"100%",width:`${course.progress}%`,background:course.progress===100?"#2F9E44":"#E67700",borderRadius:10}}/>
                   </div>
-                  <span style={{color:course.progress===100?"#69DB7C":"#E67700",fontSize:11,fontWeight:700,minWidth:32}}>{course.progress}%</span>
+                  <span style={{color:course.progress===100?"#107c10":"#E67700",fontSize:11,fontWeight:700,minWidth:32}}>{course.progress}%</span>
                 </div>
                 <CPBtn size="sm" style={{
                   background:course.progress===100?"#2F9E44":course.progress>0?"#E67700":"#1C7ED6",
@@ -8776,7 +8782,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
             {/* Section header */}
             <div style={{
               display:"flex",alignItems:"center",gap:10,marginBottom:14,
-              paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)",
+              paddingTop:20,borderTop:"1px solid rgba(0,0,0,0.049)",
             }}>
               <div style={{
                 background:"linear-gradient(135deg,#1C7ED6,#0CA678)",
@@ -8791,14 +8797,14 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {extFiltered.map((c,i)=>(
                 <div key={i} style={{
-                  background:"rgba(255,255,255,0.03)",
-                  border:"1px solid rgba(255,255,255,0.08)",
+                  background:"rgba(0,0,0,0.035)",
+                  border:"1px solid rgba(0,0,0,0.056)",
                   borderRadius:14,padding:"14px 16px",
                   display:"flex",alignItems:"center",gap:14,
                   transition:"all .2s",
                 }}
                   onMouseEnter={e=>e.currentTarget.style.background="rgba(28,126,214,0.08)"}
-                  onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.03)"}
+                  onMouseLeave={e=>e.currentTarget.style.background="rgba(0,0,0,0.021)"}
                 >
                   {/* Emoji */}
                   <div style={{fontSize:28,flexShrink:0}}>{c.emoji}</div>
@@ -8812,16 +8818,16 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                       {c.desc[lang]||c.desc.EN}
                     </div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-                      <span style={{background:"rgba(47,158,68,0.2)",color:"#69DB7C",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6}}>
+                      <span style={{background:"rgba(47,158,68,0.2)",color:"#107c10",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6}}>
                         ✅ {L("GRATIS","GRATIS","FREE","GRATIS")}
                       </span>
-                      <span style={{background:"rgba(255,255,255,0.08)",color:CP.textSecondary,fontSize:10,padding:"2px 8px",borderRadius:6}}>
+                      <span style={{background:"rgba(0,0,0,0.035)",color:CP.textSecondary,fontSize:10,padding:"2px 8px",borderRadius:6}}>
                         🏫 {c.provider}
                       </span>
-                      <span style={{background:"rgba(255,255,255,0.08)",color:CP.textSecondary,fontSize:10,padding:"2px 8px",borderRadius:6}}>
+                      <span style={{background:"rgba(0,0,0,0.035)",color:CP.textSecondary,fontSize:10,padding:"2px 8px",borderRadius:6}}>
                         ⏱️ {c.duration}
                       </span>
-                      <span style={{background:"rgba(255,255,255,0.08)",color:CP.textSecondary,fontSize:10,padding:"2px 8px",borderRadius:6}}>
+                      <span style={{background:"rgba(0,0,0,0.035)",color:CP.textSecondary,fontSize:10,padding:"2px 8px",borderRadius:6}}>
                         📊 {c.level}
                       </span>
                     </div>
@@ -8882,7 +8888,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
 
         {/* Info card */}
         <div style={{background:`linear-gradient(135deg,${course.color}18,transparent)`,border:`1px solid ${course.color}35`,borderRadius:18,padding:"18px 20px",marginBottom:16}}>
-          <div style={{color:"#fff",fontWeight:700,fontSize:16,marginBottom:8}}>{title}</div>
+          <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16,marginBottom:8}}>{title}</div>
           <div style={{color:CP.textSecondary,fontSize:13,lineHeight:1.6,marginBottom:12}}>{desc}</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
             <CPBadge text={levelLabel(course.level)} color={levelColor(course.level)}/>
@@ -8893,7 +8899,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
             <span style={{color:CP.textSecondary,fontSize:12}}>{t.progress||"Progress"}</span>
             <span style={{color:"#E67700",fontWeight:700}}>{course.lessons_list.filter(l=>l.done).length}/{course.lessons_list.length} · {course.progress}%</span>
           </div>
-          <div style={{height:8,background:"rgba(255,255,255,0.07)",borderRadius:20,overflow:"hidden"}}>
+          <div style={{height:8,background:"rgba(0,0,0,0.035)",borderRadius:20,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${course.progress}%`,background:course.progress===100?"#2F9E44":"#E67700",borderRadius:20}}/>
           </div>
         </div>
@@ -8910,24 +8916,24 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                 <div key={lesson.id} onClick={()=>{if(!locked){setSelLesson({...lesson,idx,course});setView("lesson");}}}
                   style={{
                     display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
-                    background:lesson.done?"rgba(47,158,68,0.1)":locked?"rgba(255,255,255,0.02)":"rgba(28,126,214,0.08)",
-                    border:`1px solid ${lesson.done?"rgba(47,158,68,0.25)":locked?"rgba(255,255,255,0.05)":"rgba(28,126,214,0.22)"}`,
+                    background:lesson.done?"rgba(47,158,68,0.1)":locked?"rgba(0,0,0,0.014)":"rgba(28,126,214,0.08)",
+                    border:`1px solid ${lesson.done?"rgba(47,158,68,0.25)":locked?"rgba(0,0,0,0.035)":"rgba(28,126,214,0.22)"}`,
                     borderRadius:12,cursor:locked?"not-allowed":"pointer",opacity:locked?0.4:1,transition:"all .15s",
                   }}
                   onMouseEnter={e=>{if(!locked)e.currentTarget.style.background=lesson.done?"rgba(47,158,68,0.18)":"rgba(28,126,214,0.18)";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background=lesson.done?"rgba(47,158,68,0.1)":locked?"rgba(255,255,255,0.02)":"rgba(28,126,214,0.08)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=lesson.done?"rgba(47,158,68,0.1)":locked?"rgba(0,0,0,0.014)":"rgba(28,126,214,0.08)";}}
                 >
                   <div style={{width:30,height:30,borderRadius:"50%",
-                    background:lesson.done?"#2F9E44":locked?"rgba(255,255,255,0.07)":"rgba(28,126,214,0.35)",
+                    background:lesson.done?"#2F9E44":locked?"rgba(0,0,0,0.049)":"rgba(28,126,214,0.35)",
                     display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0,fontWeight:700}}>
                     {lesson.done?"✓":locked?"🔒":(idx+1)}
                   </div>
                   <div style={{flex:1}}>
-                    <div style={{color:lesson.done?"#69DB7C":locked?CP.textTertiary:CP.textPrimary,fontWeight:600,fontSize:14}}>{ltitle}</div>
+                    <div style={{color:lesson.done?"#107c10":locked?CP.textTertiary:CP.textPrimary,fontWeight:600,fontSize:14}}>{ltitle}</div>
                     <div style={{color:CP.textTertiary,fontSize:11,marginTop:1}}>{t.lesson||"Lesson"} {idx+1} · ~15 min</div>
                   </div>
-                  {!locked&&!lesson.done&&<span style={{color:"#74C0FC",fontSize:20}}>›</span>}
-                  {lesson.done&&<span style={{color:"#69DB7C",fontSize:14}}>✓</span>}
+                  {!locked&&!lesson.done&&<span style={{color:"#0067c0",fontSize:20}}>›</span>}
+                  {lesson.done&&<span style={{color:"#107c10",fontSize:14}}>✓</span>}
                 </div>
               );
             })}
@@ -8947,7 +8953,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
             {quizState.done?(
               <div style={{textAlign:"center",padding:"8px 0"}}>
                 <div style={{fontSize:28,marginBottom:6}}>{quizState.answers.filter((a,i)=>a===course.quiz[i].ans).length>=Math.ceil(course.quiz.length*0.7)?"🏆":"📖"}</div>
-                <div style={{color:"#fff",fontWeight:700,fontSize:16,marginBottom:4}}>
+                <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16,marginBottom:4}}>
                   {t.score||"Score"}: {quizState.answers.filter((a,i)=>a===course.quiz[i].ans).length}/{course.quiz.length}
                 </div>
                 <div style={{display:"flex",gap:6,justifyContent:"center",marginTop:10}}>
@@ -8970,7 +8976,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
             <div style={{display:"flex",alignItems:"center",gap:12}}>
               <div style={{fontSize:32}}>🏅</div>
               <div>
-                <div style={{color:"#69DB7C",fontWeight:700,fontSize:14}}>{t.completed||"Completed"}</div>
+                <div style={{color:"#107c10",fontWeight:700,fontSize:14}}>{t.completed||"Completed"}</div>
                 <div style={{color:CP.textSecondary,fontSize:12}}>{t.certificate||"Certificate"} {lang==="DE"?"verfügbar":lang==="ES"?"disponible":lang==="IT"?"disponibile":"available"}</div>
               </div>
               <CPBtn onClick={()=>sendByEmail({to:"info@patjacservices.ch",subject:(t.certificate||"Certificate")+" — Patjac Academy",body:"Patjac Academy — "+(selCourse?.titleKey?.[lang]||"")+" — "+(t.certificate||"Certificate")})} variant="success" size="sm" style={{marginLeft:"auto"}}>
@@ -8997,7 +9003,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
 
     return (
       <CPScreen title={ltitle} icon="📖" onBack={()=>setView("course")} t={t} actions={<LangBar/>}>
-        <div style={{background:"rgba(28,126,214,0.08)",border:"1px solid rgba(28,126,214,0.2)",borderRadius:12,padding:"8px 14px",marginBottom:14,fontSize:12,color:"#74C0FC"}}>
+        <div style={{background:"rgba(28,126,214,0.08)",border:"1px solid rgba(28,126,214,0.2)",borderRadius:12,padding:"8px 14px",marginBottom:14,fontSize:12,color:"#0067c0"}}>
           📚 {courseTitle} › {t.lesson||"Lesson"} {selLesson.idx+1}
         </div>
 
@@ -9022,7 +9028,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                 }}>
                   {p.split("\n").map((line,j)=>(
                     <div key={j} style={{
-                      color: line.startsWith("⛔")?"#FF8787":line.startsWith("⚠️")?"#FFD43B":line.startsWith("🔸")?"#FFD43B":line.startsWith("❌")?"#FF8787":line.startsWith("✅")?"#69DB7C":CP.textSecondary,
+                      color: line.startsWith("⛔")?"#c42b1c":line.startsWith("⚠️")?"#9a5b00":line.startsWith("🔸")?"#9a5b00":line.startsWith("❌")?"#c42b1c":line.startsWith("✅")?"#107c10":CP.textSecondary,
                       fontSize:j===0?14:13,fontWeight:j===0?600:400,lineHeight:1.6,marginBottom:j<p.split("\n").length-1?4:0,
                     }}>{line}</div>
                   ))}
@@ -9030,7 +9036,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
               ):(
                 p.includes("\n") ? (
                   // Multi-line paragraph: first line is a heading, the rest are steps/points
-                  <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"10px 14px"}}>
+                  <div style={{background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.056)",borderRadius:10,padding:"10px 14px"}}>
                     {p.split("\n").map((line,j)=>(
                       <div key={j} style={{color:j===0?CP.textPrimary:CP.textSecondary,fontSize:j===0?15:14,fontWeight:j===0?700:400,lineHeight:1.7,marginBottom:j===0?4:0,whiteSpace:"pre-wrap"}}>{line}</div>
                     ))}
@@ -9052,7 +9058,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
           </CPBtn>
         )}
         {selLesson.done&&(
-          <div style={{textAlign:"center",color:"#69DB7C",fontWeight:700,fontSize:15,padding:"14px"}}>✅ {t.completed||"Completed"}</div>
+          <div style={{textAlign:"center",color:"#107c10",fontWeight:700,fontSize:15,padding:"14px"}}>✅ {t.completed||"Completed"}</div>
         )}
       </CPScreen>
     );
@@ -9070,8 +9076,8 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
         <CPScreen title={t.quiz||"Quiz"} icon="🧠" onBack={()=>setView("course")} t={t} actions={<LangBar/>}>
           <div style={{maxWidth:500,margin:"30px auto",textAlign:"center"}}>
             <div style={{fontSize:64,marginBottom:14}}>{passed?"🏆":"📖"}</div>
-            <div style={{color:"#fff",fontWeight:700,fontSize:26,marginBottom:6}}>{t.score||"Score"}: {score}/{quiz.length}</div>
-            <div style={{color:passed?"#69DB7C":"#FF8787",fontWeight:700,fontSize:18,marginBottom:22}}>{passed?(t.passed||"Passed"):(t.failed||"Failed")}</div>
+            <div style={{color:CP.textPrimary,fontWeight:700,fontSize:26,marginBottom:6}}>{t.score||"Score"}: {score}/{quiz.length}</div>
+            <div style={{color:passed?"#107c10":"#c42b1c",fontWeight:700,fontSize:18,marginBottom:22}}>{passed?(t.passed||"Passed"):(t.failed||"Failed")}</div>
             <CPCard style={{marginBottom:20,textAlign:"left"}}>
               {quiz.map((q,i)=>{
                 const qtext=q.q[lang]||q.q.EN;
@@ -9079,12 +9085,12 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                 const correct=quizState.answers[i]===q.ans;
                 return (
                   <div key={i} style={{marginBottom:12,paddingBottom:12,borderBottom:i<quiz.length-1?`1px solid ${CP.border}`:"none"}}>
-                    <div style={{color:correct?"#69DB7C":"#FF8787",fontWeight:600,fontSize:13,marginBottom:4}}>
+                    <div style={{color:correct?"#107c10":"#c42b1c",fontWeight:600,fontSize:13,marginBottom:4}}>
                       {correct?"✓":"✗"} {qtext}
                     </div>
                     <div style={{color:CP.textSecondary,fontSize:12}}>
                       {lang==="DE"?"Korrekt: ":lang==="ES"?"Correcto: ":lang==="IT"?"Corretto: ":"Correct: "}
-                      <strong style={{color:"#69DB7C"}}>{opts[q.ans]}</strong>
+                      <strong style={{color:"#107c10"}}>{opts[q.ans]}</strong>
                     </div>
                   </div>
                 );
@@ -9117,26 +9123,26 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
             <span style={{color:CP.textTertiary,fontSize:12}}>{lang==="DE"?"Frage":lang==="ES"?"Pregunta":lang==="IT"?"Domanda":"Question"} {quizState.step+1}</span>
             <span style={{color:CP.textTertiary,fontSize:12}}>{Math.round((quizState.step/quiz.length)*100)}%</span>
           </div>
-          <div style={{height:6,background:"rgba(255,255,255,0.07)",borderRadius:20,overflow:"hidden"}}>
+          <div style={{height:6,background:"rgba(0,0,0,0.035)",borderRadius:20,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${(quizState.step/quiz.length)*100}%`,background:"#E67700",borderRadius:20}}/>
           </div>
         </div>
 
         <CPCard style={{marginBottom:16}}>
-          <div style={{color:"#fff",fontWeight:600,fontSize:17,lineHeight:1.6,marginBottom:20}}>{qtext}</div>
+          <div style={{color:CP.textPrimary,fontWeight:600,fontSize:17,lineHeight:1.6,marginBottom:20}}>{qtext}</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {opts.map((opt,i)=>(
               <button key={i} onClick={()=>answerQuiz(i)} style={{
-                padding:"14px 18px",background:"rgba(255,255,255,0.06)",
-                border:"1px solid rgba(255,255,255,0.1)",borderRadius:14,
-                color:"#fff",cursor:"pointer",textAlign:"left",fontSize:14,
+                padding:"14px 18px",background:"rgba(0,0,0,0.035)",
+                border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,
+                color:CP.textPrimary,cursor:"pointer",textAlign:"left",fontSize:14,
                 fontWeight:500,fontFamily:CP.font,transition:"all .15s",
                 display:"flex",alignItems:"center",gap:12,
               }}
                 onMouseEnter={e=>{e.currentTarget.style.background="rgba(230,119,0,0.2)";e.currentTarget.style.borderColor="rgba(230,119,0,0.5)";}}
-                onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.borderColor="rgba(255,255,255,0.1)";}}
+                onMouseLeave={e=>{e.currentTarget.style.background="rgba(0,0,0,0.042)";e.currentTarget.style.borderColor="rgba(0,0,0,0.07)";}}
               >
-                <div style={{width:30,height:30,borderRadius:"50%",background:"rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0,color:"#E67700"}}>
+                <div style={{width:30,height:30,borderRadius:"50%",background:"rgba(0,0,0,0.035)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0,color:"#E67700"}}>
                   {String.fromCharCode(65+i)}
                 </div>
                 {opt}
@@ -9504,7 +9510,7 @@ function HelpModal({t, lang, onClose}){
     const isBullet = line.startsWith("•") || line.startsWith("→");
     const isNumber = /^\d+\./.test(line.trim());
     const isArt = /^Art\. \d/.test(line.trim());
-    const color = isWarning?"#FF8787":isTip?"#69DB7C":isSection?"#FFD43B":isArt?"#74C0FC":isBullet?"#a8d8ff":"rgba(255,255,255,0.82)";
+    const color = isWarning?"#c42b1c":isTip?"#107c10":isSection?"#9a5b00":isArt?"#0067c0":isBullet?"#a8d8ff":"rgba(0,0,0,0.85)";
     return (
       <div key={i} style={{
         color, fontSize:13, lineHeight:1.65,
@@ -9523,7 +9529,7 @@ function HelpModal({t, lang, onClose}){
       zIndex:99999,padding:14,
     }} onClick={onClose}>
       <div style={{
-        background:"rgba(8,12,24,0.99)",
+        background:"#ffffff",
         border:"1px solid rgba(28,126,214,0.45)",
         borderRadius:22,
         width:"min(960px,97vw)",
@@ -9551,18 +9557,18 @@ function HelpModal({t, lang, onClose}){
               boxShadow:"0 0 16px rgba(28,126,214,0.5)",flexShrink:0,
             }}>?</div>
             <div>
-              <div style={{color:"#fff",fontWeight:700,fontSize:16}}>{t.helpTitle||"User Manual – Patjac Business Suite"}</div>
+              <div style={{color:CP.textPrimary,fontWeight:700,fontSize:16}}>{t.helpTitle||"User Manual – Patjac Business Suite"}</div>
               <div style={{color:"rgba(116,192,252,0.75)",fontSize:12}}>{t.helpSubtitle||"Complete guide for administrators"}</div>
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{background:"rgba(201,42,42,0.2)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:20,padding:"3px 12px",color:"#FF8787",fontSize:11,fontWeight:700}}>
+            <div style={{background:"rgba(201,42,42,0.2)",border:"1px solid rgba(201,42,42,0.4)",borderRadius:20,padding:"3px 12px",color:"#c42b1c",fontSize:11,fontWeight:700}}>
               {t.helpAdminOnly||"👑 Admin only"}
             </div>
             <button onClick={onClose} style={{
               width:30,height:30,borderRadius:"50%",
-              background:"rgba(255,255,255,0.08)",border:"none",
-              color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:16,
+              background:"rgba(0,0,0,0.035)",border:"none",
+              color:"rgba(0,0,0,0.72)",cursor:"pointer",fontSize:16,
               display:"flex",alignItems:"center",justifyContent:"center",
             }}>✕</button>
           </div>
@@ -9574,8 +9580,8 @@ function HelpModal({t, lang, onClose}){
           {/* Sidebar */}
           <div style={{
             width:185,flexShrink:0,
-            borderRight:"1px solid rgba(255,255,255,0.06)",
-            background:"rgba(0,0,0,0.3)",
+            borderRight:"1px solid rgba(0,0,0,0.042)",
+            background:"rgba(0,0,0,0.035)",
             overflow:"auto",
             padding:"8px 6px",
           }}>
@@ -9585,25 +9591,25 @@ function HelpModal({t, lang, onClose}){
                 <button key={sec.id} onClick={()=>setActiveSection(sec.id)} style={{
                   width:"100%",padding:"8px 10px",borderRadius:9,border:"none",
                   background:isActive?"rgba(28,126,214,0.32)":"transparent",
-                  color:isActive?"#fff":"rgba(255,255,255,0.52)",
+                  color:isActive?"#fff":"rgba(0,0,0,0.64)",
                   cursor:"pointer",textAlign:"left",fontSize:12.5,fontWeight:isActive?700:500,
                   display:"flex",alignItems:"center",gap:7,marginBottom:2,
                   transition:"all .13s",fontFamily:CP.font,
                 }}
-                  onMouseEnter={e=>{if(!isActive){e.currentTarget.style.background="rgba(255,255,255,0.07)";e.currentTarget.style.color="#fff";}}}
-                  onMouseLeave={e=>{if(!isActive){e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,0.52)";}}}
+                  onMouseEnter={e=>{if(!isActive){e.currentTarget.style.background="rgba(0,0,0,0.049)";e.currentTarget.style.color="#fff";}}}
+                  onMouseLeave={e=>{if(!isActive){e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(0,0,0,0.64)";}}}
                 >
                   <span style={{fontSize:15,flexShrink:0}}>{sec.icon}</span>
                   <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sec.label[lang]||sec.label.EN}</span>
-                  {isActive&&<span style={{marginLeft:"auto",color:"#74C0FC",fontSize:11}}>›</span>}
+                  {isActive&&<span style={{marginLeft:"auto",color:"#0067c0",fontSize:11}}>›</span>}
                 </button>
               );
             })}
             {/* App info */}
             <div style={{margin:"12px 4px 4px",padding:"10px 10px",background:"rgba(28,126,214,0.08)",border:"1px solid rgba(28,126,214,0.15)",borderRadius:10}}>
               <div style={{color:"rgba(116,192,252,0.8)",fontSize:10,fontWeight:700,marginBottom:3}}>PATJAC BUSINESS SUITE</div>
-              <div style={{color:"rgba(255,255,255,0.35)",fontSize:10}}>Version 2.0 · 🇨🇭 Zürich</div>
-              <div style={{color:"rgba(255,255,255,0.35)",fontSize:10}}>© 2024 Patjac</div>
+              <div style={{color:"rgba(0,0,0,0.47)",fontSize:10}}>Version 2.0 · 🇨🇭 Zürich</div>
+              <div style={{color:"rgba(0,0,0,0.47)",fontSize:10}}>© 2024 Patjac</div>
             </div>
           </div>
 
@@ -9612,9 +9618,9 @@ function HelpModal({t, lang, onClose}){
             {current&&(
               <>
                 {/* Section title */}
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18,paddingBottom:12,borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18,paddingBottom:12,borderBottom:"1px solid rgba(0,0,0,0.049)"}}>
                   <span style={{fontSize:28}}>{current.icon}</span>
-                  <div style={{color:"#fff",fontWeight:700,fontSize:19}}>{current.title?.[lang]||current.title?.EN}</div>
+                  <div style={{color:CP.textPrimary,fontWeight:700,fontSize:19}}>{current.title?.[lang]||current.title?.EN}</div>
                 </div>
 
                 {/* Items */}
@@ -9623,12 +9629,12 @@ function HelpModal({t, lang, onClose}){
                     {/* Item heading */}
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                       <div style={{width:4,height:18,background:"#1C7ED6",borderRadius:2,flexShrink:0}}/>
-                      <div style={{color:"#74C0FC",fontWeight:700,fontSize:14}}>{item.h?.[lang]||item.h?.EN}</div>
+                      <div style={{color:"#0067c0",fontWeight:700,fontSize:14}}>{item.h?.[lang]||item.h?.EN}</div>
                     </div>
                     {/* Item body */}
                     <div style={{
-                      background:"rgba(255,255,255,0.03)",
-                      border:"1px solid rgba(255,255,255,0.06)",
+                      background:"rgba(0,0,0,0.035)",
+                      border:"1px solid rgba(0,0,0,0.042)",
                       borderRadius:13,padding:"14px 16px",
                     }}>
                       {(item.b?.[lang]||item.b?.EN||"").split("\n").map((line,li)=>renderLine(line,li))}
@@ -9643,12 +9649,12 @@ function HelpModal({t, lang, onClose}){
         {/* ── FOOTER ── */}
         <div style={{
           padding:"10px 22px",
-          borderTop:"1px solid rgba(255,255,255,0.06)",
-          background:"rgba(0,0,0,0.2)",
+          borderTop:"1px solid rgba(0,0,0,0.042)",
+          background:"rgba(0,0,0,0.035)",
           display:"flex",justifyContent:"space-between",alignItems:"center",
           flexShrink:0,
         }}>
-          <div style={{color:"rgba(255,255,255,0.3)",fontSize:12}}>
+          <div style={{color:"rgba(0,0,0,0.42)",fontSize:12}}>
             📧 info@patjacservices.ch · 🇨🇭 Swiss Standard 2024
           </div>
           <button onClick={onClose} style={{
@@ -9709,7 +9715,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
     const color = p.stock===0?"#C92A2A":p.stock<=p.minStock?"#F08C00":"#2F9E44";
     return (
       <div style={{marginTop:4}}>
-        <div style={{height:4,background:"rgba(255,255,255,0.08)",borderRadius:10,overflow:"hidden"}}>
+        <div style={{height:4,background:"rgba(0,0,0,0.035)",borderRadius:10,overflow:"hidden"}}>
           <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:10}}/>
         </div>
       </div>
@@ -9765,21 +9771,21 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
         <CPStat label={t.lowStock||"Low stock"} value={lowStockProducts.length} icon="⚠️" accent={lowStockProducts.length>0?"#F08C00":"#2F9E44"}/>
         <CPStat label={t.outOfStock||"Out"} value={outOfStockProducts.length} icon="🚫" accent={outOfStockProducts.length>0?"#C92A2A":"#2F9E44"}/>
         <CPStat label={t.stockValue||"Value"} value={`CHF ${totalStockValue.toFixed(0)}`} icon="💰" accent="#0CA678"/>
-        <CPStat label={t.orders||"Orders"} value={`${pendingOrders} ${L("pend.","pend.","pend.","pend.")}`} icon="🚚" accent={pendingOrders>0?"#FFD43B":"#2F9E44"}/>
+        <CPStat label={t.orders||"Orders"} value={`${pendingOrders} ${L("pend.","pend.","pend.","pend.")}`} icon="🚚" accent={pendingOrders>0?"#9a5b00":"#2F9E44"}/>
       </div>
 
       {/* Low stock alerts */}
       {lowStockProducts.length>0&&(
         <CPCard style={{marginBottom:14,background:"rgba(240,140,0,0.08)",border:"1px solid rgba(240,140,0,0.3)"}}>
-          <div style={{color:"#FFD43B",fontWeight:700,fontSize:13,marginBottom:8}}>
+          <div style={{color:"#9a5b00",fontWeight:700,fontSize:13,marginBottom:8}}>
             ⚠️ {t.stockAlert||"Stock alerts"} ({lowStockProducts.length})
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {lowStockProducts.map(p=>(
               <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(240,140,0,0.15)",borderRadius:20,padding:"4px 12px"}}>
                 {safeImg(p.image)?<Avatar photo={p.image} size={24} round={false}/>:<span>{p.icon}</span>}
-                <span style={{color:"#FFD43B",fontSize:12,fontWeight:600}}>{pName(p)}: {p.stock} {p.unit}</span>
-                <button onClick={()=>quickOrder(p)} style={{background:"rgba(240,140,0,0.4)",border:"none",borderRadius:10,color:"#fff",padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:CP.font}}>
+                <span style={{color:"#9a5b00",fontSize:12,fontWeight:600}}>{pName(p)}: {p.stock} {p.unit}</span>
+                <button onClick={()=>quickOrder(p)} style={{background:"rgba(240,140,0,0.4)",border:"none",borderRadius:10,color:CP.textPrimary,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:CP.font}}>
                   🚚 {t.quickOrder||"Order"}
                 </button>
               </div>
@@ -9797,8 +9803,8 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
         ].map(tab=>(
           <button key={tab.id} onClick={()=>setView(tab.id)} style={{
             padding:"8px 18px",borderRadius:22,border:"none",cursor:"pointer",
-            background:view===tab.id?"#6741D9":"rgba(255,255,255,0.08)",
-            color:"#fff",fontSize:13,fontWeight:700,fontFamily:CP.font,
+            background:view===tab.id?"#6741D9":"rgba(0,0,0,0.056)",
+            color:(view===tab.id)?"#fff":CP.textPrimary,fontSize:13,fontWeight:700,fontFamily:CP.font,
             display:"flex",alignItems:"center",gap:6,transition:"background .15s",
           }}>{tab.icon} {tab.label}</button>
         ))}
@@ -9815,7 +9821,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             {cats.map(c=>(
               <button key={c.id} onClick={()=>setCatFilter(c.id)} style={{
                 padding:"6px 14px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
-                background:catFilter===c.id?"#6741D9":"rgba(255,255,255,0.08)",color:"#fff",fontFamily:CP.font,
+                background:catFilter===c.id?"#6741D9":"rgba(0,0,0,0.056)",color:(catFilter===c.id)?"#fff":CP.textPrimary,fontFamily:CP.font,
                 display:"flex",alignItems:"center",gap:5,
               }}>{c.icon} {c.label}</button>
             ))}
@@ -9825,7 +9831,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             {filtered.map(p=>{
               const isLow=p.stock>0&&p.stock<=p.minStock;
               const isOut=p.stock===0;
-              const borderColor=isOut?"rgba(201,42,42,0.5)":isLow?"rgba(240,140,0,0.4)":"rgba(255,255,255,0.08)";
+              const borderColor=isOut?"rgba(201,42,42,0.5)":isLow?"rgba(240,140,0,0.4)":"rgba(0,0,0,0.056)";
               const bgColor=isOut?"rgba(201,42,42,0.06)":isLow?"rgba(240,140,0,0.06)":CP.surface;
               return (
                 <CPCard key={p.id} style={{background:bgColor,border:`1px solid ${borderColor}`,padding:"14px 16px"}}>
@@ -9845,17 +9851,17 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                   <div style={{color:CP.textSecondary,fontSize:12,marginBottom:10,lineHeight:1.4}}>{p.description}</div>
 
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
-                    <div style={{background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 8px"}}>
+                    <div style={{background:"rgba(0,0,0,0.035)",borderRadius:8,padding:"6px 8px"}}>
                       <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>BESTAND</div>
-                      <div style={{color:isOut?"#FF8787":isLow?"#FFD43B":"#69DB7C",fontWeight:700,fontSize:16}}>{p.stock} {p.unit}</div>
+                      <div style={{color:isOut?"#c42b1c":isLow?"#9a5b00":"#107c10",fontWeight:700,fontSize:16}}>{p.stock} {p.unit}</div>
                     </div>
-                    <div style={{background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 8px"}}>
+                    <div style={{background:"rgba(0,0,0,0.035)",borderRadius:8,padding:"6px 8px"}}>
                       <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>MIN</div>
                       <div style={{color:CP.textSecondary,fontWeight:700,fontSize:16}}>{p.minStock} {p.unit}</div>
                     </div>
-                    <div style={{background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 8px"}}>
+                    <div style={{background:"rgba(0,0,0,0.035)",borderRadius:8,padding:"6px 8px"}}>
                       <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>WERT</div>
-                      <div style={{color:"#74C0FC",fontWeight:700,fontSize:13}}>CHF {(Number(p.stock||0)*prPrice(p)).toFixed(0)}</div>
+                      <div style={{color:"#0067c0",fontWeight:700,fontSize:13}}>CHF {(Number(p.stock||0)*prPrice(p)).toFixed(0)}</div>
                     </div>
                   </div>
 
@@ -9899,13 +9905,13 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     {order.notes&&<div style={{color:CP.textTertiary,fontSize:12,marginTop:2,fontStyle:"italic"}}>{order.notes}</div>}
                   </div>
                   <div style={{textAlign:"right"}}>
-                    <div style={{color:"#FFD43B",fontWeight:700,fontSize:18}}>CHF {(order.total||0).toFixed(2)}</div>
+                    <div style={{color:"#9a5b00",fontWeight:700,fontSize:18}}>CHF {(order.total||0).toFixed(2)}</div>
                     <div style={{color:CP.textTertiary,fontSize:11}}>{order.items.length} {L("Positionen","posiciones","items","posizioni")}</div>
                   </div>
                 </div>
 
                 {/* Order items */}
-                <div style={{background:"rgba(0,0,0,0.2)",borderRadius:10,padding:"8px 12px",marginBottom:10}}>
+                <div style={{background:"rgba(0,0,0,0.035)",borderRadius:10,padding:"8px 12px",marginBottom:10}}>
                   {order.items.map((item,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:i<order.items.length-1?`1px solid ${CP.border}`:"none",fontSize:13}}>
                       <span style={{color:CP.textSecondary}}>{item.productName} × {item.qty}</span>
@@ -9968,7 +9974,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {cats.filter(c=>c.id!=="safety"||suppliers.some(s=>s.category==="safety")).map(c=>(
               <button key={c.id} onClick={()=>setSupCat(c.id)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
-                background:supCat===c.id?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{c.icon} {c.label} ({c.id==="all"?suppliers.length:suppliers.filter(s=>s.category===c.id).length})</button>
+                background:supCat===c.id?CP.accent:"rgba(0,0,0,0.07)",color:(supCat===c.id)?"#fff":CP.textPrimary}}>{c.icon} {c.label} ({c.id==="all"?suppliers.length:suppliers.filter(s=>s.category===c.id).length})</button>
             ))}
           </div>
           {suppliers.filter(s=>supCat==="all"||s.category===supCat).sort((a,b)=>(a.category||"").localeCompare(b.category||"")||(a.name||"").localeCompare(b.name||"")).map(sup=>(
@@ -9981,7 +9987,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     <div style={{color:CP.textSecondary,fontSize:13}}>{sup.contact}</div>
                     {(sup.phone||sup.email)&&<div style={{color:CP.textSecondary,fontSize:12,marginTop:2}}>{[sup.phone,sup.email].filter(Boolean).join(" · ")}</div>}
                     <div style={{color:CP.textTertiary,fontSize:12,marginTop:1}}>{sup.address}</div>
-                    {sup.notes&&<div style={{color:"#74C0FC",fontSize:12,marginTop:4}}>💡 {sup.notes}</div>}
+                    {sup.notes&&<div style={{color:"#0067c0",fontSize:12,marginTop:4}}>💡 {sup.notes}</div>}
                     <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
                       <CPBadge text={cats.find(c=>c.id===sup.category)?.label||sup.category} color="blue"/>
                       {sup.paymentDays&&<CPBadge text={`${t.paymentTerms}: ${sup.paymentDays} ${L("Tage","días","days","giorni")}`} color="gray"/>}
@@ -10002,11 +10008,11 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                 </div>
               </div>
               {/* Products from this supplier */}
-              <div style={{marginTop:12,background:"rgba(0,0,0,0.2)",borderRadius:10,padding:"8px 12px"}}>
+              <div style={{marginTop:12,background:"rgba(0,0,0,0.035)",borderRadius:10,padding:"8px 12px"}}>
                 <div style={{color:CP.textTertiary,fontSize:11,marginBottom:6}}>{L("Produkte von diesem Lieferanten","Productos de este proveedor","Products from this supplier","Prodotti da questo fornitore")}:</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {products.filter(p=>p.supplier===sup.id).map(p=>(
-                    <span key={p.id} style={{background:"rgba(103,65,217,0.15)",border:"1px solid rgba(103,65,217,0.3)",borderRadius:12,padding:"3px 10px",fontSize:11,color:"#c084fc"}}>
+                    <span key={p.id} style={{background:"rgba(103,65,217,0.15)",border:"1px solid rgba(103,65,217,0.3)",borderRadius:12,padding:"3px 10px",fontSize:11,color:"#7e3fbf"}}>
                       {p.icon} {pName(p)} ({p.stock} {p.unit})
                     </span>
                   ))}
@@ -10052,7 +10058,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <CPBtn size="sm" variant="secondary" onClick={()=>setForm(f=>({...f,items:[...(f.items||[]),{_k:gid(),productId:"",qty:1,price:0}]}))}>＋ {L("Artikel","Producto","Item","Articolo")}</CPBtn>
             <CPField label={L("Notizen","Notas","Notes","Note")}><CPInput value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></CPField>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
-              <div style={{color:"#FFD43B",fontWeight:700,fontSize:16}}>Total CHF {total.toFixed(2)}</div>
+              <div style={{color:"#9a5b00",fontWeight:700,fontSize:16}}>Total CHF {total.toFixed(2)}</div>
               <div style={{display:"flex",gap:8}}><CPBtn variant="secondary" onClick={()=>setModal(null)}>{t.cancel}</CPBtn><CPBtn onClick={saveOrder}>💾 {t.save}</CPBtn></div>
             </div>
           </CPModal>
@@ -10184,7 +10190,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <div style={{padding:"8px 0 20px"}}>
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
-                <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>{item?.icon} {pName(item)}</div>
+                <div style={{color:"#c42b1c",fontWeight:700,fontSize:15}}>{item?.icon} {pName(item)}</div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{L("Bestand","Stock","Stock","Scorte")}: {item?.stock} {item?.unit} · CHF {item?.price}/u</div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
@@ -10208,11 +10214,11 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <div style={{padding:"8px 0 20px"}}>
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
-                <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>🏭 {item?.name}</div>
+                <div style={{color:"#c42b1c",fontWeight:700,fontSize:15}}>🏭 {item?.name}</div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{item?.phone} · {item?.email}</div>
               </div>
               {supplierProducts.length>0&&(
-                <div style={{background:"rgba(240,140,0,0.1)",border:"1px solid rgba(240,140,0,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#FFD43B"}}>
+                <div style={{background:"rgba(240,140,0,0.1)",border:"1px solid rgba(240,140,0,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#9a5b00"}}>
                   ⚠️ {L(`${supplierProducts.length} Produkt(e) sind diesem Lieferanten zugeordnet.`,`${supplierProducts.length} producto(s) están asociados a este proveedor.`,`${supplierProducts.length} product(s) are linked to this supplier.`,`${supplierProducts.length} prodotto/i sono collegati a questo fornitore.`)}
                 </div>
               )}
@@ -10236,7 +10242,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <div style={{padding:"8px 0 20px"}}>
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
-                <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>🚚 {item?.supplierName}</div>
+                <div style={{color:"#c42b1c",fontWeight:700,fontSize:15}}>🚚 {item?.supplierName}</div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>{fmtDate(item?.date)} · CHF {Number(item?.total||0).toFixed(2)} · {item?.items?.length} {L("Artikel","artículos","items","articoli")}</div>
               </div>
               <div style={{color:CP.textSecondary,fontSize:13,textAlign:"center",marginBottom:18,lineHeight:1.6}}>
@@ -10434,7 +10440,7 @@ function SendToDocsButton({lang,employeeId,title,category,period,refId,getHtml,s
   const label = st==="sending"?"⏳":st==="done"?`✅ ${L("Gesendet","Enviado","Sent","Inviato")}`:st==="error"?`⚠️ ${L("Fehler – nochmals","Error – reintentar","Error – retry","Errore – riprova")}`:
     compact?"📤":`📤 ${L("An Mitarbeiter-Dokumente senden","Enviar a Documentos del empleado","Send to employee documents","Invia ai documenti del dipendente")}`;
   return <button onClick={send} disabled={st==="sending"} title={L("An Mitarbeiter-Dokumente senden","Enviar a Documentos del empleado","Send to employee documents","Invia ai documenti del dipendente")}
-    style={{background:st==="done"?"rgba(47,158,68,0.85)":"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",borderRadius:10,color:"#fff",padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font,...(style||{})}}>{label}</button>;
+    style={{background:st==="done"?"rgba(47,158,68,0.85)":"rgba(0,0,0,0.14)",border:"1px solid rgba(0,0,0,0.52)",borderRadius:10,color:(st==="done")?"#fff":CP.textPrimary,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font,...(style||{})}}>{label}</button>;
 }
 const DOC_CATS = [
   {id:"contract",    icon:"📝", L:["Unterschriebener Vertrag","Contrato firmado","Signed contract","Contratto firmato"]},
@@ -10543,14 +10549,14 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
   const waNum = (()=>{ let d=String(client?.phone||"").replace(/[^\d+]/g,""); if(d.startsWith("+")) d=d.slice(1); else if(d.startsWith("00")) d=d.slice(2); else if(d.startsWith("0")) d="41"+d.slice(1); return /^\d{8,15}$/.test(d)?d:""; })();
   const copy = () => { try{ navigator.clipboard.writeText(msg); notify&&notify(L("Kopiert","Copiado","Copied","Copiato"),"success"); }catch(e){} };
 
-  const opt = (active, acc) => ({border:`1.5px solid ${active?(acc||"#2C5F7C"):CP.border}`,background:active?(acc||"#2C5F7C"):"rgba(255,255,255,.05)",color:"#fff",borderRadius:999,padding:"9px 14px",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:CP.font});
+  const opt = (active, acc) => ({border:`1.5px solid ${active?(acc||"#2C5F7C"):CP.border}`,background:active?(acc||"#2C5F7C"):"rgba(0,0,0,0.035)",color:active?"#fff":CP.textPrimary,borderRadius:999,padding:"9px 14px",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:CP.font});
   const step = (n,label) => (
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
       <span style={{width:26,height:26,borderRadius:"50%",background:"#2C5F7C",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13}}>{n}</span>
       <span style={{color:CP.textSecondary,fontSize:12,fontWeight:800,letterSpacing:.5,textTransform:"uppercase"}}>{label}</span>
     </div>
   );
-  const abtn = bg => ({background:bg,border:"none",borderRadius:12,color:"#fff",padding:"11px 12px",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
+  const abtn = bg => ({background:bg,border:lightBg(bg)?`1px solid ${CP.borderActive}`:"none",borderRadius:12,color:fgOn(bg),padding:"11px 12px",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
 
   return (
     <CPScreen title={t.pricecalc||"Calculadora de precios"} icon="🧮" onBack={onBack} t={t}>
@@ -10558,7 +10564,7 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
         {step(1,L("Leistung","Servicio","Service","Servizio"))}
         <div data-testid="pc-svcs" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
           {SVCS.map((s,i)=>(
-            <button key={i} onClick={()=>setSvc(i)} aria-pressed={svc===i} style={{textAlign:"left",border:`1.5px solid ${svc===i?s.acc:CP.border}`,background:svc===i?"rgba(255,255,255,.09)":"rgba(255,255,255,.03)",boxShadow:svc===i?`0 0 0 3px ${s.acc}44`:"none",borderRadius:14,padding:"10px 12px",cursor:"pointer",color:"#fff",fontFamily:CP.font,display:"flex",flexDirection:"column",gap:4}}>
+            <button key={i} onClick={()=>setSvc(i)} aria-pressed={svc===i} style={{textAlign:"left",border:`1.5px solid ${svc===i?s.acc:CP.border}`,background:svc===i?"rgba(0,0,0,0.063)":"rgba(0,0,0,0.021)",boxShadow:svc===i?`0 0 0 3px ${s.acc}44`:"none",borderRadius:14,padding:"10px 12px",cursor:"pointer",color:CP.textPrimary,fontFamily:CP.font,display:"flex",flexDirection:"column",gap:4}}>
               <span style={{fontSize:22}}>{s.ic}</span>
               <span style={{fontWeight:800,fontSize:13.5,lineHeight:1.2}}>{s.name}</span>
               <span style={{color:CP.textTertiary,fontSize:11.5}}>{s.hint}</span>
@@ -10581,14 +10587,14 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
       </CPCard>
 
       <div style={{background:"linear-gradient(160deg,#2c5f7c 0%,#173a4d 100%)",borderRadius:CP.radius,padding:"18px 20px",color:"#fff",marginBottom:12}}>
-        <span style={{display:"inline-block",background:"rgba(255,255,255,.14)",border:"1px solid rgba(255,255,255,.25)",borderRadius:999,padding:"3px 10px",fontSize:12,fontWeight:700}}>✓ {L("Unverbindlich","Sin compromiso","No obligation","Senza impegno")}</span>
+        <span style={{display:"inline-block",background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.175)",borderRadius:999,padding:"3px 10px",fontSize:12,fontWeight:700}}>✓ {L("Unverbindlich","Sin compromiso","No obligation","Senza impegno")}</span>
         <div style={{fontSize:12,fontWeight:800,letterSpacing:.6,textTransform:"uppercase",opacity:.85,marginTop:10}}>{L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")} · {r.per?L("pro Einsatz","por visita","per visit","per intervento"):L("Gesamtpreis","precio total","total price","prezzo totale")}</div>
         <div data-testid="pc-price" style={{fontSize:34,fontWeight:800,lineHeight:1.15,margin:"4px 0 10px"}}>{priceTxt}</div>
-        <div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.14)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.098)"}}>
           <span>{L("Berechnung","Cálculo","Calculation","Calcolo")}</span>
           <b data-testid="pc-break">{hTxt} h × CHF {r.rate}.–{r.mat?" "+L("+ Material","+ material","+ materials","+ materiale"):""}</b>
         </div>
-        {svc===0&&<div data-testid="pc-month" style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.14)",marginTop:6}}>
+        {svc===0&&<div data-testid="pc-month" style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.098)",marginTop:6}}>
           <span>{L("Pro Monat ca.","Al mes aprox.","Per month approx.","Al mese ca.")} ({FREQS[freq]})</span><b>{monthTxt}</b>
         </div>}
         <div style={{fontSize:12,fontWeight:800,letterSpacing:.6,textTransform:"uppercase",opacity:.8,margin:"12px 0 6px"}}>{L("In Ihrer Offerte enthalten","Incluido en tu presupuesto","Included in your quote","Incluso nel preventivo")}</div>
@@ -10605,7 +10611,7 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
         </CPSelect>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
           <a href={`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer" style={abtn("#25D366")}>💬 WhatsApp{waNum?` → ${client.phone}`:""}</a>
-          <button onClick={copy} style={abtn("rgba(255,255,255,.14)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
+          <button onClick={copy} style={abtn("rgba(0,0,0,0.098)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
         </div>
         <CompanyEmailButtons to={client?.email||""} subject={`${L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")} – ${SVCS[svc].name} – Patjac`} body={msg} lang={lang}/>
       </CPCard>
@@ -10730,7 +10736,7 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
       {!emp ? <CPCard><div style={{color:CP.textSecondary}}>{L("Kein Mitarbeiter","Sin empleado","No employee","Nessun dipendente")}</div></CPCard> : (<>
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
         {tabs.map(([k,ic,lbl])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:CP.font,background:tab===k?CP.accent:"rgba(255,255,255,.1)",color:"#fff"}}>{ic} {lbl}</button>
+          <button key={k} onClick={()=>setTab(k)} style={{padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:CP.font,background:tab===k?CP.accent:"rgba(0,0,0,0.07)",color:(tab===k)?"#fff":CP.textPrimary}}>{ic} {lbl}</button>
         ))}
       </div>
 
@@ -10746,7 +10752,7 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
                 <div>
                   <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{monthNames[m-1]} {y}</div>
                   <div style={{color:CP.textTertiary,fontSize:12}}>{current?L("Laufender Monat (nur Admin)","Mes en curso (solo administrador)","Current month (admin only)","Mese in corso (solo admin)"):L("Abgeschlossen","Mes cerrado","Closed","Chiuso")}</div>
-                  {(sp||sw)&&<div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {isAdmin?L("An Mitarbeiter gesendet","Enviado al empleado","Sent to employee","Inviato al dipendente"):L("Offizielles Dokument der Firma","Documento oficial de la empresa","Official company document","Documento ufficiale dell'azienda")} {fmtDate((sp||sw).created_at)}</div>}
+                  {(sp||sw)&&<div style={{color:"#107c10",fontSize:12,fontWeight:600}}>✅ {isAdmin?L("An Mitarbeiter gesendet","Enviado al empleado","Sent to employee","Inviato al dipendente"):L("Offizielles Dokument der Firma","Documento oficial de la empresa","Official company document","Documento ufficiale dell'azienda")} {fmtDate((sp||sw).created_at)}</div>}
                 </div>
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -10764,7 +10770,7 @@ function DocumentsApp({t,lang,employees,jobs,clients,timeclock,contracts,company
             <div style={{fontSize:28}}>📝</div>
             <div>
               <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>{d.title}</div>
-              <div style={{color:"#69DB7C",fontSize:12,fontWeight:600}}>✅ {L("Von der Firma gesendet","Enviado por la empresa","Sent by the company","Inviato dall'azienda")} {fmtDate(d.created_at)}</div>
+              <div style={{color:"#107c10",fontSize:12,fontWeight:600}}>✅ {L("Von der Firma gesendet","Enviado por la empresa","Sent by the company","Inviato dall'azienda")} {fmtDate(d.created_at)}</div>
             </div>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -11193,18 +11199,18 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
               <CPCard style={{padding:0,overflow:"hidden"}}>
                 <div style={{
                   background:"linear-gradient(90deg,rgba(11,114,133,0.2),rgba(47,158,68,0.1))",
-                  padding:"10px 16px",borderBottom:"1px solid rgba(255,255,255,0.08)",
+                  padding:"10px 16px",borderBottom:"1px solid rgba(0,0,0,0.056)",
                   display:"flex",justifyContent:"space-between",alignItems:"center",
                 }}>
-                  <div style={{color:"#4ECDC4",fontWeight:700,fontSize:13}}>
+                  <div style={{color:"#0b7a75",fontWeight:700,fontSize:13}}>
                     👁️ {L("Vertragsvorschau","Vista previa del contrato","Contract preview","Anteprima contratto")}
                   </div>
                   <button onClick={()=>{ const w=window.open("","_blank"); if(w){ w.document.write(safeHtml(html)); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400);} }} style={{
-                    background:"rgba(47,158,68,0.3)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:8,color:"#fff",padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:CP.font,marginLeft:"auto",marginRight:8,
+                    background:"rgba(47,158,68,0.3)",border:"1px solid rgba(47,158,68,0.4)",borderRadius:8,color:CP.textPrimary,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:CP.font,marginLeft:"auto",marginRight:8,
                   }}>🖨️ {L("Drucken","Imprimir","Print","Stampa")}</button>
                   <button onClick={()=>downloadContract(c)} style={{
                     background:"rgba(11,114,133,0.3)",border:"1px solid rgba(11,114,133,0.4)",
-                    borderRadius:8,color:"#fff",padding:"5px 12px",cursor:"pointer",
+                    borderRadius:8,color:CP.textPrimary,padding:"5px 12px",cursor:"pointer",
                     fontSize:12,fontWeight:700,fontFamily:CP.font,
                   }}>
                     ⬇️ {L("Herunterladen","Descargar","Download","Scarica")}
@@ -11241,7 +11247,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
           <button key={k} onClick={()=>setFilter(k)} style={{
             padding:"7px 18px",borderRadius:20,border:"none",cursor:"pointer",
             fontWeight:700,fontSize:13,fontFamily:CP.font,
-            background:filter===k?CP.accent:"rgba(255,255,255,.1)",color:"#fff",
+            background:filter===k?CP.accent:"rgba(0,0,0,0.07)",color:(filter===k)?"#fff":CP.textPrimary,
           }}>{label}</button>
         ))}
         <div style={{marginLeft:"auto",color:CP.textSecondary,fontSize:13,lineHeight:"34px"}}>
@@ -11254,16 +11260,16 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
         onDelete={ids=>{setContracts(p=>p.filter(c=>!ids.has(c.id)));notify(L("Verträge gelöscht","Contratos eliminados","Contracts deleted","Contratti eliminati"),"success");}}
         extra={ids=>(<>
           <select defaultValue="" onChange={e=>{const v=e.target.value;if(!v)return;setContracts(p=>p.map(c=>ids.has(c.id)?{...c,status:v}:c));notify(t.success,"success");e.target.value="";}}
-            style={{background:"rgba(255,255,255,.1)",color:"#fff",border:`1px solid ${CP.border}`,borderRadius:8,padding:"5px 8px",fontSize:12}}>
+            style={{background:"rgba(0,0,0,0.035)",color:CP.textPrimary,border:`1px solid ${CP.border}`,borderRadius:8,padding:"5px 8px",fontSize:12}}>
             <option value="">✏️ {L("Status ändern","Cambiar estado","Change status","Cambia stato")}</option>
-            {["draft","signed","active","expired","terminated"].map(st=><option key={st} value={st} style={{background:"#1a1a2e"}}>{statusLabel(st)}</option>)}
+            {["draft","signed","active","expired","terminated"].map(st=><option key={st} value={st} style={{background:"#fff",color:"#1a1a1a"}}>{statusLabel(st)}</option>)}
           </select>
           <select defaultValue="" onChange={e=>{const v=e.target.value;if(!v)return;setContracts(p=>p.map(c=>ids.has(c.id)?{...c,salaryType:v}:c));notify(t.success,"success");e.target.value="";}}
-            style={{background:"rgba(255,255,255,.1)",color:"#fff",border:`1px solid ${CP.border}`,borderRadius:8,padding:"5px 8px",fontSize:12}}>
+            style={{background:"rgba(0,0,0,0.035)",color:CP.textPrimary,border:`1px solid ${CP.border}`,borderRadius:8,padding:"5px 8px",fontSize:12}}>
             <option value="">✏️ {L("Abrechnungsart","Tipo facturación","Billing type","Tipo fatturazione")}</option>
-            <option value="hourly" style={{background:"#1a1a2e"}}>{L("Pro Stunde","Por hora","Per hour","All'ora")}</option>
-            <option value="weekly" style={{background:"#1a1a2e"}}>{L("Wöchentlich","Semanal","Weekly","Settimanale")}</option>
-            <option value="monthly" style={{background:"#1a1a2e"}}>{L("Monatlich","Mensual","Monthly","Mensile")}</option>
+            <option value="hourly" style={{background:"#fff",color:"#1a1a1a"}}>{L("Pro Stunde","Por hora","Per hour","All'ora")}</option>
+            <option value="weekly" style={{background:"#fff",color:"#1a1a1a"}}>{L("Wöchentlich","Semanal","Weekly","Settimanale")}</option>
+            <option value="monthly" style={{background:"#fff",color:"#1a1a1a"}}>{L("Monatlich","Mensual","Monthly","Mensile")}</option>
           </select>
         </>)}/>
       {filtered.length===0 ? (
@@ -11299,8 +11305,8 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                         {t.contractStart}: {fmtDate(c.startDate)}
                         {c.endDate?" · "+t.contractEnd+": "+fmtDate(c.endDate):" · "+t.indefinite}
                       </div>
-                      {c.type==="employee"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.salary} {c.salaryType==="hourly"?"/h":c.salaryType==="weekly"?"/W":"/M"}</div>}
-                      {c.type==="client"&&<div style={{color:"#69DB7C",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.price} {c.salaryType==="hourly"?"/h":c.salaryType==="weekly"?"/W":"/M"}</div>}
+                      {c.type==="employee"&&<div style={{color:"#107c10",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.salary} {c.salaryType==="hourly"?"/h":c.salaryType==="weekly"?"/W":"/M"}</div>}
+                      {c.type==="client"&&<div style={{color:"#107c10",fontSize:12,marginTop:2,fontWeight:600}}>CHF {c.price} {c.salaryType==="hourly"?"/h":c.salaryType==="weekly"?"/W":"/M"}</div>}
                     </div>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
@@ -11356,9 +11362,9 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                   {id:"gardening", label:L("🌿 Gartenbau","🌿 Jardinería","🌿 Gardening","🌿 Giardinaggio")},
                 ].map(opt=>(
                   <button key={opt.id} onClick={()=>setForm(f=>({...f,gavActivity:opt.id,gavContractType:""}))}
-                    style={{padding:"8px 18px",borderRadius:20,border:`2px solid ${form.gavActivity===opt.id?"#1c7ed6":"rgba(255,255,255,.2)"}`,
-                      background:form.gavActivity===opt.id?"rgba(28,126,214,.25)":"rgba(255,255,255,.05)",
-                      color:form.gavActivity===opt.id?"#74c0fc":"#ccc",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all .2s"}}>
+                    style={{padding:"8px 18px",borderRadius:20,border:`2px solid ${form.gavActivity===opt.id?"#1c7ed6":"rgba(0,0,0,0.14)"}`,
+                      background:form.gavActivity===opt.id?"rgba(28,126,214,.25)":"rgba(0,0,0,0.035)",
+                      color:form.gavActivity===opt.id?"#0067c0":"#ccc",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all .2s"}}>
                     {opt.label}
                   </button>
                 ))}
@@ -11388,9 +11394,9 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   {types.map(tp=>(
                     <button key={tp.id} onClick={()=>setForm(f=>({...f,gavContractType:tp.id,salary:tp.hourly,salaryType:"hourly"}))}
-                      style={{padding:"8px 14px",borderRadius:20,border:`2px solid ${form.gavContractType===tp.id?"#69DB7C":"rgba(255,255,255,.2)"}`,
-                        background:form.gavContractType===tp.id?"rgba(105,219,124,.2)":"rgba(255,255,255,.05)",
-                        color:form.gavContractType===tp.id?"#69DB7C":"#ccc",cursor:"pointer",fontSize:12,fontWeight:600,transition:"all .2s",
+                      style={{padding:"8px 14px",borderRadius:20,border:`2px solid ${form.gavContractType===tp.id?"#107c10":"rgba(0,0,0,0.14)"}`,
+                        background:form.gavContractType===tp.id?"rgba(105,219,124,.2)":"rgba(0,0,0,0.035)",
+                        color:form.gavContractType===tp.id?"#107c10":"#ccc",cursor:"pointer",fontSize:12,fontWeight:600,transition:"all .2s",
                         textAlign:"left",lineHeight:1.3}}>
                       <div>{tp.id}</div>
                       <div style={{fontSize:10,opacity:.8}}>CHF {tp.hourly.toFixed(2)}/h</div>
@@ -11398,7 +11404,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
                   ))}
                 </div>
                 {form.gavContractType&&(
-                  <div style={{marginTop:8,padding:"8px 12px",background:"rgba(105,219,124,.1)",borderRadius:8,border:"1px solid rgba(105,219,124,.3)",fontSize:12,color:"#69DB7C"}}>
+                  <div style={{marginTop:8,padding:"8px 12px",background:"rgba(105,219,124,.1)",borderRadius:8,border:"1px solid rgba(105,219,124,.3)",fontSize:12,color:"#107c10"}}>
                     ✅ {types.find(t=>t.id===form.gavContractType)?.label} — CHF {types.find(t=>t.id===form.gavContractType)?.hourly.toFixed(2)}/h
                   </div>
                 )}
@@ -11457,17 +11463,17 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
             <div style={{background:CP.surface,border:`1px solid rgba(11,114,133,0.5)`,borderRadius:22,width:"min(820px,96vw)",marginTop:8,marginBottom:8,boxShadow:"0 32px 80px rgba(0,0,0,0.9)"}}
               onClick={e=>e.stopPropagation()}>
               <div style={{background:"linear-gradient(90deg,#0B7285,#2F9E44)",borderRadius:"22px 22px 0 0",padding:"13px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{color:"#fff",fontWeight:700,fontSize:15}}>📝 {typeLabel(selContract.type)} — {entity?.name}</div>
+                <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>📝 {typeLabel(selContract.type)} — {entity?.name}</div>
                 <div style={{display:"flex",gap:8}}>
                   {selContract.type==="employee"&&selContract.employeeId&&<SendToDocsButton lang={lang} employeeId={selContract.employeeId} category="contract_sent" refId={selContract.id}
                     title={`${L("Arbeitsvertrag","Contrato laboral","Employment contract","Contratto di lavoro")} ${selContract.startDate||selContract.contractDate||""}`} getHtml={()=>buildContractHTML(selContract)} style={{padding:"7px 14px"}}/>}
                   <button onClick={()=>emailContract(selContract)} style={{background:"#E0115F",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>📧 E-mail</button>
-                  <button onClick={()=>downloadContract(selContract)} style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.35)",borderRadius:10,color:"#fff",padding:"7px 15px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>⬇️ {t.contractDownload}</button>
-                  <button onClick={()=>setModal(null)} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,color:"#fff",padding:"7px 12px",cursor:"pointer",fontSize:13}}>✕</button>
+                  <button onClick={()=>downloadContract(selContract)} style={{background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.47)",borderRadius:10,color:CP.textPrimary,padding:"7px 15px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:CP.font}}>⬇️ {t.contractDownload}</button>
+                  <button onClick={()=>setModal(null)} style={{background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.14)",borderRadius:10,color:CP.textPrimary,padding:"7px 12px",cursor:"pointer",fontSize:13}}>✕</button>
                 </div>
               </div>
               <div style={{padding:"14px 20px 6px"}}>
-                <div style={{background:"rgba(11,114,133,0.1)",border:"1px solid rgba(11,114,133,0.25)",borderRadius:10,padding:"8px 14px",marginBottom:10,color:"#4ECDC4",fontSize:12}}>
+                <div style={{background:"rgba(11,114,133,0.1)",border:"1px solid rgba(11,114,133,0.25)",borderRadius:10,padding:"8px 14px",marginBottom:10,color:"#0b7a75",fontSize:12}}>
                   👁️ {L("Vorschau — Herunterladen für druckbereites Vertragsexemplar","Vista previa — Descarga para copia imprimible del contrato","Preview — Download for print-ready contract copy","Anteprima — Scarica per copia del contratto pronta per la stampa")}
                 </div>
               </div>
@@ -11488,7 +11494,7 @@ ${buildRightsAnnexHTML(isEmp?ANNEX_EMPLOYEE:ANNEX_CLIENT, lang, cs.name, entity?
             <div style={{padding:"8px 0 20px"}}>
               <div style={{textAlign:"center",marginBottom:14}}><span style={{fontSize:44}}>⚠️</span></div>
               <div style={{background:"rgba(201,42,42,0.1)",border:"1px solid rgba(201,42,42,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,textAlign:"center"}}>
-                <div style={{color:"#FF8787",fontWeight:700,fontSize:15}}>
+                <div style={{color:"#c42b1c",fontWeight:700,fontSize:15}}>
                   {c?.type==="client"?"👥":"👤"} {entity?.name||"—"}
                 </div>
                 <div style={{color:CP.textSecondary,fontSize:12,marginTop:4}}>
