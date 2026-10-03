@@ -706,6 +706,66 @@ const DEVICE_KEY_LS = "patjac_device_key";
 const getDeviceKey = () => { try{ const v=localStorage.getItem(DEVICE_KEY_LS); return /^[a-f0-9]{64}$/.test(v||"")?v:""; }catch(e){ return ""; } };
 const newDeviceKey = () => { const a=new Uint8Array(32); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,"0")).join(""); };
 const deviceLabel = () => { const u=navigator.userAgent||""; return (/iPhone/.test(u)?"iPhone":/iPad/.test(u)?"iPad":/Android/.test(u)?"Android":/Mac/.test(u)?"Mac":/Windows/.test(u)?"Windows":"Gerät")+" · "+new Date().toLocaleDateString("de-CH"); };
+// ─── INSTALL THE APP ON THE HOME SCREEN ───
+// Android/Chrome: the browser offers a real "install" dialog (one tap → icon created).
+// iPhone/Safari: no automatic way exists — the person must use Share → "Add to Home Screen" (we guide step by step).
+let _installEvt = null; const _installSubs = new Set();
+if(typeof window!=="undefined"){
+  window.addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); _installEvt=e; _installSubs.forEach(f=>f()); });
+  window.addEventListener("appinstalled", ()=>{ _installEvt=null; try{ localStorage.setItem("patjac_installed","1"); }catch(e){} _installSubs.forEach(f=>f()); });
+  // the service worker is needed so phones accept the app as installable
+  if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("/sw.js").catch(()=>{}); });
+}
+const isStandalone = () => { try{ return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone===true; }catch(e){ return false; } };
+const isPhone = () => isIOS() || /Android/.test(navigator.userAgent||"");
+const inAppBrowser = () => /WhatsApp|FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|Telegram|GSA\//.test(navigator.userAgent||"");
+function useInstallPrompt(){
+  const [,force] = useState(0);
+  useEffect(()=>{ const f=()=>force(x=>x+1); _installSubs.add(f); return ()=>{ _installSubs.delete(f); }; },[]);
+  return {
+    canPrompt: !!_installEvt,
+    prompt: async () => { const e=_installEvt; if(!e) return null; try{ e.prompt(); const r=await e.userChoice; _installEvt=null; force(x=>x+1); return r?.outcome||null; }catch(err){ return null; } },
+  };
+}
+function InstallHelp({lang, code, inst}){
+  const L = makeL(lang);
+  const [copied,setCopied] = useState(false);
+  if(isStandalone() || !isPhone()) return null;
+  const link = `${APP_PUBLIC_URL}/${code?`?activar=${code}`:""}`;
+  const box = {background:"#fff",border:`2px solid ${CP.accent}`,borderRadius:12,padding:"14px 16px",marginBottom:16,boxShadow:"0 6px 20px rgba(0,103,192,0.12)"};
+  const stepRow = (n,txt) => (<div style={{display:"flex",gap:10,alignItems:"flex-start",marginTop:8}}><span style={{width:24,height:24,borderRadius:"50%",background:CP.accent,color:"#fff",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</span><span style={{color:CP.textPrimary,fontSize:14,lineHeight:1.4}}>{txt}</span></div>);
+  if(inAppBrowser()) return (
+    <div style={box}>
+      <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>⚠️ {L("Im Browser öffnen","Ábrelo en el navegador","Open in the browser","Apri nel browser")}</div>
+      <div style={{color:CP.textSecondary,fontSize:13.5,marginTop:4,lineHeight:1.45}}>{L("Sie sind in WhatsApp/Instagram. Dort kann man kein App-Symbol erstellen.","Estás dentro de WhatsApp/Instagram. Desde ahí no se puede crear el icono de la app.","You are inside WhatsApp/Instagram. The app icon can't be created from there.","Sei dentro WhatsApp/Instagram. Da lì non si può creare l'icona.")}</div>
+      {stepRow(1, isIOS()?L("Tippen Sie auf ⋯ oder auf den Kompass 🧭 und wählen Sie «In Safari öffnen».","Toca ⋯ o la brújula 🧭 y elige «Abrir en Safari».","Tap ⋯ or the compass 🧭 and choose «Open in Safari».","Tocca ⋯ o la bussola 🧭 e scegli «Apri in Safari»."):L("Tippen Sie auf ⋮ oben rechts und wählen Sie «In Chrome öffnen».","Toca ⋮ arriba a la derecha y elige «Abrir en Chrome».","Tap ⋮ at the top right and choose «Open in Chrome».","Tocca ⋮ in alto a destra e scegli «Apri in Chrome»."))}
+      <button onClick={()=>{ try{ navigator.clipboard.writeText(link); setCopied(true); }catch(e){} }} style={{marginTop:10,width:"100%",padding:"10px",borderRadius:8,border:`1px solid ${CP.borderActive}`,background:"#fff",fontWeight:700,fontSize:13.5,cursor:"pointer",fontFamily:CP.font,color:CP.textPrimary}}>{copied?"✅ "+L("Link kopiert – im Browser einfügen","Enlace copiado: pégalo en el navegador","Link copied – paste it in the browser","Link copiato – incollalo nel browser"):"📋 "+L("Link kopieren","Copiar enlace","Copy link","Copia link")}</button>
+    </div>
+  );
+  if(isIOS()) return (
+    <div style={box}>
+      <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>📲 {L("Zuerst das App-Symbol erstellen","Primero crea el icono de la app","First create the app icon","Prima crea l'icona dell'app")}</div>
+      {stepRow(1,<>{L("Unten in Safari auf «Teilen» tippen","Toca el botón «Compartir» abajo en Safari","Tap «Share» at the bottom of Safari","Tocca «Condividi» in basso in Safari")} <b style={{fontSize:17}}>⬆️</b></>)}
+      {stepRow(2,<>{L("Nach unten scrollen und","Baja y toca","Scroll down and tap","Scorri e tocca")} <b>«{L("Zum Home-Bildschirm","Añadir a pantalla de inicio","Add to Home Screen","Aggiungi a schermata Home")}» ➕</b></>)}
+      {stepRow(3,<>{L("Oben rechts auf","Toca","Tap","Tocca")} <b>«{L("Hinzufügen","Añadir","Add","Aggiungi")}»</b></>)}
+      {stepRow(4,L("Schliessen Sie Safari und öffnen Sie Patjac über das neue Symbol.","Cierra Safari y abre Patjac desde el icono nuevo.","Close Safari and open Patjac from the new icon.","Chiudi Safari e apri Patjac dalla nuova icona."))}
+      {code&&<div style={{marginTop:12,background:"rgba(0,103,192,0.08)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+        <div style={{color:CP.textSecondary,fontSize:12.5}}>{L("Im Symbol geben Sie dann diesen Code ein:","Dentro del icono escribe este código:","Inside the icon, enter this code:","Nell'icona inserisci questo codice:")}</div>
+        <div style={{color:CP.accent,fontWeight:800,fontSize:26,letterSpacing:4,marginTop:2}}>{code}</div>
+      </div>}
+    </div>
+  );
+  // Android
+  return (
+    <div style={box}>
+      <div style={{color:CP.textPrimary,fontWeight:700,fontSize:15}}>📲 {L("App-Symbol auf dem Startbildschirm","Icono de la app en tu pantalla","App icon on your home screen","Icona dell'app sulla schermata")}</div>
+      {inst.canPrompt
+        ? <button onClick={()=>inst.prompt()} style={{marginTop:10,width:"100%",padding:"13px",borderRadius:10,border:"none",background:CP.accent,color:"#fff",fontWeight:800,fontSize:15.5,cursor:"pointer",fontFamily:CP.font}}>📲 {L("Patjac installieren","Instalar Patjac","Install Patjac","Installa Patjac")}</button>
+        : <>{stepRow(1,L("Oben rechts auf ⋮ tippen","Toca ⋮ arriba a la derecha","Tap ⋮ at the top right","Tocca ⋮ in alto a destra"))}{stepRow(2,<><b>«{L("App installieren","Instalar aplicación","Install app","Installa app")}»</b> {L("oder","o","or","o")} <b>«{L("Zum Startbildschirm hinzufügen","Añadir a pantalla de inicio","Add to Home screen","Aggiungi a schermata Home")}»</b></>)}</>}
+      <div style={{color:CP.textTertiary,fontSize:12,marginTop:8}}>{L("Danach öffnen Sie Patjac immer über das Symbol.","Después abre Patjac siempre desde el icono.","Then always open Patjac from the icon.","Poi apri Patjac sempre dall'icona.")}</div>
+    </div>
+  );
+}
 // Zürich public holidays (same rule as the server)
 const easterSunday = (y) => { const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),dy=((h+l-7*m+114)%31)+1; return new Date(y,mo-1,dy); };
 const zhHoliday = (dt) => { const y=dt.getFullYear(), e=easterSunday(y), add=(n)=>{const x=new Date(e);x.setDate(x.getDate()+n);return ymd(x);};
@@ -1912,6 +1972,10 @@ export default function PatjacCarPlay(){
   const [needActivation,setNeedActivation] = useState(()=>{ try{ return !!new URLSearchParams(location.search).get("activar"); }catch(e){ return false; } });
   const [actCode,setActCode] = useState(()=>{ try{ return (new URLSearchParams(location.search).get("activar")||"").toUpperCase().slice(0,12); }catch(e){ return ""; } });
   const [actMsg,setActMsg] = useState("");
+  const inst = useInstallPrompt();
+  // iPhone: Safari and the home-screen icon keep separate data, so the phone must be activated INSIDE the icon
+  const [iosBrowserUse,setIosBrowserUse] = useState(false);
+  const iosMustInstall = isIOS() && !isStandalone() && !iosBrowserUse;
   useEffect(()=>{ try{ if(new URLSearchParams(location.search).get("activar")){ setAuthType("employee"); history.replaceState(null,"",location.pathname); } }catch(e){} },[]);
   const activateDevice = async () => {
     setLoginErr(""); setActMsg("");
@@ -1920,6 +1984,7 @@ export default function PatjacCarPlay(){
     const key = newDeviceKey(); let r=null;
     try{ r = await supaRpc("app_activate_device",{p_code:code,p_secret:key,p_label:deviceLabel()},false); }catch(e){ setLoginErr(L("Keine Verbindung","Sin conexión","No connection","Nessuna connessione")); return; }
     if(r?.ok){ try{ localStorage.setItem(DEVICE_KEY_LS,key); }catch(e){}
+      if(inst.canPrompt && !isStandalone()) inst.prompt();   // Android: the install dialog opens right away → icon is created
       setNeedActivation(false); setActCode("");
       setActMsg(`✅ ${L("Telefon freigeschaltet für","Teléfono activado para","Phone activated for","Telefono attivato per")} ${r.name||""}. ${L("Jetzt PIN eingeben.","Ahora escribe tu PIN.","Now enter your PIN.","Ora inserisci il PIN.")}`);
     } else if(r?.error==="locked") setLoginErr(L("Zu viele Versuche – bitte in 1 Std. erneut","Demasiados intentos: inténtalo en 1 hora","Too many attempts – try again in 1 hour","Troppi tentativi – riprova tra 1 ora"));
@@ -2085,8 +2150,8 @@ export default function PatjacCarPlay(){
   if(authState==="login") return (
     <div style={{
       width:"100vw",height:"100vh",background:CP.bg,
-      display:"flex",alignItems:"center",justifyContent:"center",
-      fontFamily:CP.font,overflow:"hidden",position:"relative",
+      display:"flex",alignItems:"safe center",justifyContent:"center",padding:"56px 0 24px",boxSizing:"border-box",
+      fontFamily:CP.font,overflowY:"auto",position:"relative",
     }}>
       {/* Ambient glow */}
       <div style={{position:"absolute",top:"15%",left:"50%",transform:"translateX(-50%)",width:500,height:500,background:"radial-gradient(circle,rgba(28,126,214,0.12) 0%,transparent 70%)",pointerEvents:"none"}}/>
@@ -2117,6 +2182,7 @@ export default function PatjacCarPlay(){
           <div style={{color:CP.textSecondary,fontSize:13,marginTop:4}}>{t.tagline}</div>
         </div>
 
+        <InstallHelp lang={lang} code={authType==="employee"?actCode:""} inst={inst}/>
         {/* Card */}
         <div style={{
           background:"#fff",
@@ -2147,7 +2213,13 @@ export default function PatjacCarPlay(){
             </>
           ):(
             <>
-              {(needActivation||!getDeviceKey())&&(
+              {iosMustInstall&&(needActivation||!getDeviceKey())&&(
+                <div style={{color:CP.textSecondary,fontSize:13,lineHeight:1.5,marginBottom:12,textAlign:"center"}}>
+                  ☝️ {L("Auf dem iPhone zuerst das Symbol erstellen (oben) und die App von dort öffnen.","En iPhone primero crea el icono (arriba) y abre la app desde ahí.","On iPhone, first create the icon (above) and open the app from there.","Su iPhone prima crea l'icona (sopra) e apri l'app da lì.")}
+                  <div><button onClick={()=>setIosBrowserUse(true)} style={{background:"none",border:"none",color:CP.accent,textDecoration:"underline",fontSize:12,cursor:"pointer",marginTop:4}}>{L("Ohne Symbol im Browser verwenden","Usar en el navegador sin icono","Use in the browser without icon","Usa nel browser senza icona")}</button></div>
+                </div>
+              )}
+              {!iosMustInstall&&(needActivation||!getDeviceKey())&&(
                 <div style={{background:"rgba(28,126,214,.12)",border:"1px solid rgba(28,126,214,.35)",borderRadius:12,padding:"10px 12px",marginBottom:12}}>
                   <div style={{color:"#0067c0",fontWeight:700,fontSize:13,marginBottom:6}}>📲 {L("Dieses Telefon freischalten","Activar este teléfono","Activate this phone","Attiva questo telefono")}</div>
                   <div style={{display:"flex",gap:6}}>
@@ -3461,7 +3533,11 @@ willkommen bei Patjac Reinigung Garten & Services!
 🔑 Ihr persönlicher PIN: ${emp.pin}
 📲 Aktivierungscode (nur 1× und nur für Ihr Telefon, 7 Tage gültig): ${code||"—"}
 
-So melden Sie sich an: Link AUF IHREM TELEFON öffnen (iPhone: zuerst «Zum Home-Bildschirm» und von dort öffnen) → «Mitarbeiter» → Aktivierungscode eingeben → PIN eingeben. Die App funktioniert Mo–Fr und Sa bis 12:00.
+So geht's (2 Minuten):
+1. Link AUF IHREM TELEFON mit Safari (iPhone) oder Chrome (Android) öffnen. Öffnet er sich in WhatsApp: «In Safari/Chrome öffnen» wählen.
+2. Die App zeigt, wie das Symbol erstellt wird: Android → Knopf «Patjac installieren»; iPhone → Teilen ⬆️ → «Zum Home-Bildschirm».
+3. Patjac über das Symbol öffnen → «Mitarbeiter» → Aktivierungscode → PIN.
+Die App funktioniert NUR auf Ihrem Telefon (Mo–Fr und Sa bis 12:00). Versucht jemand mit Ihren Daten auf einem anderen Telefon einzusteigen, erhält die Firma sofort eine Meldung.
 
 ⚠️ WICHTIG: Ihr PIN ist persönlich und vertraulich. Geben Sie ihn an niemanden weiter. Die Zugangsdaten sind Eigentum der Firma; eine Weitergabe oder Nutzung durch Dritte ist verboten und kann arbeitsrechtliche Konsequenzen haben (Treue- und Schweigepflicht, Art. 321a OR). Bei Verlust sofort die Firma informieren.
 
@@ -3474,7 +3550,11 @@ Patjac Reinigung Garten & Services`,
 🔑 Tu PIN personal: ${emp.pin}
 📲 Código de activación (sirve 1 sola vez, solo para tu teléfono, válido 7 días): ${code||"—"}
 
-Cómo entrar: abre el enlace EN TU TELÉFONO (iPhone: primero «Añadir a pantalla de inicio» y ábrela desde ese icono) → «Empleado» → escribe el código de activación → escribe tu PIN. La app funciona de lunes a viernes y el sábado hasta las 12:00.
+Cómo entrar (2 minutos):
+1. Abre el enlace EN TU TELÉFONO con Safari (iPhone) o Chrome (Android). Si se abre dentro de WhatsApp, elige «Abrir en Safari/Chrome».
+2. La app te enseña a crear el icono: Android → botón «Instalar Patjac»; iPhone → Compartir ⬆️ → «Añadir a pantalla de inicio».
+3. Abre Patjac desde el icono → «Empleado» → escribe el código de activación → escribe tu PIN.
+La app funciona SOLO en tu teléfono (de lunes a viernes y el sábado hasta las 12:00). Si alguien intenta entrar con tus datos en otro teléfono, la empresa recibe un aviso al momento.
 
 ⚠️ IMPORTANTE: tu PIN es personal y confidencial. No lo compartas con nadie. Las credenciales son propiedad de la empresa; está prohibido darlas a otra persona o que otra persona las use, y hacerlo puede tener consecuencias laborales (deber de lealtad y confidencialidad, Art. 321a del Código de Obligaciones). Si lo pierdes, avisa a la empresa de inmediato.
 
@@ -3487,7 +3567,11 @@ welcome to Patjac Reinigung Garten & Services!
 🔑 Your personal PIN: ${emp.pin}
 📲 Activation code (works once, only for your phone, valid 7 days): ${code||"—"}
 
-How to log in: open the link ON YOUR PHONE (iPhone: first “Add to Home Screen” and open it from there) → «Employee» → enter the activation code → enter your PIN. The app works Mon–Fri and Sat until 12:00.
+How to get in (2 minutes):
+1. Open the link ON YOUR PHONE with Safari (iPhone) or Chrome (Android). If it opens inside WhatsApp, choose «Open in Safari/Chrome».
+2. The app shows how to create the icon: Android → «Install Patjac» button; iPhone → Share ⬆️ → «Add to Home Screen».
+3. Open Patjac from the icon → «Employee» → activation code → PIN.
+The app works ONLY on your phone (Mon–Fri and Sat until 12:00). If someone tries to log in with your details on another phone, the company is alerted immediately.
 
 ⚠️ IMPORTANT: your PIN is personal and confidential. Do not share it with anyone. The credentials are company property; passing them on or letting anyone else use them is forbidden and may have employment consequences (duty of loyalty and confidentiality, Art. 321a CO). If you lose it, inform the company immediately.
 
@@ -3500,7 +3584,11 @@ benvenuto/a in Patjac Reinigung Garten & Services!
 🔑 Il tuo PIN personale: ${emp.pin}
 📲 Codice di attivazione (vale 1 volta, solo per il tuo telefono, 7 giorni): ${code||"—"}
 
-Come accedere: apri il link SUL TUO TELEFONO (iPhone: prima «Aggiungi a Home» e aprila da lì) → «Dipendente» → codice di attivazione → PIN. L'app funziona lun–ven e sab fino alle 12:00.
+Come accedere (2 minuti):
+1. Apri il link SUL TUO TELEFONO con Safari (iPhone) o Chrome (Android). Se si apre dentro WhatsApp, scegli «Apri in Safari/Chrome».
+2. L'app mostra come creare l'icona: Android → pulsante «Installa Patjac»; iPhone → Condividi ⬆️ → «Aggiungi a Home».
+3. Apri Patjac dall'icona → «Dipendente» → codice di attivazione → PIN.
+L'app funziona SOLO sul tuo telefono (lun–ven e sab fino alle 12:00). Se qualcuno prova ad entrare con i tuoi dati da un altro telefono, l'azienda viene avvisata subito.
 
 ⚠️ IMPORTANTE: il PIN è personale e riservato. Non condividerlo con nessuno. Le credenziali sono proprietà dell'azienda; cederle o farle usare ad altri è vietato e può avere conseguenze disciplinari (dovere di fedeltà e riservatezza, Art. 321a CO). In caso di smarrimento avvisa subito l'azienda.
 
@@ -3553,6 +3641,10 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
   const [devices,setDevices] = useState(null);   // {employeeId: {label, activatedAt, lastSeen}}
   const loadDevices = () => supaRpc("admin_list_devices",{}).then(rows=>{ const m={}; (rows||[]).forEach(r=>{ m[r.employee_id]={label:r.label,activatedAt:r.activated_at,lastSeen:r.last_seen,active:true}; }); setDevices(m); }).catch(()=>{});
   useEffect(()=>{ if(currentUser?.role==="admin") loadDevices(); },[inviteEmp]);
+  // Security alerts: phones activated, forwarded codes, PIN used on an unknown phone
+  const [secEvents,setSecEvents] = useState([]);
+  const [secOpen,setSecOpen] = useState(false);
+  useEffect(()=>{ if(currentUser?.role==="admin") docsFetch("security_events?select=id,created_at,employee_id,kind,detail&order=id.desc&limit=30").then(r=>setSecEvents(Array.isArray(r)?r:[])).catch(()=>{}); },[inviteEmp]);
   useQstTariffs(employees);
   const now = new Date();
   const [selMonth,setSelMonth] = useState(now.getMonth()+1);
@@ -3607,6 +3699,25 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
         }}>＋ {t.add}</CPBtn>
       ) : null}
     >
+      {isAdmin&&secEvents.length>0&&(()=>{
+        const recent = secEvents.filter(e=>e.kind!=="activated" && Date.now()-new Date(e.created_at).getTime() < 7*86400000).length;
+        return (
+          <CPCard style={{marginBottom:16,border:`1px solid ${recent?"#c42b1c":CP.border}`,background:recent?"rgba(196,43,28,0.05)":"#fff"}}>
+            <button onClick={()=>setSecOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:CP.font,textAlign:"left"}}>
+              <span style={{fontSize:18}}>🔒</span>
+              <span style={{flex:1,color:recent?"#c42b1c":CP.textPrimary,fontWeight:700,fontSize:14}}>{L("Sicherheit des Zugangs","Seguridad del acceso","Access security","Sicurezza dell'accesso")}{recent?` · ⚠️ ${recent} ${L("Warnung(en) diese Woche","aviso(s) esta semana","warning(s) this week","avviso/i questa settimana")}`:""}</span>
+              <span style={{color:CP.textSecondary}}>{secOpen?"▲":"▼"}</span>
+            </button>
+            {secOpen&&<div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6}}>
+              {secEvents.map(e=>(
+                <div key={e.id} style={{fontSize:13,color:e.kind==="activated"?CP.textSecondary:"#c42b1c",borderTop:`1px solid ${CP.border}`,paddingTop:6}}>
+                  <span style={{color:CP.textTertiary,fontSize:11.5}}>{new Date(e.created_at).toLocaleString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span> · {e.detail}
+                </div>
+              ))}
+            </div>}
+          </CPCard>
+        );
+      })()}
       {/* Month / year selector */}
       <CPCard style={{marginBottom:16}}>
         <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
@@ -7987,10 +8098,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "app_phone",
      "contentKey": {
-      "ES": "🪟 NUEVO ASPECTO\n• La app ahora es clara, con el logo de Patjac arriba en el centro.\n• Abajo tienes 4 botones: 🏠 Inicio, ⏱️ Fichaje, 📋 Trabajos y 💬 Mensajes.\n\n🗺️ TU RUTA DEL DÍA\n• Toca 🗺️ «Rutas». Ves la fecha de hoy y SOLO tus clientes de hoy, en orden de hora (1, 2, 3…).\n• Entre un cliente y otro ves los km en coche.\n• «🚗 Ir aquí» te lleva con Google Maps. «Ruta completa del día» pone todas las paradas en orden.\n\n⏰ LLEGA A TIEMPO Y FICHA\n• Ficha la entrada en cuanto llegues al cliente.\n• Si 15 minutos después de la hora no has fichado, la empresa recibe un aviso y puede enviar a un compañero.\n• Si no llegas en todo el horario, el trabajo se cierra como «No se presentó» y esas horas no se pagan.\n\n🔄 SI TE TOCA REEMPLAZAR A ALGUIEN\n• Recibes un mensaje: «🔄 Nuevo trabajo para ti» con la hora y la dirección.\n• Ve lo antes posible y ficha al llegar. El trabajo ya aparece en tus Trabajos y Rutas.\n\n📷 FOTOS Y VÍDEOS EN EL CHAT\n• En 💬 Mensajes puedes enviar fotos 🖼️ o grabar un vídeo 🎬. La app los hace pequeños sola.\n\n📱 TU TELÉFONO\n• La app solo funciona en el teléfono que activaste con tu código. Si cambias de teléfono, pide un código nuevo a la empresa.\n• Sábado desde las 12:00, domingos y festivos de Zúrich la app está cerrada.\n\n🔒 TRABAJO TERMINADO = BLOQUEADO\n• Cuando fichas la salida (o el trabajo termina solo), el trabajo queda «Completado» con un candado 🔒.\n• Ya no puedes cambiar nada: solo lo ves hasta el final del día. Si algo está mal, avisa a la empresa por 💬 Mensajes.",
-      "DE": "🪟 NEUES AUSSEHEN\n• Die App ist jetzt hell, das Patjac-Logo oben in der Mitte.\n• Unten 4 Knöpfe: 🏠 Start, ⏱️ Zeit, 📋 Aufträge, 💬 Nachrichten.\n\n🗺️ IHRE ROUTE DES TAGES\n• 🗺️ «Routen»: das heutige Datum und NUR Ihre Kunden von heute, nach Uhrzeit (1, 2, 3 …), mit km dazwischen.\n• «🚗 Hierhin navigieren» öffnet Google Maps.\n\n⏰ PÜNKTLICH UND EINSTEMPELN\n• Stempeln Sie ein, sobald Sie beim Kunden sind.\n• 15 Minuten nach Beginn ohne Einstempeln erhält die Firma eine Warnung und kann jemand anderen schicken.\n• Kommen Sie gar nicht, wird der Auftrag als «Nicht erschienen» geschlossen und nicht bezahlt.\n\n🔄 ALS ERSATZ\n• Sie erhalten die Nachricht «🔄 Neuer Auftrag für Sie» mit Zeit und Adresse. Bitte sofort hinfahren.\n\n📷 FOTOS UND VIDEOS IM CHAT\n• In 💬 Nachrichten können Sie Fotos und Videos senden.\n\n🔒 FERTIGER AUFTRAG = GESPERRT\n• Nach dem Ausstempeln (oder automatischem Ende) ist der Auftrag «Abgeschlossen» mit 🔒. Sie können nichts mehr ändern, nur ansehen bis Tagesende. Bei Fehlern der Firma schreiben.",
-      "EN": "🪟 NEW LOOK\n• The app is now light, with the Patjac logo at the top centre. 4 buttons at the bottom: 🏠 Home, ⏱️ Clock, 📋 Jobs, 💬 Messages.\n\n🗺️ YOUR ROUTE OF THE DAY\n• 🗺️ «Routes»: today's date and ONLY your clients of today, in time order, with km between them. «🚗 Navigate here» opens Google Maps.\n\n⏰ BE ON TIME AND CLOCK IN\n• Clock in as soon as you arrive. 15 minutes after the start without clocking in, the company is warned and may send a colleague.\n• If you never arrive, the job is closed as «No-show» and not paid.\n\n🔄 AS A REPLACEMENT\n• You get the message «🔄 New job for you» with time and address. Please go straight away.\n\n📷 PHOTOS AND VIDEOS IN THE CHAT\n• In 💬 Messages you can send photos and videos.\n\n🔒 FINISHED JOB = LOCKED\n• After clocking out (or the automatic end) the job is «Completed» with a 🔒. You can't change anything, only view it until the end of the day. If something is wrong, message the company.",
-      "IT": "🪟 NUOVO ASPETTO\n• L'app ora è chiara, con il logo Patjac in alto al centro. In basso 4 pulsanti: 🏠 Inizio, ⏱️ Presenze, 📋 Lavori, 💬 Messaggi.\n\n🗺️ IL TUO PERCORSO DEL GIORNO\n• 🗺️ «Percorsi»: la data di oggi e SOLO i tuoi clienti di oggi, in ordine di ora, con i km tra loro.\n\n⏰ PUNTUALITÀ\n• Timbra appena arrivi. 15 minuti dopo l'inizio senza timbrare, l'azienda viene avvisata e può mandare un collega.\n• Se non arrivi, il lavoro si chiude come «Assente» e non viene pagato.\n\n🔄 COME SOSTITUTO\n• Ricevi il messaggio «🔄 Nuovo lavoro per te» con ora e indirizzo.\n\n📷 FOTO E VIDEO NELLA CHAT\n• In 💬 Messaggi puoi inviare foto e video.\n\n🔒 LAVORO FINITO = BLOCCATO\n• Dopo l'uscita (o la fine automatica) il lavoro è «Completato» con 🔒. Non puoi più modificarlo, solo vederlo fino a fine giornata. Se qualcosa non va, scrivi all'azienda."
+      "ES": "🪟 NUEVO ASPECTO\n• La app ahora es clara, con el logo de Patjac arriba en el centro.\n• Abajo tienes 4 botones: 🏠 Inicio, ⏱️ Fichaje, 📋 Trabajos y 💬 Mensajes.\n\n🗺️ TU RUTA DEL DÍA\n• Toca 🗺️ «Rutas». Ves la fecha de hoy y SOLO tus clientes de hoy, en orden de hora (1, 2, 3…).\n• Entre un cliente y otro ves los km en coche.\n• «🚗 Ir aquí» te lleva con Google Maps. «Ruta completa del día» pone todas las paradas en orden.\n\n⏰ LLEGA A TIEMPO Y FICHA\n• Ficha la entrada en cuanto llegues al cliente.\n• Si 15 minutos después de la hora no has fichado, la empresa recibe un aviso y puede enviar a un compañero.\n• Si no llegas en todo el horario, el trabajo se cierra como «No se presentó» y esas horas no se pagan.\n\n🔄 SI TE TOCA REEMPLAZAR A ALGUIEN\n• Recibes un mensaje: «🔄 Nuevo trabajo para ti» con la hora y la dirección.\n• Ve lo antes posible y ficha al llegar. El trabajo ya aparece en tus Trabajos y Rutas.\n\n📷 FOTOS Y VÍDEOS EN EL CHAT\n• En 💬 Mensajes puedes enviar fotos 🖼️ o grabar un vídeo 🎬. La app los hace pequeños sola.\n\n📱 TU TELÉFONO\n• La app solo funciona en el teléfono que activaste con tu código. Si cambias de teléfono, pide un código nuevo a la empresa.\n• Sábado desde las 12:00, domingos y festivos de Zúrich la app está cerrada.\n\n🔒 TRABAJO TERMINADO = BLOQUEADO\n• Cuando fichas la salida (o el trabajo termina solo), el trabajo queda «Completado» con un candado 🔒.\n• Ya no puedes cambiar nada: solo lo ves hasta el final del día. Si algo está mal, avisa a la empresa por 💬 Mensajes.\n\n📲 CREAR EL ICONO DE PATJAC\n• Abre el enlace que te envía la empresa con Safari (iPhone) o Chrome (Android), no dentro de WhatsApp.\n• Android: toca «Instalar Patjac» y el icono aparece solo en tu pantalla.\n• iPhone: toca Compartir ⬆️ → «Añadir a pantalla de inicio» → «Añadir». Luego abre Patjac desde el icono y escribe ahí tu código.\n\n🚫 TU ACCESO ES SOLO TUYO\n• La app solo funciona en tu teléfono. Si alguien prueba tu PIN en otro teléfono, no entra y la empresa recibe un aviso.",
+      "DE": "🪟 NEUES AUSSEHEN\n• Die App ist jetzt hell, das Patjac-Logo oben in der Mitte.\n• Unten 4 Knöpfe: 🏠 Start, ⏱️ Zeit, 📋 Aufträge, 💬 Nachrichten.\n\n🗺️ IHRE ROUTE DES TAGES\n• 🗺️ «Routen»: das heutige Datum und NUR Ihre Kunden von heute, nach Uhrzeit (1, 2, 3 …), mit km dazwischen.\n• «🚗 Hierhin navigieren» öffnet Google Maps.\n\n⏰ PÜNKTLICH UND EINSTEMPELN\n• Stempeln Sie ein, sobald Sie beim Kunden sind.\n• 15 Minuten nach Beginn ohne Einstempeln erhält die Firma eine Warnung und kann jemand anderen schicken.\n• Kommen Sie gar nicht, wird der Auftrag als «Nicht erschienen» geschlossen und nicht bezahlt.\n\n🔄 ALS ERSATZ\n• Sie erhalten die Nachricht «🔄 Neuer Auftrag für Sie» mit Zeit und Adresse. Bitte sofort hinfahren.\n\n📷 FOTOS UND VIDEOS IM CHAT\n• In 💬 Nachrichten können Sie Fotos und Videos senden.\n\n🔒 FERTIGER AUFTRAG = GESPERRT\n• Nach dem Ausstempeln (oder automatischem Ende) ist der Auftrag «Abgeschlossen» mit 🔒. Sie können nichts mehr ändern, nur ansehen bis Tagesende. Bei Fehlern der Firma schreiben.\n\n📲 PATJAC-SYMBOL ERSTELLEN\n• Link mit Safari (iPhone) oder Chrome (Android) öffnen, nicht in WhatsApp.\n• Android: «Patjac installieren» tippen. iPhone: Teilen ⬆️ → «Zum Home-Bildschirm» → «Hinzufügen», dann im Symbol den Code eingeben.\n\n🚫 IHR ZUGANG GEHÖRT NUR IHNEN\n• Die App funktioniert nur auf Ihrem Telefon; Versuche auf anderen Telefonen werden der Firma gemeldet.",
+      "EN": "🪟 NEW LOOK\n• The app is now light, with the Patjac logo at the top centre. 4 buttons at the bottom: 🏠 Home, ⏱️ Clock, 📋 Jobs, 💬 Messages.\n\n🗺️ YOUR ROUTE OF THE DAY\n• 🗺️ «Routes»: today's date and ONLY your clients of today, in time order, with km between them. «🚗 Navigate here» opens Google Maps.\n\n⏰ BE ON TIME AND CLOCK IN\n• Clock in as soon as you arrive. 15 minutes after the start without clocking in, the company is warned and may send a colleague.\n• If you never arrive, the job is closed as «No-show» and not paid.\n\n🔄 AS A REPLACEMENT\n• You get the message «🔄 New job for you» with time and address. Please go straight away.\n\n📷 PHOTOS AND VIDEOS IN THE CHAT\n• In 💬 Messages you can send photos and videos.\n\n🔒 FINISHED JOB = LOCKED\n• After clocking out (or the automatic end) the job is «Completed» with a 🔒. You can't change anything, only view it until the end of the day. If something is wrong, message the company.\n\n📲 CREATE THE PATJAC ICON\n• Open the link with Safari (iPhone) or Chrome (Android), not inside WhatsApp.\n• Android: tap «Install Patjac». iPhone: Share ⬆️ → «Add to Home Screen» → «Add», then enter your code inside the icon.\n\n🚫 YOUR ACCESS IS ONLY YOURS\n• The app only works on your phone; attempts on other phones are reported to the company.",
+      "IT": "🪟 NUOVO ASPETTO\n• L'app ora è chiara, con il logo Patjac in alto al centro. In basso 4 pulsanti: 🏠 Inizio, ⏱️ Presenze, 📋 Lavori, 💬 Messaggi.\n\n🗺️ IL TUO PERCORSO DEL GIORNO\n• 🗺️ «Percorsi»: la data di oggi e SOLO i tuoi clienti di oggi, in ordine di ora, con i km tra loro.\n\n⏰ PUNTUALITÀ\n• Timbra appena arrivi. 15 minuti dopo l'inizio senza timbrare, l'azienda viene avvisata e può mandare un collega.\n• Se non arrivi, il lavoro si chiude come «Assente» e non viene pagato.\n\n🔄 COME SOSTITUTO\n• Ricevi il messaggio «🔄 Nuovo lavoro per te» con ora e indirizzo.\n\n📷 FOTO E VIDEO NELLA CHAT\n• In 💬 Messaggi puoi inviare foto e video.\n\n🔒 LAVORO FINITO = BLOCCATO\n• Dopo l'uscita (o la fine automatica) il lavoro è «Completato» con 🔒. Non puoi più modificarlo, solo vederlo fino a fine giornata. Se qualcosa non va, scrivi all'azienda.\n\n📲 CREARE L'ICONA PATJAC\n• Apri il link con Safari (iPhone) o Chrome (Android), non dentro WhatsApp.\n• Android: tocca «Installa Patjac». iPhone: Condividi ⬆️ → «Aggiungi a Home» → «Aggiungi», poi inserisci il codice nell'icona.\n\n🚫 IL TUO ACCESSO È SOLO TUO\n• L'app funziona solo sul tuo telefono; i tentativi da altri telefoni vengono segnalati all'azienda."
      }
     }
    ],
@@ -8333,10 +8444,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "management_customer",
      "contentKey": {
-      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).",
-      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.",
-      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.",
-      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo."
+      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.",
+      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.",
+      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.",
+      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti."
      }
     }
    ],
@@ -9321,6 +9432,8 @@ function HelpModal({t, lang, onClose}){
       icon:"👤",
       title:{DE:"Mitarbeiter verwalten",ES:"Gestionar empleados",EN:"Managing Employees",IT:"Gestione dipendenti"},
       items:[
+        {h:{"DE":"📲 App-Symbol & nicht teilbarer Zugang","ES":"📲 Icono de la app y acceso que no se puede compartir","EN":"📲 App icon & non-shareable access","IT":"📲 Icona dell'app e accesso non condivisibile"},
+          b:{"ES":"1. Empleados → 🔑 «Enviar acceso»: el mensaje lleva el enlace, el PIN y un código de activación (1 sola vez, 7 días).\n2. El empleado abre el enlace en Safari (iPhone) o Chrome (Android). La app le muestra cómo crear el icono:\n• Android: botón «Instalar Patjac» → el icono se crea solo.\n• iPhone: Compartir ⬆️ → «Añadir a pantalla de inicio» → abre el icono y escribe el código ahí.\n3. Desde entonces la app solo funciona en ESE teléfono.\n\n🔒 Avisos de seguridad (Empleados → «Seguridad del acceso»): teléfono activado, código reenviado/reutilizado, PIN usado en un teléfono no autorizado.\n💡 Si un empleado cambia de teléfono: 📱 quitar acceso y enviar un código nuevo.","DE":"Empleados → 🔑 Zugang senden. Android: «Patjac installieren». iPhone: Teilen ⬆️ → «Zum Home-Bildschirm», Code im Symbol eingeben. Danach nur auf diesem Telefon. 🔒-Meldungen unter «Sicherheit des Zugangs».","EN":"Employees → 🔑 Send access. Android: «Install Patjac». iPhone: Share ⬆️ → «Add to Home Screen», enter the code inside the icon. Then it only works on that phone. 🔒 alerts under «Access security».","IT":"Dipendenti → 🔑 Invia accesso. Android: «Installa Patjac». iPhone: Condividi ⬆️ → «Aggiungi a Home», codice nell'icona. Poi funziona solo su quel telefono. Avvisi 🔒 in «Sicurezza dell'accesso»."}},
         {
           h:{DE:"Neuen Mitarbeiter anlegen",ES:"Crear nuevo empleado",EN:"Creating a New Employee",IT:"Creare un nuovo dipendente"},
           b:{DE:"1. App 'Mitarbeiter' → '＋ Hinzufügen'\n2. Vorname + Nachname (Pflicht)\n3. Vollständige Adresse\n4. Telefon + E-Mail\n5. Beschäftigungsart: Stundenlohn oder Festanstellung\n6. AHV-Nummer: 756.XXXX.XXXX.XX\n7. Eintrittsdatum\n8. 13. Monatslohn (nur Festanstellung)\n\n🏷️ GAV-LOHNKATEGORIE (NEU):\n→ Schritt 1: Tätigkeit wählen: 🧹 Reinigung oder 🌿 Gartenbau\n→ Schritt 2: Lohnkategorie wählen:\n   Reinigung: A (CHF 21.45/h) bis H (CHF 28.00/h)\n   Gartenbau: A (CHF 20.50/h) bis F (CHF 30.00/h)\n→ Mindestlohn wird automatisch eingetragen – anpassbar\n\n🔐 AUTOMATISCH GENERIERT:\n• Benutzercode (z.B. PJ-ABCD01) → interne Kennung (nicht für Login nötig)\n• PIN (4-stellig) → das Einzige, was der Mitarbeiter zum Einloggen braucht\n\n⚠️ Code & PIN sofort notieren und dem Mitarbeiter mitteilen!\n\n📧 Lohnabrechnung per E-Mail: Klick auf 📧 öffnet Outlook/Gmail mit vorausgefüllten Daten.",
