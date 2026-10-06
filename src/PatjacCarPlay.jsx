@@ -8444,10 +8444,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "management_customer",
      "contentKey": {
-      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.",
-      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.",
-      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.",
-      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti."
+      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.\n\n🧮 CALCULADORA DE PRECIOS (nueva versión, igual que la web)\n🔹 Limpieza a fondo y de mudanza: precio por pieza (dormitorios, salones, cocinas, baños y ventanas) con desplegables; el tamaño elegido rellena las cantidades y puedes cambiarlas (hasta 30 dormitorios).\n🔹 Limpieza regular: horas según las piezas (mínimo 2 h), CHF 40/h o CHF 44/h si es mensual.\n🔹 Jardín mínimo 2 h (restos verdes aparte) y reparaciones mínimo 1 h (material aparte).\n🔹 Tú ves el desglose interno 🔒; el mensaje al cliente solo lleva las cantidades y el precio total.",
+      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.\n\n🧮 PREISRECHNER (neu, wie die Webseite)\n🔹 Grund- und Umzugsreinigung: Preis pro Raum (Schlafzimmer, Wohnzimmer, Küchen, Bäder, Fenster) mit Auswahllisten.\n🔹 Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. oder CHF 44/Std. monatlich.\n🔹 Interne Aufschlüsselung 🔒 nur für Sie; der Kunde erhält nur Anzahl und Gesamtpreis.",
+      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.\n\n🧮 PRICE CALCULATOR (new, same as the website)\n🔹 Deep and move-out cleaning: price per room (bedrooms, living rooms, kitchens, bathrooms, windows) with drop-downs.\n🔹 Regular cleaning: hours by rooms (min. 2 h), CHF 40/h or CHF 44/h monthly.\n🔹 Internal breakdown 🔒 only for you; the client only gets counts and the total.",
+      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti.\n\n🧮 CALCOLATORE PREZZI (nuovo, come il sito)\n🔹 Pulizia a fondo e di trasloco: prezzo per locale (camere, soggiorni, cucine, bagni, finestre) con menu a tendina.\n🔹 Pulizia regolare: ore secondo i locali (min. 2 h), CHF 40/h o CHF 44/h mensile.\n🔹 Dettaglio interno 🔒 solo per te; il cliente riceve solo quantità e totale."
      }
     }
    ],
@@ -9645,6 +9645,8 @@ function HelpModal({t, lang, onClose}){
       icon:"🧮",
       title:{DE:"Preisrechner",ES:"Calculadora de precios",EN:"Price calculator",IT:"Calcolatore prezzi"},
       items:[
+        {h:{"DE":"🆕 Preise pro Raum (wie die Webseite)","ES":"🆕 Precios por pieza (igual que la web)","EN":"🆕 Prices per room (same as the website)","IT":"🆕 Prezzi per locale (come il sito)"},
+          b:{"ES":"🔹 Limpieza a fondo y de mudanza: base + precio por dormitorio, salón, cocina, baño y ventana. Elige el tamaño y ajusta cada cantidad en los desplegables.\n🔹 Limpieza regular: horas según las piezas, mínimo 2 h; CHF 40/h (CHF 44/h mensual).\n🔹 El rango (+15 %) depende del estado de la vivienda.\n🔒 El desglose interno solo lo ves tú; al cliente se le envían las cantidades y el total.","DE":"Grund-/Umzugsreinigung: Grundpreis + Preis pro Raum und Fenster. Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. (44 monatlich). Interne Aufschlüsselung nur für Sie.","EN":"Deep/move-out: base + price per room and window. Regular: hours by rooms (min. 2 h), CHF 40/h (44 monthly). Internal breakdown only for you.","IT":"A fondo/trasloco: base + prezzo per locale e finestra. Regolare: ore per locali (min. 2 h), CHF 40/h (44 mensile). Dettaglio interno solo per te."}},
         {h:{"DE": "Richtpreis berechnen und senden", "ES": "Calcular y enviar un precio orientativo", "EN": "Calculate and send an indicative price", "IT": "Calcolare e inviare un prezzo indicativo"},
           b:{"ES": "1. Abre 🧮 «Calculadora de precios» (solo administrador).\n2. Elige el servicio: limpieza regular, a fondo, mudanza (desde CHF 40/h), jardinería o reparaciones (desde CHF 65/h).\n3. Elige el tamaño y, en limpieza regular, la frecuencia.\n4. Ves el precio orientativo, el cálculo (horas × tarifa) y, en limpieza regular, el total aproximado al mes.\n5. Elige el cliente (opcional) y envíalo por WhatsApp o e-mail, o copia el texto.\n\n💡 Son los mismos precios que la calculadora de la página web.", "DE": "1. 🧮 «Preisrechner» öffnen (nur Administrator).\n2. Leistung, Grösse und Häufigkeit wählen.\n3. Richtpreis und Berechnung (Std. × Ansatz) erscheinen.\n4. Kunde wählen und per WhatsApp oder E-Mail senden.\n\n💡 Gleiche Preise wie auf der Webseite.", "EN": "1. Open 🧮 «Price calculator» (administrator only).\n2. Choose service, size and frequency.\n3. See the indicative price and the calculation (hours × rate).\n4. Choose the client and send by WhatsApp or e-mail.\n\n💡 Same prices as the website.", "IT": "1. Apri 🧮 «Calcolatore prezzi» (solo amministratore).\n2. Scegli servizio, dimensione e frequenza.\n3. Vedi il prezzo indicativo e il calcolo (ore × tariffa).\n4. Scegli il cliente e invialo via WhatsApp o e-mail."}},
       ]
@@ -10698,23 +10700,50 @@ const computeSpesen = async (emp, month, year, jobs, clients) => {
   return total;
 };
 
-// ─── PRICE CALCULATOR (admin) — same rates & hour estimates as the website calculator ───
-const PRICE_RATE = { clean: 40, garden: 65, repair: 65 };          // CHF per hour (Tarife 2026)
-const PRICE_CLEAN_H = [2, 2.5, 3, 4, 5];                           // regular cleaning, hours per visit
-const PRICE_DEEP_H  = [3, 4, 5, 6.5, 8];                           // one-off deep cleaning
-const PRICE_MOVE_H  = [6, 8, 10, 13, 16];                          // move-out cleaning
-const PRICE_GARDEN_H = [[2, 3], [4, 6], [7, 10]];
-const PRICE_REPAIR_H = [[1, 1], [2, 3], [4, 6]];
+// ─── PRICE CALCULATOR (admin) — same prices and logic as the website calculator (Version 36) ───
+const PRICE_RATE = { clean: 40, garden: 65, repair: 65 };   // CHF per hour (Tarife 2026)
+const PRICE_MONTHLY = 44;                                    // regular cleaning once a month
+const PRICE_CNT_KEYS = ["d","s","k","b","w"];                // bedrooms, living rooms, kitchens, bathrooms, windows
+const PRICE_CNT_ICONS = ["🛏️","🛋️","🍳","🛁","🪟"];
+const PRICE_CNT_MAX = { d:30, s:10, k:5, b:15, w:80 };
+const PRICE_SIZE_PRESETS = [
+  { d:1, s:0, k:1, b:1, w:3 },
+  { d:1, s:1, k:1, b:1, w:5 },
+  { d:2, s:1, k:1, b:1, w:7 },
+  { d:3, s:1, k:1, b:2, w:9 },
+  { d:4, s:1, k:1, b:2, w:11 },
+];
+const PRICE_UNIT = {
+  move: { base:80, d:70, s:80, k:120, b:85, w:20 },   // CHF, move-out incl. handover guarantee
+  deep: { base:50, d:45, s:50, k:80,  b:55, w:15 },   // CHF, one-off deep cleaning
+  reg:  { base:0.5, d:0.4, s:0.5, k:0.6, b:0.6 },     // hours per visit, regular cleaning
+};
+const PRICE_SPREAD = 1.15;                            // upper end of the range: condition of the home
+const PRICE_GARDEN_H = [[2,3],[4,6],[7,10]];
+const PRICE_REPAIR_H = [[1,1.5],[2,3],[4,6]];
+const priceR5 = n => Math.round(n/5)*5;
+const priceChf = n => "CHF " + priceR5(n).toLocaleString("de-CH");
 const priceRateOf = s => s <= 2 ? PRICE_RATE.clean : s === 3 ? PRICE_RATE.garden : PRICE_RATE.repair;
-const priceChf = n => "CHF " + (Math.round(n / 5) * 5).toLocaleString("de-CH");
-function priceCompute(svc, size){
-  if(svc <= 2){
-    const rate = PRICE_RATE.clean;
-    const h = (svc === 0 ? PRICE_CLEAN_H : svc === 1 ? PRICE_DEEP_H : PRICE_MOVE_H)[Math.min(size, 4)];
-    return { lo: h * rate, hi: h * 1.25 * rate, h: [h, Math.round(h * 1.25 * 2) / 2], per: svc === 0, mat: false, rate };
+const priceHomeTotal = (kind, cnt) => { const u=PRICE_UNIT[kind]; let t=u.base; PRICE_CNT_KEYS.forEach(k=>{ if(u[k]!=null) t+=u[k]*cnt[k]; }); return t; };
+function priceCompute(svc, size, freq, cnt){
+  const lines = [];
+  if(svc === 0){
+    const u=PRICE_UNIT.reg, rate = freq===2 ? PRICE_MONTHLY : PRICE_RATE.clean; let h=u.base;
+    lines.push({k:"base", n:1, v:u.base*rate});
+    ["d","s","k","b"].forEach(k=>{ if(cnt[k]){ h+=u[k]*cnt[k]; lines.push({k, n:cnt[k], v:u[k]*cnt[k]*rate}); } });
+    h = Math.max(2, Math.round(h*2)/2);
+    const hHi = Math.round(h*1.2*2)/2;
+    return { lo:h*rate, hi:hHi*rate, h:[h,hHi], rate, per:true, home:true, lines };
   }
-  const r = (svc === 3 ? PRICE_GARDEN_H : PRICE_REPAIR_H)[Math.min(size, 2)], rate = priceRateOf(svc);
-  return { lo: r[0] * rate, hi: r[1] * rate, h: r, per: false, mat: svc === 4, rate };
+  if(svc === 1 || svc === 2){
+    const kind = svc===1 ? "deep" : "move", u=PRICE_UNIT[kind];
+    lines.push({k:"base", n:1, v:u.base});
+    PRICE_CNT_KEYS.forEach(k=>{ if(cnt[k]) lines.push({k, n:cnt[k], v:u[k]*cnt[k]}); });
+    const tot = priceHomeTotal(kind, cnt);
+    return { lo:tot, hi:tot*PRICE_SPREAD, per:false, home:true, fixed:true, lines };
+  }
+  const r = (svc===3 ? PRICE_GARDEN_H : PRICE_REPAIR_H)[Math.min(Math.max(size,0),2)], rt = priceRateOf(svc);
+  return { lo:r[0]*rt, hi:r[1]*rt, h:r, rate:rt, per:false, home:false, mat:svc===4 };
 }
 
 function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
@@ -10722,6 +10751,7 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
   const [svc,setSvc] = useState(0);
   const [size,setSize] = useState(2);
   const [freq,setFreq] = useState(1);
+  const [cnt,setCnt] = useState(()=>({...PRICE_SIZE_PRESETS[2]}));
   const [clientId,setClientId] = useState("");
   if(currentUser?.role!=="admin") return null;
 
@@ -10748,41 +10778,64 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
     ["Small job (≈1 h)","Medium job (2–3 h)","Large job (4–6 h)"],
     ["Lavoro piccolo (≈1 h)","Lavoro medio (2–3 h)","Lavoro grande (4–6 h)"]);
   const FREQS = L(["Wöchentlich","Alle 2 Wochen","Monatlich"],["Semanal","Cada 2 semanas","Mensual"],["Weekly","Every 2 weeks","Monthly"],["Settimanale","Ogni 2 settimane","Mensile"]);
+  const ITEMS = L(["Schlafzimmer","Wohnzimmer","Küchen","Badezimmer","Fenster"],["Dormitorios","Salones","Cocinas","Baños","Ventanas"],["Bedrooms","Living rooms","Kitchens","Bathrooms","Windows"],["Camere","Soggiorni","Cucine","Bagni","Finestre"]);
+  const ONE = L(["Schlafzimmer","Wohnzimmer","Küche","Bad","Fenster"],["Dormitorio","Salón","Cocina","Baño","Ventana"],["Bedroom","Living room","Kitchen","Bathroom","Window"],["Camera","Soggiorno","Cucina","Bagno","Finestra"]);
   const VISITS_PER_MONTH = [4.33, 2.17, 1];
+  const isHome = svc <= 2;
+  const sizes = isHome ? ROOMS : svc === 3 ? GARDEN : REPAIR;
+  const keys = svc === 0 ? ["d","s","k","b"] : PRICE_CNT_KEYS;
+  const r = priceCompute(svc, size, freq, cnt);
+  const priceTxt = priceR5(r.lo) === priceR5(r.hi) ? priceChf(r.lo) : priceChf(r.lo) + " – " + priceChf(r.hi).replace("CHF ","");
+  const monthTxt = svc === 0 ? priceChf(r.lo*VISITS_PER_MONTH[freq]) + " – " + priceChf(r.hi*VISITS_PER_MONTH[freq]).replace("CHF ","") : "";
+  const hrsTxt = r.h ? (r.h[0]===r.h[1] ? String(r.h[0]) : r.h[0]+"–"+r.h[1]) : "";
+  const unitLabel = k => svc===0 ? (PRICE_UNIT.reg[k]*r.rate).toFixed(0) : (svc===1 ? PRICE_UNIT.deep : PRICE_UNIT.move)[k];
+  const fromLabel = i => i===1 ? priceChf(priceHomeTotal("deep", PRICE_SIZE_PRESETS[0]))+".–" : i===2 ? priceChf(priceHomeTotal("move", PRICE_SIZE_PRESETS[0]))+".–" : `CHF ${priceRateOf(i)}.–/h`;
 
-  const sizes = svc <= 2 ? ROOMS : svc === 3 ? GARDEN : REPAIR;
-  const sz = Math.min(size, sizes.length - 1);
-  const r = priceCompute(svc, sz);
-  const priceTxt = r.lo === r.hi ? priceChf(r.lo) : priceChf(r.lo) + " – " + priceChf(r.hi).replace("CHF ", "");
-  const hTxt = r.h[0] === r.h[1] ? String(r.h[0]) : r.h[0] + "–" + r.h[1];
-  const monthTxt = svc === 0 ? priceChf(r.lo * VISITS_PER_MONTH[freq]) + " – " + priceChf(r.hi * VISITS_PER_MONTH[freq]).replace("CHF ", "") : "";
+  const pickSvc = i => {
+    if(i===svc) return;
+    const wasHome = svc<=2, nowHome = i<=2;
+    if(wasHome!==nowHome){ setSize(nowHome?2:1); if(nowHome) setCnt({...PRICE_SIZE_PRESETS[2]}); }
+    setSvc(i);
+  };
+  const pickSize = i => { setSize(i); if(isHome) setCnt({...PRICE_SIZE_PRESETS[i]}); };
+  const setCount = (k,v) => { setCnt(c=>({...c,[k]:Math.max(0,Math.min(PRICE_CNT_MAX[k],Number(v)||0))})); setSize(-1); };
+
   const incl = [
     L("Gratis Besichtigung vor Ort","Visita gratis a domicilio","Free on-site visit","Sopralluogo gratuito"),
     L("Kostenlose, unverbindliche Offerte","Presupuesto gratuito y sin compromiso","Free, no-obligation quote","Preventivo gratuito e senza impegno"),
     ...(svc === 2 ? [L("Abnahmegarantie bei der Wohnungsabgabe","Garantía de entrega del piso","Apartment handover guarantee","Garanzia di consegna dell'appartamento")] : []),
     L("Schnelle Antwort per WhatsApp","Respuesta rápida por WhatsApp","Fast reply via WhatsApp","Risposta rapida via WhatsApp"),
   ];
+  const minNote = svc===3 ? L("Mindestens 2 Std. · Grünabfuhr separat","Mínimo 2 h · retirada de restos verdes aparte","Minimum 2 h · green waste extra","Minimo 2 h · smaltimento verde a parte")
+    : svc===4 ? L("Mindestens 1 Std. · Material separat","Mínimo 1 h · material aparte","Minimum 1 h · material extra","Minimo 1 h · materiale a parte")
+    : svc===0 ? L("Mindestens 2 Std. pro Einsatz","Mínimo 2 h por visita","Minimum 2 h per visit","Minimo 2 h per intervento")
+    : L("Die Spanne hängt vom Zustand der Wohnung ab.","El rango depende del estado de la vivienda.","The range depends on the condition of the home.","L'intervallo dipende dallo stato dell'abitazione.");
 
+  // Message for the client: counts and total, never the internal per-item prices
   const client = (clients||[]).find(c=>c.id===clientId);
   const greet = client ? `${L("Guten Tag","Hola","Hello","Buongiorno")} ${client.name},` : `${L("Guten Tag","Hola","Hello","Buongiorno")},`;
+  const sizeName = size>=0 ? sizes[Math.min(size,sizes.length-1)] : L("Individuell","Personalizado","Custom","Personalizzato");
+  const homeLine = isHome ? `• ${keys.map(k=>`${ITEMS[PRICE_CNT_KEYS.indexOf(k)]}: ${cnt[k]}`).join(", ")}\n` : "";
   const msg = `${greet}\n\n${L("Gerne senden wir Ihnen unseren Richtpreis","Le enviamos nuestro precio orientativo","Here is our indicative price","Le inviamo il nostro prezzo indicativo")}:\n`+
-    `• ${SVCS[svc].name} – ${sizes[sz]}${svc===0?` (${FREQS[freq]})`:""}\n`+
-    `• ${L("Ca.","Aprox.","Approx.","Ca.")} ${hTxt} h × CHF ${r.rate}.–${r.mat?" "+L("+ Material","+ material","+ materials","+ materiale"):""}\n`+
+    `• ${SVCS[svc].name} – ${sizeName}${svc===0?` (${FREQS[freq]})`:""}\n`+ homeLine +
+    (r.home ? "" : `• ${L("Ca.","Aprox.","Approx.","Ca.")} ${hrsTxt} h × CHF ${r.rate}.–${r.mat?" "+L("+ Material","+ material","+ materials","+ materiale"):""}\n`)+
     `• ${L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")}${r.per?" "+L("pro Einsatz","por visita","per visit","per intervento"):""}: ${priceTxt}\n`+
     (svc===0?`• ${L("Pro Monat ca.","Al mes aprox.","Per month approx.","Al mese ca.")}: ${monthTxt}\n`:"")+
     `\n${L("Den genauen Preis bestätigen wir nach der kostenlosen Besichtigung.","El precio final lo confirmamos tras la visita gratis.","We confirm the final price after the free visit.","Il prezzo finale lo confermiamo dopo il sopralluogo gratuito.")}\n\n`+
-    `${L("Freundliche Grüsse","Saludos cordiales","Kind regards","Cordiali saluti")}\nPatjac Reinigung Garten & Services\n${COMPANY_EMAIL}`;
+    `${L("Freundliche Grüsse","Saludos cordiales","Kind regards","Cordiali saluti")}\nPatjac Reinigung Garten Services\n${COMPANY_EMAIL}`;
   const waNum = (()=>{ let d=String(client?.phone||"").replace(/[^\d+]/g,""); if(d.startsWith("+")) d=d.slice(1); else if(d.startsWith("00")) d=d.slice(2); else if(d.startsWith("0")) d="41"+d.slice(1); return /^\d{8,15}$/.test(d)?d:""; })();
   const copy = () => { try{ navigator.clipboard.writeText(msg); notify&&notify(L("Kopiert","Copiado","Copied","Copiato"),"success"); }catch(e){} };
 
-  const opt = (active, acc) => ({border:`1.5px solid ${active?(acc||"#2C5F7C"):CP.border}`,background:active?(acc||"#2C5F7C"):"rgba(0,0,0,0.035)",color:active?"#fff":CP.textPrimary,borderRadius:999,padding:"9px 14px",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:CP.font});
+  const opt = active => ({border:`1.5px solid ${active?"#2C5F7C":CP.border}`,background:active?"#2C5F7C":"#fff",color:active?"#fff":CP.textPrimary,borderRadius:999,padding:"9px 14px",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:CP.font});
   const step = (n,label) => (
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
       <span style={{width:26,height:26,borderRadius:"50%",background:"#2C5F7C",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13}}>{n}</span>
       <span style={{color:CP.textSecondary,fontSize:12,fontWeight:800,letterSpacing:.5,textTransform:"uppercase"}}>{label}</span>
     </div>
   );
+  const line = {display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"3px 0"};
   const abtn = bg => ({background:bg,border:lightBg(bg)?`1px solid ${CP.borderActive}`:"none",borderRadius:12,color:fgOn(bg),padding:"11px 12px",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"center",textDecoration:"none",display:"block",fontFamily:CP.font});
+  let n = 3;
 
   return (
     <CPScreen title={t.pricecalc||"Calculadora de precios"} icon="🧮" onBack={onBack} t={t}>
@@ -10790,11 +10843,11 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
         {step(1,L("Leistung","Servicio","Service","Servizio"))}
         <div data-testid="pc-svcs" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
           {SVCS.map((s,i)=>(
-            <button key={i} onClick={()=>setSvc(i)} aria-pressed={svc===i} style={{textAlign:"left",border:`1.5px solid ${svc===i?s.acc:CP.border}`,background:svc===i?"rgba(0,0,0,0.063)":"rgba(0,0,0,0.021)",boxShadow:svc===i?`0 0 0 3px ${s.acc}44`:"none",borderRadius:14,padding:"10px 12px",cursor:"pointer",color:CP.textPrimary,fontFamily:CP.font,display:"flex",flexDirection:"column",gap:4}}>
+            <button key={i} onClick={()=>pickSvc(i)} aria-pressed={svc===i} style={{textAlign:"left",border:`1.5px solid ${svc===i?s.acc:CP.border}`,background:svc===i?"#f0f6fc":"#fff",boxShadow:svc===i?`0 0 0 3px ${s.acc}33`:"none",borderRadius:12,padding:"10px 12px",cursor:"pointer",color:CP.textPrimary,fontFamily:CP.font,display:"flex",flexDirection:"column",gap:4}}>
               <span style={{fontSize:22}}>{s.ic}</span>
               <span style={{fontWeight:800,fontSize:13.5,lineHeight:1.2}}>{s.name}</span>
               <span style={{color:CP.textTertiary,fontSize:11.5}}>{s.hint}</span>
-              <span style={{color:s.acc,fontSize:12,fontWeight:800}}>{L("ab","desde","from","da")} CHF {priceRateOf(i)}.–/h</span>
+              <span style={{color:s.acc,fontSize:12,fontWeight:800}}>{L("ab","desde","from","da")} {fromLabel(i)}</span>
             </button>
           ))}
         </div>
@@ -10802,42 +10855,62 @@ function PriceCalculatorApp({t,lang,clients,notify,onBack,currentUser}){
       <CPCard style={{marginBottom:12}}>
         {step(2,L("Grösse","Tamaño","Size","Dimensione"))}
         <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-          {sizes.map((x,i)=><button key={i} onClick={()=>setSize(i)} style={opt(sz===i)}>{x}</button>)}
+          {sizes.map((x,i)=><button key={i} onClick={()=>pickSize(i)} style={opt(size===i)}>{x}</button>)}
         </div>
-        {svc===0&&(<div style={{marginTop:14}}>
-          {step(3,L("Häufigkeit","Frecuencia","Frequency","Frequenza"))}
+        {isHome&&(<div style={{marginTop:16}}>
+          {step(n++,L("Details der Wohnung","Detalle de la vivienda","Home details","Dettagli dell'abitazione"))}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {keys.map(k=>{ const i=PRICE_CNT_KEYS.indexOf(k); return (
+              <label key={k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"8px 12px",border:`1px solid ${CP.border}`,borderRadius:10,background:"#fafafa"}}>
+                <span style={{display:"flex",alignItems:"center",gap:10,fontWeight:700,fontSize:14}}>
+                  <span style={{fontSize:18}}>{PRICE_CNT_ICONS[i]}</span>
+                  <span>{ITEMS[i]}<small style={{display:"block",fontWeight:500,fontSize:11.5,color:CP.textTertiary}}>CHF {unitLabel(k)}.– / {ONE[i]}</small></span>
+                </span>
+                <select data-testid={`pc-cnt-${k}`} value={cnt[k]} onChange={e=>setCount(k,e.target.value)} style={{minWidth:80,padding:"8px 10px",borderRadius:8,border:`1.5px solid ${CP.borderActive}`,background:"#fff",fontWeight:800,fontSize:15,fontFamily:CP.font,color:CP.textPrimary}}>
+                  {Array.from({length:PRICE_CNT_MAX[k]+1},(_,v)=><option key={v} value={v}>{v}</option>)}
+                </select>
+              </label>); })}
+          </div>
+        </div>)}
+        {svc===0&&(<div style={{marginTop:16}}>
+          {step(n++,L("Häufigkeit","Frecuencia","Frequency","Frequenza"))}
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {FREQS.map((x,i)=><button key={i} onClick={()=>setFreq(i)} style={opt(freq===i)}>{x}</button>)}
+            {FREQS.map((x,i)=><button key={i} onClick={()=>setFreq(i)} style={opt(freq===i)}>{x}{i===2?` · CHF ${PRICE_MONTHLY}.–/h`:""}</button>)}
           </div>
         </div>)}
       </CPCard>
 
       <div style={{background:"linear-gradient(160deg,#2c5f7c 0%,#173a4d 100%)",borderRadius:CP.radius,padding:"18px 20px",color:"#fff",marginBottom:12}}>
-        <span style={{display:"inline-block",background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.175)",borderRadius:999,padding:"3px 10px",fontSize:12,fontWeight:700}}>✓ {L("Unverbindlich","Sin compromiso","No obligation","Senza impegno")}</span>
+        <span style={{display:"inline-block",background:"rgba(255, 255, 255, .14)",border:"1px solid rgba(255, 255, 255, .25)",borderRadius:999,padding:"3px 10px",fontSize:12,fontWeight:700}}>✓ {L("Unverbindlich","Sin compromiso","No obligation","Senza impegno")}</span>
         <div style={{fontSize:12,fontWeight:800,letterSpacing:.6,textTransform:"uppercase",opacity:.85,marginTop:10}}>{L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")} · {r.per?L("pro Einsatz","por visita","per visit","per intervento"):L("Gesamtpreis","precio total","total price","prezzo totale")}</div>
         <div data-testid="pc-price" style={{fontSize:34,fontWeight:800,lineHeight:1.15,margin:"4px 0 10px"}}>{priceTxt}</div>
-        <div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.098)"}}>
-          <span>{L("Berechnung","Cálculo","Calculation","Calcolo")}</span>
-          <b data-testid="pc-break">{hTxt} h × CHF {r.rate}.–{r.mat?" "+L("+ Material","+ material","+ materials","+ materiale"):""}</b>
+        <div data-testid="pc-break" style={{padding:"9px 12px",borderRadius:10,background:"rgba(255, 255, 255, .08)",border:"1px solid rgba(255, 255, 255, .14)"}}>
+          {r.home ? <>
+            <div style={{fontSize:11,fontWeight:800,letterSpacing:.5,textTransform:"uppercase",opacity:.8,marginBottom:4}}>🔒 {L("Interne Aufschlüsselung","Desglose interno","Internal breakdown","Dettaglio interno")}</div>
+            {r.lines.map((l,i)=>(<div key={i} style={line}><span style={{opacity:.9}}>{l.k==="base"?L("Grundpreis (Eingang, Gänge, Anfahrt)","Base (entrada, pasillos, desplazamiento)","Base (entrance, hallways, travel)","Base (ingresso, corridoi, trasferta)"):`${l.n} × ${ONE[PRICE_CNT_KEYS.indexOf(l.k)]}`}</span><b>CHF {Math.round(l.v).toLocaleString("de-CH")}.–</b></div>))}
+            {svc===0&&<div style={{...line,borderTop:"1px solid rgba(255, 255, 255, .2)",marginTop:4,paddingTop:6,fontWeight:800}}><span>{L("Berechnung","Cálculo","Calculation","Calcolo")}</span><span>{hrsTxt} h × CHF {r.rate}.–</span></div>}
+          </> : <div style={line}><span>{L("Berechnung","Cálculo","Calculation","Calcolo")}</span><b>{hrsTxt} h × CHF {r.rate}.–{r.mat?" "+L("+ Material","+ material","+ materials","+ materiale"):""}</b></div>}
+          <div style={{fontSize:12,opacity:.85,marginTop:4}}>{minNote}</div>
         </div>
-        {svc===0&&<div data-testid="pc-month" style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13.5,padding:"9px 12px",borderRadius:10,background:"rgba(0,0,0,0.035)",border:"1px solid rgba(0,0,0,0.098)",marginTop:6}}>
+        {svc===0&&<div data-testid="pc-month" style={{...line,padding:"9px 12px",borderRadius:10,background:"rgba(255, 255, 255, .08)",border:"1px solid rgba(255, 255, 255, .14)",marginTop:6}}>
           <span>{L("Pro Monat ca.","Al mes aprox.","Per month approx.","Al mese ca.")} ({FREQS[freq]})</span><b>{monthTxt}</b>
         </div>}
         <div style={{fontSize:12,fontWeight:800,letterSpacing:.6,textTransform:"uppercase",opacity:.8,margin:"12px 0 6px"}}>{L("In Ihrer Offerte enthalten","Incluido en tu presupuesto","Included in your quote","Incluso nel preventivo")}</div>
         {incl.map((x,i)=><div key={i} style={{fontSize:13.5,display:"flex",gap:8,marginBottom:4}}><span style={{color:"#8ed3a6"}}>✓</span>{x}</div>)}
         <div style={{fontSize:12,opacity:.8,marginTop:8}}>{L("Richtpreis gemäss unseren Ansätzen. Den genauen Preis bestätigen wir nach der kostenlosen Besichtigung.","Precio orientativo según nuestras tarifas. El precio final lo confirmamos tras la visita gratis.","Indicative price based on our rates. We confirm the final price after the free visit.","Prezzo indicativo secondo le nostre tariffe. Il prezzo finale lo confermiamo dopo il sopralluogo gratuito.")}</div>
-        <div style={{fontSize:11,opacity:.6,marginTop:4}}>{L("Tarife 2026 · Preise in CHF","Tarifas 2026 · precios en CHF","2026 rates · prices in CHF","Tariffe 2026 · prezzi in CHF")}</div>
+        <div style={{fontSize:11,opacity:.6,marginTop:4}}>{L("Tarife 2026 · Preise in CHF · gleiche Preise wie die Webseite","Tarifas 2026 · precios en CHF · mismos precios que la web","2026 rates · prices in CHF · same prices as the website","Tariffe 2026 · prezzi in CHF · stessi prezzi del sito")}</div>
       </div>
 
       <CPCard style={{marginBottom:20}}>
-        <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14,marginBottom:8}}>📤 {L("Richtpreis an Kunden senden","Enviar precio al cliente","Send price to client","Invia prezzo al cliente")}</div>
+        <div style={{color:CP.textPrimary,fontWeight:700,fontSize:14,marginBottom:4}}>📤 {L("Richtpreis an Kunden senden","Enviar precio al cliente","Send price to client","Invia prezzo al cliente")}</div>
+        <div style={{color:CP.textTertiary,fontSize:12,marginBottom:8}}>🔒 {L("Der Kunde sieht nur die Anzahl der Räume und den Gesamtpreis – nie die internen Einzelpreise.","El cliente solo ve las cantidades y el precio total, nunca los precios internos por pieza.","The client only sees the counts and the total, never the internal unit prices.","Il cliente vede solo le quantità e il totale, mai i prezzi interni.")}</div>
         <CPSelect value={clientId} onChange={e=>setClientId(e.target.value)} style={{marginBottom:10}}>
           <option value="">{L("— Kunde wählen (optional) —","— Elegir cliente (opcional) —","— Choose client (optional) —","— Scegli cliente (facoltativo) —")}</option>
           {(clients||[]).filter(c=>c.active!==false).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </CPSelect>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
           <a href={`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer" style={abtn("#25D366")}>💬 WhatsApp{waNum?` → ${client.phone}`:""}</a>
-          <button onClick={copy} style={abtn("rgba(0,0,0,0.098)")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
+          <button onClick={copy} style={abtn("#ffffff")}>📋 {L("Text kopieren","Copiar texto","Copy text","Copia testo")}</button>
         </div>
         <CompanyEmailButtons to={client?.email||""} subject={`${L("Richtpreis","Precio orientativo","Indicative price","Prezzo indicativo")} – ${SVCS[svc].name} – Patjac`} body={msg} lang={lang}/>
       </CPCard>
