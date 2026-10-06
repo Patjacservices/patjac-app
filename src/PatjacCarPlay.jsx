@@ -1243,9 +1243,9 @@ function CPCard({children, style:xs, onClick}){
   );
 }
 
-function CPInput({value,onChange,placeholder,type="text",style:xs,min,max}){
+function CPInput({value,onChange,placeholder,type="text",style:xs,min,max,onFocus,onBlur,inputMode,autoComplete,maxLength,step}){
   const input = (
-    <input type={type} value={value??""} onChange={onChange} placeholder={placeholder} min={min} max={max}
+    <input type={type} value={value??""} onChange={onChange} placeholder={placeholder} min={min} max={max} onFocus={onFocus} onBlur={onBlur} inputMode={inputMode} autoComplete={autoComplete} maxLength={maxLength} step={step}
       style={{
         width:"100%", padding:"12px 16px", background:"#fff",
         border:`1px solid ${CP.border}`, borderBottom:"1px solid #8a8a8a", borderRadius: 6,
@@ -1267,6 +1267,37 @@ function CPSelect({value,onChange,children,style:xs}){
       border:`1px solid ${CP.border}`, borderRadius: CP.radiusSm,
       color: CP.textPrimary, fontSize:15, fontFamily: CP.font, outline:"none", ...xs,
     }}>{children}</select>
+  );
+}
+// Text box with a list of values already used: tap to choose, type only when the value is new
+const comboNorm = x => String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+const uniqVals = arr => { const seen=new Set(), out=[]; (arr||[]).forEach(v=>{ const s=String(v??"").trim(); const k=comboNorm(s); if(s && !seen.has(k)){ seen.add(k); out.push(s); } }); return out.sort((a,b)=>a.localeCompare(b,"de")); };
+function CPCombo({value,onChange,options=[],placeholder,type="text",lang,testId}){
+  const L = makeL(lang||appLang);
+  const [open,setOpen] = useState(false);
+  const v = String(value??"");
+  const q = comboNorm(v);
+  const opts = uniqVals(options.map(o=>typeof o==="string"?o:o?.label));
+  const exact = opts.some(o=>comboNorm(o)===q);
+  const list = (q && !exact ? opts.filter(o=>comboNorm(o).includes(q)) : opts).slice(0,10);
+  return (
+    <div style={{position:"relative"}}>
+      <div style={{position:"relative"}} data-testid={testId}>
+        <CPInput type={type} value={v} placeholder={placeholder||(opts.length?L("Wählen oder neu schreiben…","Elige o escribe uno nuevo…","Choose or type a new one…","Scegli o scrivi uno nuovo…"):"")}
+          onChange={e=>{ onChange(e.target.value); setOpen(true); }} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),180)} style={{paddingRight:opts.length?40:16}}/>
+        {opts.length>0&&<button type="button" tabIndex={-1} aria-label="list" data-testid={testId?`${testId}-toggle`:undefined} onMouseDown={e=>{ e.preventDefault(); setOpen(o=>!o); }}
+          style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",width:30,height:30,border:"none",background:"transparent",cursor:"pointer",fontSize:14,color:CP.textSecondary}}>▾</button>}
+      </div>
+      {open&&(list.length>0||(q&&!exact))&&(
+        <div onMouseDown={e=>e.preventDefault()} style={{position:"absolute",left:0,right:0,top:"100%",marginTop:4,zIndex:50,background:"#fff",border:`1px solid ${CP.borderActive}`,borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,0.14)",maxHeight:240,overflowY:"auto"}}>
+          {list.map(o=>(
+            <button type="button" key={o} data-testid={testId?`${testId}-opt`:undefined} onClick={()=>{ onChange(o); setOpen(false); }}
+              style={{display:"block",width:"100%",textAlign:"left",padding:"10px 12px",border:"none",borderBottom:`1px solid ${CP.border}`,background:comboNorm(o)===q?"rgba(0,103,192,0.08)":"#fff",cursor:"pointer",fontSize:14,fontFamily:CP.font,color:CP.textPrimary}}>{o}</button>
+          ))}
+          {q&&!exact&&<div style={{padding:"8px 12px",fontSize:12.5,color:"#107c10",fontFamily:CP.font}}>➕ {L("Neu","Nuevo","New","Nuovo")}: «{v.trim()}»</div>}
+        </div>
+      )}
+    </div>
   );
 }
 function CPField({label,children}){
@@ -8444,10 +8475,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "management_customer",
      "contentKey": {
-      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.\n\n🧮 CALCULADORA DE PRECIOS (nueva versión, igual que la web)\n🔹 Limpieza a fondo y de mudanza: precio por pieza (dormitorios, salones, cocinas, baños y ventanas) con desplegables; el tamaño elegido rellena las cantidades y puedes cambiarlas (hasta 30 dormitorios).\n🔹 Limpieza regular: horas según las piezas (mínimo 2 h), CHF 40/h o CHF 44/h si es mensual.\n🔹 Jardín mínimo 2 h (restos verdes aparte) y reparaciones mínimo 1 h (material aparte).\n🔹 Tú ves el desglose interno 🔒; el mensaje al cliente solo lleva las cantidades y el precio total.",
-      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.\n\n🧮 PREISRECHNER (neu, wie die Webseite)\n🔹 Grund- und Umzugsreinigung: Preis pro Raum (Schlafzimmer, Wohnzimmer, Küchen, Bäder, Fenster) mit Auswahllisten.\n🔹 Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. oder CHF 44/Std. monatlich.\n🔹 Interne Aufschlüsselung 🔒 nur für Sie; der Kunde erhält nur Anzahl und Gesamtpreis.",
-      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.\n\n🧮 PRICE CALCULATOR (new, same as the website)\n🔹 Deep and move-out cleaning: price per room (bedrooms, living rooms, kitchens, bathrooms, windows) with drop-downs.\n🔹 Regular cleaning: hours by rooms (min. 2 h), CHF 40/h or CHF 44/h monthly.\n🔹 Internal breakdown 🔒 only for you; the client only gets counts and the total.",
-      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti.\n\n🧮 CALCOLATORE PREZZI (nuovo, come il sito)\n🔹 Pulizia a fondo e di trasloco: prezzo per locale (camere, soggiorni, cucine, bagni, finestre) con menu a tendina.\n🔹 Pulizia regolare: ore secondo i locali (min. 2 h), CHF 40/h o CHF 44/h mensile.\n🔹 Dettaglio interno 🔒 solo per te; il cliente riceve solo quantità e totale."
+      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.\n\n🧮 CALCULADORA DE PRECIOS (nueva versión, igual que la web)\n🔹 Limpieza a fondo y de mudanza: precio por pieza (dormitorios, salones, cocinas, baños y ventanas) con desplegables; el tamaño elegido rellena las cantidades y puedes cambiarlas (hasta 30 dormitorios).\n🔹 Limpieza regular: horas según las piezas (mínimo 2 h), CHF 40/h o CHF 44/h si es mensual.\n🔹 Jardín mínimo 2 h (restos verdes aparte) y reparaciones mínimo 1 h (material aparte).\n🔹 Tú ves el desglose interno 🔒; el mensaje al cliente solo lleva las cantidades y el precio total.\n\n📦 ALMACÉN Y PEDIDOS: ELEGIR EN VEZ DE ESCRIBIR\n🔹 En productos, proveedores y pedidos, cada casilla (nombre, proveedor, unidad, ubicación, descripción, contacto, teléfono, e-mail, dirección, web) muestra una lista ▾ con lo que ya escribiste antes: toca y elige.\n🔹 Solo escribes cuando el dato es nuevo (sale «➕ Nuevo: …»).\n🔹 Si escribes un producto o proveedor que ya existe, la app avisa y te ofrece «✏️ Editar ese» para no duplicarlo.\n🔹 Un proveedor nuevo escrito en un producto o pedido se guarda solo; un producto nuevo escrito en un pedido se crea solo (stock 0).",
+      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.\n\n🧮 PREISRECHNER (neu, wie die Webseite)\n🔹 Grund- und Umzugsreinigung: Preis pro Raum (Schlafzimmer, Wohnzimmer, Küchen, Bäder, Fenster) mit Auswahllisten.\n🔹 Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. oder CHF 44/Std. monatlich.\n🔹 Interne Aufschlüsselung 🔒 nur für Sie; der Kunde erhält nur Anzahl und Gesamtpreis.\n\n📦 LAGER & BESTELLUNGEN: WÄHLEN STATT TIPPEN\n🔹 Jedes Feld zeigt eine Liste ▾ der schon verwendeten Werte – antippen und wählen. Nur Neues wird getippt («➕ Neu»).\n🔹 Doppelte Produkte/Lieferanten werden erkannt («✏️ Diesen bearbeiten»). Neue Lieferanten/Produkte aus einer Bestellung werden automatisch gespeichert.",
+      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.\n\n🧮 PRICE CALCULATOR (new, same as the website)\n🔹 Deep and move-out cleaning: price per room (bedrooms, living rooms, kitchens, bathrooms, windows) with drop-downs.\n🔹 Regular cleaning: hours by rooms (min. 2 h), CHF 40/h or CHF 44/h monthly.\n🔹 Internal breakdown 🔒 only for you; the client only gets counts and the total.\n\n📦 STOCK & ORDERS: CHOOSE INSTEAD OF TYPING\n🔹 Every field shows a ▾ list of values already used – tap to choose. Type only when it's new («➕ New»).\n🔹 Duplicate products/suppliers are detected («✏️ Edit that one»). New suppliers/products typed in an order are saved automatically.",
+      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti.\n\n🧮 CALCOLATORE PREZZI (nuovo, come il sito)\n🔹 Pulizia a fondo e di trasloco: prezzo per locale (camere, soggiorni, cucine, bagni, finestre) con menu a tendina.\n🔹 Pulizia regolare: ore secondo i locali (min. 2 h), CHF 40/h o CHF 44/h mensile.\n🔹 Dettaglio interno 🔒 solo per te; il cliente riceve solo quantità e totale.\n\n📦 MAGAZZINO E ORDINI: SCEGLIERE INVECE DI SCRIVERE\n🔹 Ogni campo mostra un elenco ▾ dei valori già usati – tocca e scegli. Scrivi solo se è nuovo («➕ Nuovo»).\n🔹 Prodotti/fornitori doppi vengono segnalati («✏️ Modifica quello»). Nuovi fornitori/prodotti scritti in un ordine si salvano da soli."
      }
     }
    ],
@@ -9568,6 +9599,8 @@ function HelpModal({t, lang, onClose}){
       icon:"📦",
       title:{DE:"Lager & Bestellungen",ES:"Almacén y pedidos",EN:"Inventory & Orders",IT:"Magazzino e ordini"},
       items:[
+        {h:{"DE":"⚡ Schneller erfassen: wählen statt tippen","ES":"⚡ Ingresar más rápido: elegir en vez de escribir","EN":"⚡ Faster entry: choose instead of typing","IT":"⚡ Inserimento rapido: scegliere invece di scrivere"},
+          b:{"ES":"🔹 Toca una casilla (o la flecha ▾): aparece la lista de nombres, proveedores, unidades, ubicaciones, direcciones, teléfonos, etc. que ya usaste. Toca uno y listo.\n🔹 Si el dato no existe, escríbelo: verás «➕ Nuevo: …».\n🔹 Al escribir un producto o proveedor repetido, la app avisa «ya existe» y ofrece «✏️ Editar ese».\n🔹 En un pedido puedes escribir un proveedor o producto nuevo: se guarda automáticamente al guardar el pedido (producto nuevo con stock 0).","DE":"Feld oder ▾ antippen → Liste der bekannten Werte → wählen. Nur Neues tippen («➕ Neu»). Doppelte werden erkannt. Neue Lieferanten/Produkte aus Bestellungen werden automatisch gespeichert.","EN":"Tap a field or ▾ → list of known values → choose. Type only new values («➕ New»). Duplicates are detected. New suppliers/products in orders are saved automatically.","IT":"Tocca un campo o ▾ → elenco dei valori noti → scegli. Scrivi solo i nuovi («➕ Nuovo»). I doppioni vengono segnalati. Nuovi fornitori/prodotti negli ordini si salvano da soli."}},
         {
           h:{DE:"Lagerbestand verwalten",ES:"Gestionar inventario",EN:"Managing Inventory",IT:"Gestire il magazzino"},
           b:{DE:"App '📦 Lager' öffnet 3 Ansichten:\n\n📦 LAGERBESTAND:\n• Produkte nach Kategorie: Reinigung / Garten / Ausrüstung / Sicherheit\n• Suchfunktion\n• Jedes Produkt: Bestand vs. Mindestbestand, Wert CHF, Einheit\n• Farbbalken: Grün (OK) → Gelb (niedrig) → Rot (leer)\n• ⚠️ Warnungen oben: Produkte mit niedrigem/leerem Bestand\n• ＋ Produkt hinzufügen / ✏️ Bearbeiten / 🗑️ Löschen\n• '➕ Bestellung' pro Produkt\n\n🛒 BESTELLUNGEN:\n• Alle Bestellungen an Lieferanten\n• Status: 🟡 Ausstehend / 🟢 Geliefert / 🔴 Storniert\n• Status ändern → fliesst in Finanzberechnung ein!\n\n🏭 LIEFERANTEN:\n• Kontaktdaten, Kategorie, Bewertung\n• Hinzufügen / Bearbeiten",
@@ -9932,6 +9965,14 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
   const lowStockProducts = products.filter(p=>p.stock<=p.minStock);
   const outOfStockProducts = products.filter(p=>p.stock===0);
   const prPrice = p => Number(p.price ?? p.unitPrice ?? 0);
+  // Existing supplier by name, or create it when the name is new (so nothing is typed twice)
+  const findOrAddSupplier = (name, category) => {
+    const nm = String(name||"").trim(); if(!nm) return "";
+    const ex = suppliers.find(x=>comboNorm(x.name)===comboNorm(nm)); if(ex) return ex.id;
+    const id = gid(); setSuppliers(prev=>[...prev,{id,name:nm,contact:"",phone:"",email:"",address:"",category:category||"cleaning",paymentDays:30,rating:4}]);
+    notify(`➕ ${L("Neuer Lieferant gespeichert","Proveedor nuevo guardado","New supplier saved","Nuovo fornitore salvato")}: ${nm}`,"info");
+    return id;
+  };
   const totalStockValue = products.reduce((s,p)=>s+Number(p.stock||0)*prPrice(p),0);
   const pendingOrders = orders.filter(o=>o.status==="pending").length;
 
@@ -10252,32 +10293,41 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       )}
 
       {/* ── PRODUCT MODAL ── */}
+      <style>{`@media (max-width:560px){.ord-row{grid-template-columns:1fr 1fr auto !important}.ord-row>:first-child{grid-column:1 / -1}}`}</style>
       {modal==="order"&&(()=>{
         const items=form.items||[];
         const setIt=(i,patch)=>setForm(f=>{const it=[...(f.items||[])]; it[i]={...it[i],...patch}; return {...f,items:it};});
         const total=items.reduce((a,i)=>a+(Number(i.qty)||0)*(Number(i.price)||0),0);
         const saveOrder=()=>{
-          const sup=suppliers.find(x=>x.id===form.supplierId);
-          const its=items.filter(i=>i.productId).map(i=>{const pr=products.find(x=>x.id===i.productId); const q=Number(i.qty)||0, pc=Number(i.price)||0; return {productId:i.productId,productName:pr?pName(pr):"",qty:q,price:pc,total:Math.round(q*pc*100)/100};});
+          const supName = form._supName ?? (suppliers.find(x=>x.id===form.supplierId)?.name||"");
+          const supId = findOrAddSupplier(supName);
+          const sup = suppliers.find(x=>x.id===supId) || (supId?{id:supId,name:String(supName).trim()}:null);
+          // items typed with a new name become new products (stock 0)
+          const newProds=[];
+          const its=items.map(i=>{
+            const nm=String(i.name ?? (products.find(x=>x.id===i.productId)?pName(products.find(x=>x.id===i.productId)):"")).trim(); if(!nm) return null;
+            let pr=products.find(x=>x.id===i.productId) || products.find(x=>comboNorm(pName(x))===comboNorm(nm)||comboNorm(x.name)===comboNorm(nm));
+            if(!pr){ pr={id:gid(),name:nm,category:"cleaning",unit:"Stück",stock:0,minStock:0,price:Number(i.price)||0,supplier:supId||"",icon:"📦"}; newProds.push(pr); }
+            const q=Number(i.qty)||0, pc=Number(i.price)||0; return {productId:pr.id,productName:pName(pr)||pr.name,qty:q,price:pc,total:Math.round(q*pc*100)/100};
+          }).filter(Boolean);
           if(!sup||!its.length){ notify(L("Lieferant und mindestens ein Artikel nötig","Elija proveedor y al menos un producto","Choose supplier and at least one item","Scegli fornitore e almeno un articolo"),"error"); return; }
+          if(newProds.length){ setProducts(prev=>[...prev,...newProds]); notify(`➕ ${newProds.length} ${L("neue Produkte gespeichert","productos nuevos guardados","new products saved","nuovi prodotti salvati")}`,"info"); }
           setOrders(prev=>[{id:gid(),supplierId:sup.id,supplierName:sup.name,date:form.date,deliveryDate:form.deliveryDate||null,status:"pending",items:its,total:Math.round(total*100)/100,notes:form.notes||""},...prev]);
           notify(t.success,"success"); setModal(null);
         };
         return (
           <CPModal title={`📦 ${L("Neue Bestellung","Nuevo pedido","New order","Nuovo ordine")}`} onClose={()=>setModal(null)} width={600}>
             <CPField label={L("Lieferant","Proveedor","Supplier","Fornitore")}>
-              <CPSelect value={form.supplierId} onChange={e=>setForm(f=>({...f,supplierId:e.target.value}))}>{suppliers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</CPSelect>
+              <CPCombo testId="inv-osup" lang={lang} value={form._supName ?? (suppliers.find(x=>x.id===form.supplierId)?.name||"")} onChange={v=>setForm(f=>({...f,_supName:v}))} options={suppliers.map(x=>x.name)}/>
             </CPField>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>
               <CPField label={L("Datum","Fecha","Date","Data")}><CPInput type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
               <CPField label={L("Lieferung","Entrega","Delivery","Consegna")}><CPInput type="date" value={form.deliveryDate} onChange={e=>setForm(f=>({...f,deliveryDate:e.target.value}))}/></CPField>
             </div>
             {items.map((it,i)=>(
-              <div key={it._k||i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr auto",gap:6,marginBottom:6}}>
-                <CPSelect value={it.productId} onChange={e=>{const pr=products.find(x=>x.id===e.target.value); setIt(i,{productId:e.target.value,price:pr?prPrice(pr):0});}}>
-                  <option value="">— {L("Artikel","Producto","Item","Articolo")} —</option>
-                  {products.map(pr=><option key={pr.id} value={pr.id}>{pName(pr)}</option>)}
-                </CPSelect>
+              <div key={it._k||i} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 80px 90px auto",gap:6,marginBottom:8,alignItems:"start"}} className="ord-row">
+                <CPCombo testId="inv-oitem" lang={lang} placeholder={L("Artikel wählen oder neu","Elige o escribe producto","Choose or type item","Scegli o scrivi articolo")} value={it.name ?? (products.find(x=>x.id===it.productId)?pName(products.find(x=>x.id===it.productId)):"")}
+                  onChange={v=>{ const pr=products.find(x=>comboNorm(pName(x))===comboNorm(v)); setIt(i,pr?{name:v,productId:pr.id,price:prPrice(pr)}:{name:v,productId:""}); }} options={products.map(pName)}/>
                 <CPInput type="number" value={it.qty} onChange={e=>setIt(i,{qty:e.target.value})} placeholder={L("Menge","Cant.","Qty","Qtà")}/>
                 <CPInput type="number" value={it.price} onChange={e=>setIt(i,{price:e.target.value})} placeholder="CHF"/>
                 <CPBtn size="sm" variant="danger" onClick={()=>setForm(f=>({...f,items:f.items.filter((_,k)=>k!==i)}))}>✕</CPBtn>
@@ -10299,7 +10349,12 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <ImagePicker value={form.image} onChange={v=>setForm(f=>({...f,image:v||""}))} lang={lang} round={false} capture="environment" fallback={form.icon||"📦"}/>
           </CPField>
           <CPField label={t.productName||"Name"}>
-            <CPInput value={form.name||""} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>
+            <CPCombo testId="inv-pname" lang={lang} value={form.name||""} onChange={v=>setForm(f=>({...f,name:v}))} options={products.filter(p=>p.id!==selId).map(p=>p.name)}/>
+            {(()=>{ const dup=products.find(p=>p.id!==selId && comboNorm(p.name)===comboNorm(form.name)); return dup?(
+              <div style={{marginTop:6,background:"rgba(197,90,0,0.08)",border:"1px solid rgba(197,90,0,0.35)",borderRadius:8,padding:"8px 10px",fontSize:12.5,color:"#9a5b00",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                ⚠️ {L("Dieses Produkt gibt es schon","Este producto ya existe","This product already exists","Questo prodotto esiste già")} ({dup.stock??0} {dup.unit||""})
+                <CPBtn size="sm" variant="secondary" onClick={()=>{ setSelId(dup.id); setForm({...dup}); }}>✏️ {L("Dieses bearbeiten","Editar ese producto","Edit that one","Modifica quello")}</CPBtn>
+              </div>):null; })()}
           </CPField>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.productCategory||"Category"}>
@@ -10312,12 +10367,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
               </CPSelect>
             </CPField>
             <CPField label={t.unit||"Unit"}>
-              <CPSelect value={form.unit||"Liter"} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}>
-                <option value="Liter">{t.unitLiter||"Litres"}</option>
-                <option value="kg">kg</option>
-                <option value="Stück">{t.unitPcs||"Pcs"}</option>
-                <option value="Pack">{t.unitPack||"Pack"}</option>
-              </CPSelect>
+              <CPCombo lang={lang} value={form.unit??"Liter"} onChange={v=>setForm(f=>({...f,unit:v}))} options={["Liter","kg","Stück","Pack","Flasche","Rolle","Karton",...products.map(p=>p.unit)]}/>
             </CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 12px"}}>
@@ -10332,15 +10382,13 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             </CPField>
           </div>
           <CPField label={t.supplier||"Supplier"}>
-            <CPSelect value={form.supplier||"s1"} onChange={e=>setForm(f=>({...f,supplier:e.target.value}))}>
-              {suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-            </CPSelect>
+            <CPCombo testId="inv-psup" lang={lang} value={form._supName ?? (suppliers.find(x=>x.id===form.supplier)?.name||"")} onChange={v=>setForm(f=>({...f,_supName:v}))} options={suppliers.map(x=>x.name)}/>
           </CPField>
           <CPField label={t.description||"Desc"}>
-            <CPInput value={form.description||""} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/>
+            <CPCombo lang={lang} value={form.description||""} onChange={v=>setForm(f=>({...f,description:v}))} options={products.map(p=>p.description)}/>
           </CPField>
           <CPField label={t.locationLabel||"Location"}>
-            <CPInput value={form.location||""} onChange={e=>setForm(f=>({...f,location:e.target.value}))}/>
+            <CPCombo lang={lang} value={form.location||""} onChange={v=>setForm(f=>({...f,location:v}))} options={products.map(p=>p.location)}/>
           </CPField>
           <div style={{display:"flex",gap:8,justifyContent:"space-between",marginTop:6}}>
             <div>
@@ -10349,9 +10397,12 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <div style={{display:"flex",gap:8}}>
               <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.cancel}</CPBtn>
               <CPBtn onClick={()=>{
-                if(!form.name){notify(t.error,"error");return;}
-                if(selId) setProducts(prev=>prev.map(p=>p.id===selId?{...p,...form}:p));
-                else setProducts(prev=>[...prev,{...form,id:gid()}]);
+                if(!String(form.name||"").trim()){notify(t.error,"error");return;}
+                const {_supName, ...clean} = form;
+                clean.name = String(clean.name).trim();
+                if(_supName!==undefined){ const supId = findOrAddSupplier(_supName, clean.category); clean.supplier = supId || ""; }
+                if(selId) setProducts(prev=>prev.map(p=>p.id===selId?{...p,...clean}:p));
+                else setProducts(prev=>[...prev,{...clean,id:gid()}]);
                 notify(t.success);setModal(null);
               }}>💾 {t.save}</CPBtn>
             </div>
@@ -10363,24 +10414,29 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       {modal==="supplier"&&(
         <CPModal title={selId?t.editProduct:t.addSupplier} onClose={()=>setModal(null)} width={480}>
           <CPField label={t.supplierName||"Name"}>
-            <CPInput value={form.name||""} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>
+            <CPCombo testId="inv-sname" lang={lang} value={form.name||""} onChange={v=>setForm(f=>({...f,name:v}))} options={suppliers.filter(x=>x.id!==selId).map(x=>x.name)}/>
+            {(()=>{ const dup=suppliers.find(x=>x.id!==selId && comboNorm(x.name)===comboNorm(form.name)); return dup?(
+              <div style={{marginTop:6,background:"rgba(197,90,0,0.08)",border:"1px solid rgba(197,90,0,0.35)",borderRadius:8,padding:"8px 10px",fontSize:12.5,color:"#9a5b00",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                ⚠️ {L("Diesen Lieferanten gibt es schon","Este proveedor ya existe","This supplier already exists","Questo fornitore esiste già")}
+                <CPBtn size="sm" variant="secondary" onClick={()=>{ setSelId(dup.id); setForm({...dup}); }}>✏️ {L("Diesen bearbeiten","Editar ese proveedor","Edit that one","Modifica quello")}</CPBtn>
+              </div>):null; })()}
           </CPField>
           <CPField label={L("Kontaktperson","Persona de contacto","Contact person","Persona di contatto")}>
-            <CPInput value={form.contact||""} onChange={e=>setForm(f=>({...f,contact:e.target.value}))}/>
+            <CPCombo lang={lang} value={form.contact||""} onChange={v=>setForm(f=>({...f,contact:v}))} options={suppliers.map(x=>x.contact)}/>
           </CPField>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.supplierPhone||"Phone"}>
-              <CPInput value={form.phone||""} onChange={e=>setForm(f=>({...f,phone:e.target.value}))}/>
+              <CPCombo lang={lang} type="tel" value={form.phone||""} onChange={v=>setForm(f=>({...f,phone:v}))} options={suppliers.map(x=>x.phone)}/>
             </CPField>
             <CPField label={t.supplierEmail||"Email"}>
-              <CPInput type="email" value={form.email||""} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>
+              <CPCombo lang={lang} type="email" value={form.email||""} onChange={v=>setForm(f=>({...f,email:v}))} options={suppliers.map(x=>x.email)}/>
             </CPField>
           </div>
           <CPField label={t.address||"Address"}>
-            <CPInput value={form.address||""} onChange={e=>setForm(f=>({...f,address:e.target.value}))}/>
+            <CPCombo lang={lang} value={form.address||""} onChange={v=>setForm(f=>({...f,address:v}))} options={suppliers.map(x=>x.address)}/>
           </CPField>
           <CPField label={L("Webseite","Página web","Website","Sito web")}>
-            <CPInput value={form.website||""} onChange={e=>setForm(f=>({...f,website:e.target.value}))} placeholder="https://"/>
+            <CPCombo lang={lang} value={form.website||""} onChange={v=>setForm(f=>({...f,website:v}))} options={suppliers.map(x=>x.website)} placeholder="https://"/>
           </CPField>
           <CPField label={L("Notizen / Angebote","Notas / ofertas","Notes / offers","Note / offerte")}>
             <CPInput value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/>
@@ -10401,7 +10457,8 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:6}}>
             <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.cancel}</CPBtn>
             <CPBtn onClick={()=>{
-              if(!form.name){notify(t.error,"error");return;}
+              if(!String(form.name||"").trim()){notify(t.error,"error");return;}
+              if(!selId && suppliers.some(x=>comboNorm(x.name)===comboNorm(form.name))){ notify(L("Diesen Lieferanten gibt es schon","Este proveedor ya existe","This supplier already exists","Questo fornitore esiste già"),"warning"); return; }
               if(selId) setSuppliers(prev=>prev.map(s=>s.id===selId?{...s,...form}:s));
               else setSuppliers(prev=>[...prev,{...form,id:gid(),rating:4}]);
               notify(t.success);setModal(null);
