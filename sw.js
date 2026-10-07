@@ -6,9 +6,10 @@ self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: "Patjac", body: e.data ? e.data.text() : "" }; }
   e.waitUntil((async () => {
-    // if the app is open and in front, it already shows the alert itself
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    if (wins.some((w) => w.visibilityState === "visible" && w.focused)) return;
+    // if the app is open in front, hand the alert to the app so it shows it inside (no lost alerts)
+    const front = wins.filter((w) => w.visibilityState === "visible" && w.focused);
+    if (front.length) { front.forEach((w) => w.postMessage({ type: "push", title: d.title, body: d.body, tag: d.tag })); return; }
     await self.registration.showNotification(d.title || "Patjac", {
       body: d.body || "",
       tag: d.tag || undefined,
