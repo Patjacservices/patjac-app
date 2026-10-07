@@ -1243,9 +1243,9 @@ function CPCard({children, style:xs, onClick}){
   );
 }
 
-function CPInput({value,onChange,placeholder,type="text",style:xs,min,max,onFocus,onBlur,inputMode,autoComplete,maxLength,step}){
+function CPInput({value,onChange,placeholder,type="text",style:xs,min,max,onFocus,onBlur,inputMode,autoComplete,maxLength,step,testId}){
   const input = (
-    <input type={type} value={value??""} onChange={onChange} placeholder={placeholder} min={min} max={max} onFocus={onFocus} onBlur={onBlur} inputMode={inputMode} autoComplete={autoComplete} maxLength={maxLength} step={step}
+    <input type={type} value={value??""} onChange={onChange} placeholder={placeholder} min={min} max={max} onFocus={onFocus} onBlur={onBlur} inputMode={inputMode} autoComplete={autoComplete} maxLength={maxLength} step={step} data-testid={testId}
       style={{
         width:"100%", padding:"12px 16px", background:"#fff",
         border:`1px solid ${CP.border}`, borderBottom:"1px solid #8a8a8a", borderRadius: 6,
@@ -1866,7 +1866,7 @@ export default function PatjacCarPlay(){
         setProducts(cached('patjac_products', DEMO_PRODUCTS));
         setSuppliers(cached('patjac_suppliers', DEMO_SUPPLIERS));
         setDbReady(true);
-        setDbError("Sin conexión a base de datos — mostrando la última copia guardada en este dispositivo");
+        setDbError(makeL(lang)("Keine Datenbankverbindung – letzte gespeicherte Kopie auf diesem Gerät","Sin conexión a base de datos — mostrando la última copia guardada en este dispositivo","No database connection – showing the last copy saved on this device","Nessuna connessione al database – ultima copia salvata su questo dispositivo"));
       }
     };
     load();
@@ -2006,7 +2006,7 @@ export default function PatjacCarPlay(){
     let alive = true;
     const poll = async () => {
       try{
-        const r = await docsFetch("material_requests?status=eq.pending&select=id,employee_name,product_name,qty,client_name&order=created_at.desc&limit=50");
+        const r = await docsFetch("material_requests?status=eq.pending&select=id,employee_name,product_id,product_name,qty,client_name&order=created_at.desc&limit=50");
         if(!alive || !Array.isArray(r)) return;
         const first = seenMatRef.current===null;
         if(first) seenMatRef.current = new Set();
@@ -2018,9 +2018,9 @@ export default function PatjacCarPlay(){
           const more = fresh.length>1 ? ` (+${fresh.length-1})` : "";
           notify(first
             ? `🧴 ${L("Offene Materialanfragen","Solicitudes de material pendientes","Pending material requests","Richieste di materiale in attesa")}: ${r.length} → ${L("Lager","Almacén","Inventory","Magazzino")} › 📨`
-            : `🧴 ${x.employee_name||""} ${L("bittet um Material","pide material","requests material","chiede materiale")}: ${x.product_name} × ${x.qty}${x.client_name?" · "+x.client_name:""}${more}`, "warning", 10000);
+            : `🧴 ${x.employee_name||""} ${L("bittet um Material","pide material","requests material","chiede materiale")}: ${prodName(products.find(p=>p.id===x.product_id)||{name:x.product_name},lang)} × ${x.qty}${x.client_name?" · "+x.client_name:""}${more}`, "warning", 10000);
           try{ navigator.vibrate && navigator.vibrate([200,100,200]); }catch(e){}
-          if(!first && document.hidden) localNotify("🧴 Patjac", {body:`${x.employee_name||""}: ${x.product_name} × ${x.qty}`, tag:"mat-"+x.id});
+          if(!first && document.hidden) localNotify("🧴 Patjac", {body:`${x.employee_name||""}: ${prodName(products.find(p=>p.id===x.product_id)||{name:x.product_name},lang)} × ${x.qty}`, tag:"mat-"+x.id});
         }
       }catch(e){}
     };
@@ -2422,7 +2422,7 @@ export default function PatjacCarPlay(){
               ))}
             </div>
           )}
-          {!isMobile&&<span style={{color:CP.textSecondary,fontSize:12.5,whiteSpace:"nowrap"}}>{currentUser?.role==="admin"?"👑":"👤"} {currentUser?.name}</span>}
+          {!isMobile&&<span style={{color:CP.textSecondary,fontSize:12.5,whiteSpace:"nowrap"}}>{currentUser?.role==="admin"?"👑":"👤"} {currentUser?.role==="admin"?L("Administrator","Administrador","Administrator","Amministratore"):currentUser?.name}</span>}
           <button onClick={handleLogout} title={L("Abmelden","Cerrar sesión","Log out","Esci")} style={topIconBtn}>⏻</button>
         </div>
       </div>
@@ -2470,7 +2470,7 @@ export default function PatjacCarPlay(){
               jobs={jobs} invoices={invoices} clients={clients} employees={employees}
               notify={notify} messages={messages} onIssueInvoice={g=>{setInvoicePrefill(g); openApp("invoices");}}
               lastBackupAt={companySettings.lastBackupAt} onBackup={doBackup} backupBusy={backupBusy}
-              matPending={matPending} onOpenMat={()=>{ INV_OPEN.view="requests"; openApp("inventory"); }}/>
+              matPending={matPending.map(x=>({...x,product_name:prodName(products.find(p=>p.id===x.product_id)||{name:x.product_name},lang)}))} onOpenMat={()=>{ INV_OPEN.view="requests"; openApp("inventory"); }}/>
           )}
         </div>
       </div>
@@ -2698,7 +2698,7 @@ function AppTile({app,label,onOpen,badge}){
   const [hov,setHov]=useState(false);
   const mob=useIsMobile();
   return (
-    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e=>{if(e.key==="Enter")onOpen();}}
+    <div data-apptile={app.id} role="button" tabIndex={0} onClick={onOpen} onKeyDown={e=>{if(e.key==="Enter")onOpen();}}
       onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
       style={{position:"relative",background:hov?"#f6f6f6":"#fff",border:`1px solid ${hov?CP.borderActive:CP.border}`,borderRadius:10,
         height:mob?80:104,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:mob?4:8,cursor:"pointer",
@@ -2765,6 +2765,57 @@ function EmployeeOffShiftScreen({lang,t,currentUser,shift,openApp,clock}){
       </div>
     </div>
   );
+}
+
+// ─── Product names / descriptions / units in the 4 languages ─────────
+// "name" is what the admin typed; "names" = {DE,ES,EN,IT} filled automatically (and editable).
+const LANGS4 = ["DE","ES","EN","IT"];
+const prodName = (p, lang) => (p && ((p.names && p.names[lang]) || p.name)) || "";
+const prodDesc = (p, lang) => (p && ((p.descriptions && p.descriptions[lang]) || p.description)) || "";
+const UNIT_I18N = [
+  ["Stück","Unidad","Piece","Pezzo","Stk","Stk.","pcs","pz","ud","ud.","unidades","pieza"],
+  ["Liter","Litro","Litre","Litro","l","lt","Liter"],
+  ["kg","kg","kg","kg"],
+  ["Pack","Paquete","Pack","Confezione","Packung"],
+  ["Flasche","Botella","Bottle","Bottiglia"],
+  ["Rolle","Rollo","Roll","Rotolo"],
+  ["Karton","Caja","Box","Scatola","Cartón"],
+  ["Paar","Par","Pair","Paio"],
+  ["Set","Juego","Set","Set"],
+  ["Meter","Metro","Metre","Metro","m"],
+];
+const unitLabel = (u, lang) => {
+  if(!u) return "";
+  const k = String(u).trim().toLowerCase();
+  const row = UNIT_I18N.find(r=>r.some(x=>x.toLowerCase()===k));
+  return row ? row[Math.max(0,LANGS4.indexOf(lang))] : u;
+};
+const unitOptions = (lang, extra=[]) => [...new Set([...UNIT_I18N.map(r=>r[Math.max(0,LANGS4.indexOf(lang))]), ...extra.map(u=>unitLabel(u,lang))].filter(Boolean))];
+// Automatic translation (free services, no key). Returns null when offline / not available.
+async function translateText(text, to){
+  const tl = {DE:"de",ES:"es",EN:"en",IT:"it"}[to]; const q = String(text||"").trim();
+  if(!q || !tl) return null;
+  const cap = x => x ? x.charAt(0).toUpperCase()+x.slice(1) : x;
+  try{
+    const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), 7000);
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${tl}&dt=t&q=${encodeURIComponent(q)}`, {signal:ctl.signal});
+    clearTimeout(tm);
+    const j = await r.json(); const out = (j && j[0] || []).map(x=>x && x[0] || "").join("").trim();
+    if(out) return cap(out);
+  }catch(e){}
+  try{
+    const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), 7000);
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(q)}&langpair=Autodetect|${tl}`, {signal:ctl.signal});
+    clearTimeout(tm);
+    const j = await r.json(); const out = j && j.responseData && j.responseData.translatedText;
+    if(out && !/MYMEMORY|INVALID|QUERY LENGTH/i.test(out)) return cap(String(out).trim());
+  }catch(e){}
+  return null;
+}
+async function translateAll(text, keep={}){
+  const res = {...keep};
+  await Promise.all(LANGS4.map(async l=>{ if(!res[l]){ const t = await translateText(text, l); if(t) res[l] = t; } }));
+  return res;
 }
 
 // Lets the admin home card open "Almacén" directly on the 📨 Requests tab
@@ -2855,7 +2906,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
             boxShadow:isClockedIn?"none":"0 8px 24px rgba(16,152,173,0.4)",
           }}>
             <span style={{fontSize:32}}>🟢</span>
-            <span style={{fontSize:15,fontWeight:700}}>{isClockedIn?(t.clockedIn||"Eingecheckt"):(t.clockIn||"Arbeitsbeginn")}</span>
+            <span style={{fontSize:15,fontWeight:700}}>{isClockedIn?(t.clockedIn||L("Eingecheckt","Entrada fichada","Clocked in","Entrata registrata")):(t.clockIn||"Arbeitsbeginn")}</span>
             {todayClock?.clockIn&&<span style={{fontSize:12,opacity:.75}}>{t.since||"Since"}: {todayClock.clockIn}</span>}
           </button>
           <button onClick={()=>openApp("timeclock")} style={{
@@ -2866,7 +2917,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
             boxShadow:isClockedIn?"0 8px 24px rgba(201,42,42,0.4)":"none",
           }}>
             <span style={{fontSize:32}}>🔴</span>
-            <span style={{fontSize:15,fontWeight:700}}>{todayClock?.clockOut?(t.clockedOut||"Ausgecheckt"):(t.clockOut||"Arbeitsende")}</span>
+            <span style={{fontSize:15,fontWeight:700}}>{todayClock?.clockOut?(t.clockedOut||L("Ausgecheckt","Salida fichada","Clocked out","Uscita registrata")):(t.clockOut||"Arbeitsende")}</span>
             {todayClock?.clockOut&&<span style={{fontSize:12,opacity:.75}}>{t.at||"At"}: {todayClock.clockOut}</span>}
           </button>
         </div>
@@ -2880,7 +2931,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
             <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
               {todayClock?.clockIn&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.clockIn}</div><div style={{color:"#107c10",fontWeight:700,fontSize:18}}>{todayClock.clockIn}</div></div>}
               {todayClock?.clockOut&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.clockOut}</div><div style={{color:"#c42b1c",fontWeight:700,fontSize:18}}>{todayClock.clockOut}</div></div>}
-              {todayClock?.hours&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.workHours||"Std."}</div><div style={{color:"#9a5b00",fontWeight:700,fontSize:18}}>{parseFloat(todayClock.hours).toFixed(1)}h</div></div>}
+              {todayClock?.hours&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.workHours||L("Std.","Horas","Hours","Ore")}</div><div style={{color:"#9a5b00",fontWeight:700,fontSize:18}}>{parseFloat(todayClock.hours).toFixed(1)}h</div></div>}
               {todayJobs.length>0&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{t.todayJobs}</div><div style={{color:"#0067c0",fontWeight:700,fontSize:18}}>{completedCount}/{todayJobs.length}</div></div>}
               {unread>0&&<div><div style={{color:CP.textTertiary,fontSize:10}}>{lang==="DE"?"Neu":lang==="ES"?"Nuevo":lang==="IT"?"Nuovo":"New"}</div><div style={{color:"#D6336C",fontWeight:700,fontSize:18}}>{unread} 💬</div></div>}
             </div>
@@ -2895,7 +2946,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
             if(app.id==="jobs"){ badge=pendingCount>0?pendingCount:null; sublabel=`${todayJobs.length} ${t.today2||"today"}`; }
             if(app.id==="documents") sublabel=L("Lohn · Verträge","Nóminas · contratos","Pay · contracts","Paga · contratti");
             if(app.id==="messaging"){ badge=unread>0?unread:null; sublabel=unread>0?`${unread} ${lang==="DE"?"neu":lang==="ES"?"nuevo":lang==="IT"?"nuovo":"new"}`:null; }
-            if(app.id==="routes"){ const r=jobs.filter(j=>j.employeeId===currentUser?.id&&j.date===todayStr); sublabel=`${r.length} stops`; }
+            if(app.id==="routes"){ const r=jobs.filter(j=>j.employeeId===currentUser?.id&&j.date===todayStr); sublabel=`${r.length} ${L("Stopps","paradas","stops","tappe")}`; }
             return (
               <EmployeeAppTile key={app.id} app={app}
                 label={app.id==="payroll"?(t.payrollTitle||"Payroll"):t[app.id]||app.id}
@@ -2957,7 +3008,7 @@ function EmployeeHomeScreen({t,openApp,clock,lang,currentUser,jobs,timeclock,mes
 function EmployeeAppTile({app,label,sublabel,badge,isClockedIn,onOpen}){
   const [hov,setHov]=useState(false);
   return (
-    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e=>{if(e.key==="Enter")onOpen();}} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    <div data-emptile={app.id} role="button" tabIndex={0} onClick={onOpen} onKeyDown={e=>{if(e.key==="Enter")onOpen();}} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
       style={{background:hov?"#f6f6f6":"#fff",border:`1px solid ${hov?CP.borderActive:CP.border}`,borderRadius:10,padding:"18px 12px",cursor:"pointer",transition:"all .15s",
         display:"flex",flexDirection:"column",alignItems:"center",gap:6,position:"relative",boxShadow:hov?"0 4px 12px rgba(0,0,0,0.08)":"0 1px 2px rgba(0,0,0,0.04)"}}>
       {badge&&<span style={{position:"absolute",top:8,right:10,background:CP.accent,color:"#fff",borderRadius:10,minWidth:20,height:20,padding:"0 6px",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{badge}</span>}
@@ -3404,7 +3455,7 @@ function PayslipModal({emp, pay, month, year, lang, t, onClose, companySettings,
 
   const generatePDF = (returnHtml) => {
     const content = document.getElementById("patjac-payslip-preview");
-    if(!content) { alert("Preview not found"); return; }
+    if(!content) { alert("⚠️ Preview?"); return; }
 
     const title = L("Lohnabrechnung","Nómina","Payslip","Busta Paga");
     const filename = `${title}_${emp.name.replace(/\s+/g,"_")}_${monthName}_${year}.html`;
@@ -4001,10 +4052,10 @@ function EmployeesApp({t,employees,setEmployees,timeclock,jobs,clients,notify,on
             ))}
           </select>
           <span style={{color:"rgba(116,192,252,0.7)",fontSize:11}}>
-            🇨🇭 {lang==="DE"?"Swiss Payroll 2024 – AHV/ALV/BVG/NBUV/KTG":
-                   lang==="ES"?"Swiss Payroll 2024 – AVS/AD/LPP/AINF/IS":
-                   lang==="IT"?"Swiss Payroll 2024 – AVS/AD/LPP/AINF/IS":
-                   "Swiss Payroll 2024 – AHV/ALV/BVG/NBUV/KTG"}
+            🇨🇭 {lang==="DE"?"Schweizer Lohnabrechnung 2024 – AHV/ALV/BVG/NBUV/KTG":
+                   lang==="ES"?"Nómina suiza 2024 – AVS/AD/LPP/AINF/IS":
+                   lang==="IT"?"Busta paga svizzera 2024 – AVS/AD/LPP/AINF/IS":
+                   "Swiss payroll 2024 – AHV/ALV/BVG/NBUV/KTG"}
           </span>
         </div>
       </CPCard>
@@ -4442,7 +4493,7 @@ function PayrollApp({t, lang, employees, timeclock, jobs, clients, currentUser, 
       {/* Swiss norms bar */}
       <CPCard style={{marginBottom:14,background:"rgba(28,126,214,0.07)",border:"1px solid rgba(28,126,214,0.18)"}}>
         <div style={{color:"#0067c0",fontSize:12}}>
-          🇨🇭 <strong>Swiss Payroll 2024</strong> · AHV 5.25+5.30% · ALV 1.1+1.1% · NBUV 1.2% · BVG ~7+7% · KTG 0.5+0.5%
+          🇨🇭 <strong>{L("Schweizer Lohnabrechnung 2024","Nómina suiza 2024","Swiss payroll 2024","Busta paga svizzera 2024")}</strong> · AHV 5.25+5.30% · ALV 1.1+1.1% · NBUV 1.2% · BVG ~7+7% · KTG 0.5+0.5%
         </div>
       </CPCard>
 
@@ -5093,7 +5144,7 @@ function JobsApp({t,jobs,setJobs,clients,employees,notify,onBack,currentUser,lan
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 12px"}}>
             <CPField label={t.date}><CPInput type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
-            <CPField label="Start"><CPInput type="time" value={form.timeStart} onChange={e=>setForm(f=>splitHours({...f,timeStart:e.target.value}))}/></CPField>
+            <CPField label={L("Beginn","Inicio","Start","Inizio")}><CPInput type="time" value={form.timeStart} onChange={e=>setForm(f=>splitHours({...f,timeStart:e.target.value}))}/></CPField>
             <CPField label={L("Ende","Fin","End","Fine")}><CPInput type="time" value={form.timeEnd} onChange={e=>setForm(f=>withAutoAmount({...f,timeEnd:e.target.value,totalHours:Math.round(hoursBetween(f.timeStart,e.target.value)*teamSize(f)*100)/100}))}/></CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:"0 12px",alignItems:"end"}}>
@@ -5280,8 +5331,8 @@ function GlobalSearch({lang, onClose, openApp, clients, employees, jobs, invoice
         (orders||[]).filter(o=>matchSearch(q,o.supplierName,o.date,o.deliveryDate,(o.items||[]).map(i=>i.productName).join(" ")))
           .map(o=>({id:o.id,title:`${o.supplierName} · ${fmtDate(o.date)}`,sub:fm(o.total),search:""}))),
       G("products","🧴",L("Artikel","Productos","Products","Prodotti"),"inventory",
-        (products||[]).filter(p=>matchSearch(q,p.name,p.nameES,p.nameEN,p.nameIT,p.category))
-          .map(p=>({id:p.id,title:({DE:p.name,ES:p.nameES,EN:p.nameEN,IT:p.nameIT})[lang]||p.name,sub:`${L("Bestand","Stock","Stock","Scorta")}: ${p.stock??"—"}`,search:p.name}))),
+        (products||[]).filter(p=>matchSearch(q,p.name,...Object.values(p.names||{}),p.category))
+          .map(p=>({id:p.id,title:prodName(p,lang),sub:`${L("Bestand","Stock","Stock","Scorta")}: ${p.stock??"—"}`,search:p.name}))),
       G("suppliers","🏪",L("Lieferanten","Proveedores","Suppliers","Fornitori"),"inventory",
         (suppliers||[]).filter(s=>matchSearch(q,s.name,s.contact,s.city,s.email,s.phone,s.category,s.website))
           .map(s=>({id:s.id,title:s.name,sub:[s.category,s.phone].filter(Boolean).join(" · "),search:s.name}))),
@@ -6109,7 +6160,7 @@ function FinanceApp({t,invoices,employees,timeclock,expenses,setExpenses,orders,
           rows={expenses.map(ex=>[
             fmtDate(ex.date)||"—",
             ex.description||"—",
-            <CPBadge text={ex.category||"—"} color="gray"/>,
+            <CPBadge text={({materials:L("Materialien","Materiales","Materials","Materiali"),vehicle:L("Fahrzeug","Vehículo","Vehicle","Veicolo"),equipment:L("Ausrüstung","Equipamiento","Equipment","Attrezzatura"),other:L("Sonstige","Otros","Other","Altro")})[ex.category]||ex.category||"—"} color="gray"/>,
             `CHF ${(ex.amount||0).toFixed(2)}`,
             <CPBtn onClick={()=>setExpenses(p=>p.filter(e=>e.id!==ex.id))} variant="danger" size="sm">🗑️</CPBtn>,
           ])}
@@ -6611,7 +6662,7 @@ function MessagingApp({t,messages,setMessages,employees,currentUser,notify,onBac
 
   const convs = isAdmin
     ? employees.filter(e=>e.active!==false&&(!search||e.name.toLowerCase().includes(search.toLowerCase())))
-    : [{id:"admin",name:"Administrator"}];
+    : [{id:"admin",name:makeL(lang)("Administrator","Administrador","Administrator","Amministratore")}];
 
   useEffect(()=>{ if(!isAdmin&&!selConv) setSelConv("admin"); },[isAdmin]);
   useEffect(()=>{ if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight; },[selConv,messages]);
@@ -7102,9 +7153,9 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
             <tbody>
               {rows.map(p=>{const q=qty(p);const isLow=q<Number(p.minStock||0);return(
                 <tr key={p.id} style={{background:q<=0?"#fee2e2":isLow?"#fff7ed":"#fff"}}>
-                  <td style={td}><b>{p.name}</b><div style={{color:"#666",fontSize:10}}>{supName(p.supplier)}</div></td>
+                  <td style={td}><b>{prodName(p,lang)}</b><div style={{color:"#666",fontSize:10}}>{supName(p.supplier)}</div></td>
                   <td style={td}>{catLbl(p.category)}</td>
-                  <td style={{...td,textAlign:"right"}}>{Number(p.stock||0)} {p.unit||""}</td>
+                  <td style={{...td,textAlign:"right"}}>{Number(p.stock||0)} {unitLabel(p.unit,lang)}</td>
                   <td style={{...td,textAlign:"right"}}>
                     <input type="number" min="0" value={counts[p.id]??""} placeholder={String(p.stock??0)} onChange={e=>setCounts(c=>({...c,[p.id]:e.target.value}))}
                       style={{width:64,padding:"3px 5px",border:"1px solid #cbd5e1",borderRadius:4,textAlign:"right",fontSize:11}}/>
@@ -7121,8 +7172,8 @@ function ReportsApp({t,jobs,clients,invoices,employees,notify,onBack,lang,timecl
               <div style={{fontWeight:700,fontSize:13,color:"#C2410C",marginBottom:6}}>🛒 {L("Nachbestellen","Hay que pedir","To reorder","Da riordinare")}</div>
               <table style={{width:"100%",borderCollapse:"collapse"}}><tbody>
                 {low.map(p=>{const sug=Math.max(1,Math.ceil(Number(p.minStock||0)*2-qty(p)));return(
-                  <tr key={p.id}><td style={td}>{p.name}</td><td style={td}>{supName(p.supplier)}</td>
-                    <td style={{...td,textAlign:"right"}}>{L("Vorschlag","Sugerido","Suggested","Suggerito")}: <b>{sug} {p.unit||""}</b></td>
+                  <tr key={p.id}><td style={td}>{prodName(p,lang)}</td><td style={td}>{supName(p.supplier)}</td>
+                    <td style={{...td,textAlign:"right"}}>{L("Vorschlag","Sugerido","Suggested","Suggerito")}: <b>{sug} {unitLabel(p.unit,lang)}</b></td>
                     <td style={{...td,textAlign:"right"}}>≈ CHF {(sug*Number(p.price ?? p.unitPrice ?? 0)).toFixed(2)}</td></tr>);})}
               </tbody></table>
             </div>
@@ -8358,10 +8409,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "app_phone",
      "contentKey": {
-      "ES": "🪟 NUEVO ASPECTO\n• La app ahora es clara, con el logo de Patjac arriba en el centro.\n• Abajo tienes 4 botones: 🏠 Inicio, ⏱️ Fichaje, 📋 Trabajos y 💬 Mensajes.\n\n🗺️ TU RUTA DEL DÍA\n• Toca 🗺️ «Rutas». Ves la fecha de hoy y SOLO tus clientes de hoy, en orden de hora (1, 2, 3…).\n• Entre un cliente y otro ves los km en coche.\n• «🚗 Ir aquí» te lleva con Google Maps. «Ruta completa del día» pone todas las paradas en orden.\n\n⏰ LLEGA A TIEMPO Y FICHA\n• Ficha la entrada en cuanto llegues al cliente.\n• Si 15 minutos después de la hora no has fichado, la empresa recibe un aviso y puede enviar a un compañero.\n• Si no llegas en todo el horario, el trabajo se cierra como «No se presentó» y esas horas no se pagan.\n\n🔄 SI TE TOCA REEMPLAZAR A ALGUIEN\n• Recibes un mensaje: «🔄 Nuevo trabajo para ti» con la hora y la dirección.\n• Ve lo antes posible y ficha al llegar. El trabajo ya aparece en tus Trabajos y Rutas.\n\n📷 FOTOS Y VÍDEOS EN EL CHAT\n• En 💬 Mensajes puedes enviar fotos 🖼️ o grabar un vídeo 🎬. La app los hace pequeños sola.\n\n📱 TU TELÉFONO\n• La app solo funciona en el teléfono que activaste con tu código. Si cambias de teléfono, pide un código nuevo a la empresa.\n• Sábado desde las 12:00, domingos y festivos de Zúrich la app está cerrada.\n\n🔒 TRABAJO TERMINADO = BLOQUEADO\n• Cuando fichas la salida (o el trabajo termina solo), el trabajo queda «Completado» con un candado 🔒.\n• Ya no puedes cambiar nada: solo lo ves hasta el final del día. Si algo está mal, avisa a la empresa por 💬 Mensajes.\n\n📲 CREAR EL ICONO DE PATJAC\n• Abre el enlace que te envía la empresa con Safari (iPhone) o Chrome (Android), no dentro de WhatsApp.\n• Android: toca «Instalar Patjac» y el icono aparece solo en tu pantalla.\n• iPhone: toca Compartir ⬆️ → «Añadir a pantalla de inicio» → «Añadir». Luego abre Patjac desde el icono y escribe ahí tu código.\n\n🚫 TU ACCESO ES SOLO TUYO\n• La app solo funciona en tu teléfono. Si alguien prueba tu PIN en otro teléfono, no entra y la empresa recibe un aviso.\n\n⏰ CUÁNDO PUEDES USAR LA APP\n• Puedes entrar con tu PIN cuando quieras.\n• Pero fichar, ver trabajos, rutas, mensajes y documentos solo funciona en tu turno: desde 1 hora antes de tu primer trabajo hasta 2 horas después del último.\n• Fuera del turno ves 🔒 y la hora a la que se abre.\n• Excepción: 🧴 «Materiales» funciona siempre, para pedir con tiempo lo que necesitas.\n\n🧴 PEDIR MATERIAL\n• Toca 🧴 «Materiales»: ves los productos del almacén con su foto.\n• Toca uno, elige la cantidad y el cliente, y pulsa «Pedir autorización».\n• Abajo, en «Mis solicitudes», ves si está ⏳ esperando, ✅ autorizado o ❌ no autorizado. También te llega un aviso.\n• Usa el material solo cuando esté ✅ autorizado.",
-      "DE": "🪟 NEUES AUSSEHEN\n• Die App ist jetzt hell, das Patjac-Logo oben in der Mitte.\n• Unten 4 Knöpfe: 🏠 Start, ⏱️ Zeit, 📋 Aufträge, 💬 Nachrichten.\n\n🗺️ IHRE ROUTE DES TAGES\n• 🗺️ «Routen»: das heutige Datum und NUR Ihre Kunden von heute, nach Uhrzeit (1, 2, 3 …), mit km dazwischen.\n• «🚗 Hierhin navigieren» öffnet Google Maps.\n\n⏰ PÜNKTLICH UND EINSTEMPELN\n• Stempeln Sie ein, sobald Sie beim Kunden sind.\n• 15 Minuten nach Beginn ohne Einstempeln erhält die Firma eine Warnung und kann jemand anderen schicken.\n• Kommen Sie gar nicht, wird der Auftrag als «Nicht erschienen» geschlossen und nicht bezahlt.\n\n🔄 ALS ERSATZ\n• Sie erhalten die Nachricht «🔄 Neuer Auftrag für Sie» mit Zeit und Adresse. Bitte sofort hinfahren.\n\n📷 FOTOS UND VIDEOS IM CHAT\n• In 💬 Nachrichten können Sie Fotos und Videos senden.\n\n🔒 FERTIGER AUFTRAG = GESPERRT\n• Nach dem Ausstempeln (oder automatischem Ende) ist der Auftrag «Abgeschlossen» mit 🔒. Sie können nichts mehr ändern, nur ansehen bis Tagesende. Bei Fehlern der Firma schreiben.\n\n📲 PATJAC-SYMBOL ERSTELLEN\n• Link mit Safari (iPhone) oder Chrome (Android) öffnen, nicht in WhatsApp.\n• Android: «Patjac installieren» tippen. iPhone: Teilen ⬆️ → «Zum Home-Bildschirm» → «Hinzufügen», dann im Symbol den Code eingeben.\n\n🚫 IHR ZUGANG GEHÖRT NUR IHNEN\n• Die App funktioniert nur auf Ihrem Telefon; Versuche auf anderen Telefonen werden der Firma gemeldet.\n\n⏰ WANN SIE DIE APP NUTZEN KÖNNEN\n• Anmelden mit PIN geht jederzeit.\n• Stempeln, Aufträge, Routen, Nachrichten und Dokumente nur während Ihrer Schicht: 1 Std. vor dem ersten bis 2 Std. nach dem letzten Auftrag. Sonst sehen Sie 🔒 und die Öffnungszeit.\n• Ausnahme: 🧴 «Material» geht immer, damit Sie rechtzeitig bestellen können.\n\n🧴 MATERIAL ANFRAGEN\n• 🧴 «Material» → Produkt antippen → Menge und Kunde → «Erlaubnis anfragen». Unter «Meine Anfragen» sehen Sie ⏳/✅/❌. Nur bei ✅ verwenden.",
-      "EN": "🪟 NEW LOOK\n• The app is now light, with the Patjac logo at the top centre. 4 buttons at the bottom: 🏠 Home, ⏱️ Clock, 📋 Jobs, 💬 Messages.\n\n🗺️ YOUR ROUTE OF THE DAY\n• 🗺️ «Routes»: today's date and ONLY your clients of today, in time order, with km between them. «🚗 Navigate here» opens Google Maps.\n\n⏰ BE ON TIME AND CLOCK IN\n• Clock in as soon as you arrive. 15 minutes after the start without clocking in, the company is warned and may send a colleague.\n• If you never arrive, the job is closed as «No-show» and not paid.\n\n🔄 AS A REPLACEMENT\n• You get the message «🔄 New job for you» with time and address. Please go straight away.\n\n📷 PHOTOS AND VIDEOS IN THE CHAT\n• In 💬 Messages you can send photos and videos.\n\n🔒 FINISHED JOB = LOCKED\n• After clocking out (or the automatic end) the job is «Completed» with a 🔒. You can't change anything, only view it until the end of the day. If something is wrong, message the company.\n\n📲 CREATE THE PATJAC ICON\n• Open the link with Safari (iPhone) or Chrome (Android), not inside WhatsApp.\n• Android: tap «Install Patjac». iPhone: Share ⬆️ → «Add to Home Screen» → «Add», then enter your code inside the icon.\n\n🚫 YOUR ACCESS IS ONLY YOURS\n• The app only works on your phone; attempts on other phones are reported to the company.\n\n⏰ WHEN YOU CAN USE THE APP\n• You can log in with your PIN at any time.\n• Clocking, jobs, routes, messages and documents only work during your shift: from 1 h before your first job to 2 h after the last. Otherwise you see 🔒 and the opening time.\n• Exception: 🧴 «Materials» always works, so you can order in advance.\n\n🧴 ASK FOR MATERIAL\n• 🧴 «Materials» → tap a product → quantity and client → «Ask for permission». «My requests» shows ⏳/✅/❌. Use it only when ✅.",
-      "IT": "🪟 NUOVO ASPETTO\n• L'app ora è chiara, con il logo Patjac in alto al centro. In basso 4 pulsanti: 🏠 Inizio, ⏱️ Presenze, 📋 Lavori, 💬 Messaggi.\n\n🗺️ IL TUO PERCORSO DEL GIORNO\n• 🗺️ «Percorsi»: la data di oggi e SOLO i tuoi clienti di oggi, in ordine di ora, con i km tra loro.\n\n⏰ PUNTUALITÀ\n• Timbra appena arrivi. 15 minuti dopo l'inizio senza timbrare, l'azienda viene avvisata e può mandare un collega.\n• Se non arrivi, il lavoro si chiude come «Assente» e non viene pagato.\n\n🔄 COME SOSTITUTO\n• Ricevi il messaggio «🔄 Nuovo lavoro per te» con ora e indirizzo.\n\n📷 FOTO E VIDEO NELLA CHAT\n• In 💬 Messaggi puoi inviare foto e video.\n\n🔒 LAVORO FINITO = BLOCCATO\n• Dopo l'uscita (o la fine automatica) il lavoro è «Completato» con 🔒. Non puoi più modificarlo, solo vederlo fino a fine giornata. Se qualcosa non va, scrivi all'azienda.\n\n📲 CREARE L'ICONA PATJAC\n• Apri il link con Safari (iPhone) o Chrome (Android), non dentro WhatsApp.\n• Android: tocca «Installa Patjac». iPhone: Condividi ⬆️ → «Aggiungi a Home» → «Aggiungi», poi inserisci il codice nell'icona.\n\n🚫 IL TUO ACCESSO È SOLO TUO\n• L'app funziona solo sul tuo telefono; i tentativi da altri telefoni vengono segnalati all'azienda.\n\n⏰ QUANDO PUOI USARE L'APP\n• Puoi entrare con il PIN quando vuoi.\n• Timbrature, lavori, percorsi, messaggi e documenti funzionano solo nel tuo turno: da 1 ora prima del primo lavoro a 2 ore dopo l'ultimo. Altrimenti vedi 🔒 e l'orario di apertura.\n• Eccezione: 🧴 «Materiali» funziona sempre, per ordinare in anticipo.\n\n🧴 CHIEDERE MATERIALE\n• 🧴 «Materiali» → tocca un prodotto → quantità e cliente → «Chiedi autorizzazione». In «Le mie richieste» vedi ⏳/✅/❌. Usalo solo con ✅."
+      "ES": "🪟 NUEVO ASPECTO\n• La app ahora es clara, con el logo de Patjac arriba en el centro.\n• Abajo tienes 4 botones: 🏠 Inicio, ⏱️ Fichaje, 📋 Trabajos y 💬 Mensajes.\n\n🗺️ TU RUTA DEL DÍA\n• Toca 🗺️ «Rutas». Ves la fecha de hoy y SOLO tus clientes de hoy, en orden de hora (1, 2, 3…).\n• Entre un cliente y otro ves los km en coche.\n• «🚗 Ir aquí» te lleva con Google Maps. «Ruta completa del día» pone todas las paradas en orden.\n\n⏰ LLEGA A TIEMPO Y FICHA\n• Ficha la entrada en cuanto llegues al cliente.\n• Si 15 minutos después de la hora no has fichado, la empresa recibe un aviso y puede enviar a un compañero.\n• Si no llegas en todo el horario, el trabajo se cierra como «No se presentó» y esas horas no se pagan.\n\n🔄 SI TE TOCA REEMPLAZAR A ALGUIEN\n• Recibes un mensaje: «🔄 Nuevo trabajo para ti» con la hora y la dirección.\n• Ve lo antes posible y ficha al llegar. El trabajo ya aparece en tus Trabajos y Rutas.\n\n📷 FOTOS Y VÍDEOS EN EL CHAT\n• En 💬 Mensajes puedes enviar fotos 🖼️ o grabar un vídeo 🎬. La app los hace pequeños sola.\n\n📱 TU TELÉFONO\n• La app solo funciona en el teléfono que activaste con tu código. Si cambias de teléfono, pide un código nuevo a la empresa.\n• Sábado desde las 12:00, domingos y festivos de Zúrich la app está cerrada.\n\n🔒 TRABAJO TERMINADO = BLOQUEADO\n• Cuando fichas la salida (o el trabajo termina solo), el trabajo queda «Completado» con un candado 🔒.\n• Ya no puedes cambiar nada: solo lo ves hasta el final del día. Si algo está mal, avisa a la empresa por 💬 Mensajes.\n\n📲 CREAR EL ICONO DE PATJAC\n• Abre el enlace que te envía la empresa con Safari (iPhone) o Chrome (Android), no dentro de WhatsApp.\n• Android: toca «Instalar Patjac» y el icono aparece solo en tu pantalla.\n• iPhone: toca Compartir ⬆️ → «Añadir a pantalla de inicio» → «Añadir». Luego abre Patjac desde el icono y escribe ahí tu código.\n\n🚫 TU ACCESO ES SOLO TUYO\n• La app solo funciona en tu teléfono. Si alguien prueba tu PIN en otro teléfono, no entra y la empresa recibe un aviso.\n\n⏰ CUÁNDO PUEDES USAR LA APP\n• Puedes entrar con tu PIN cuando quieras.\n• Pero fichar, ver trabajos, rutas, mensajes y documentos solo funciona en tu turno: desde 1 hora antes de tu primer trabajo hasta 2 horas después del último.\n• Fuera del turno ves 🔒 y la hora a la que se abre.\n• Excepción: 🧴 «Materiales» funciona siempre, para pedir con tiempo lo que necesitas.\n\n🧴 PEDIR MATERIAL\n• Toca 🧴 «Materiales»: ves los productos del almacén con su foto.\n• Toca uno, elige la cantidad y el cliente, y pulsa «Pedir autorización».\n• Abajo, en «Mis solicitudes», ves si está ⏳ esperando, ✅ autorizado o ❌ no autorizado. También te llega un aviso.\n• Usa el material solo cuando esté ✅ autorizado.\n\n🌐 TU IDIOMA\n• Los nombres de los materiales salen en el idioma que elijas en la app.",
+      "DE": "🪟 NEUES AUSSEHEN\n• Die App ist jetzt hell, das Patjac-Logo oben in der Mitte.\n• Unten 4 Knöpfe: 🏠 Start, ⏱️ Zeit, 📋 Aufträge, 💬 Nachrichten.\n\n🗺️ IHRE ROUTE DES TAGES\n• 🗺️ «Routen»: das heutige Datum und NUR Ihre Kunden von heute, nach Uhrzeit (1, 2, 3 …), mit km dazwischen.\n• «🚗 Hierhin navigieren» öffnet Google Maps.\n\n⏰ PÜNKTLICH UND EINSTEMPELN\n• Stempeln Sie ein, sobald Sie beim Kunden sind.\n• 15 Minuten nach Beginn ohne Einstempeln erhält die Firma eine Warnung und kann jemand anderen schicken.\n• Kommen Sie gar nicht, wird der Auftrag als «Nicht erschienen» geschlossen und nicht bezahlt.\n\n🔄 ALS ERSATZ\n• Sie erhalten die Nachricht «🔄 Neuer Auftrag für Sie» mit Zeit und Adresse. Bitte sofort hinfahren.\n\n📷 FOTOS UND VIDEOS IM CHAT\n• In 💬 Nachrichten können Sie Fotos und Videos senden.\n\n🔒 FERTIGER AUFTRAG = GESPERRT\n• Nach dem Ausstempeln (oder automatischem Ende) ist der Auftrag «Abgeschlossen» mit 🔒. Sie können nichts mehr ändern, nur ansehen bis Tagesende. Bei Fehlern der Firma schreiben.\n\n📲 PATJAC-SYMBOL ERSTELLEN\n• Link mit Safari (iPhone) oder Chrome (Android) öffnen, nicht in WhatsApp.\n• Android: «Patjac installieren» tippen. iPhone: Teilen ⬆️ → «Zum Home-Bildschirm» → «Hinzufügen», dann im Symbol den Code eingeben.\n\n🚫 IHR ZUGANG GEHÖRT NUR IHNEN\n• Die App funktioniert nur auf Ihrem Telefon; Versuche auf anderen Telefonen werden der Firma gemeldet.\n\n⏰ WANN SIE DIE APP NUTZEN KÖNNEN\n• Anmelden mit PIN geht jederzeit.\n• Stempeln, Aufträge, Routen, Nachrichten und Dokumente nur während Ihrer Schicht: 1 Std. vor dem ersten bis 2 Std. nach dem letzten Auftrag. Sonst sehen Sie 🔒 und die Öffnungszeit.\n• Ausnahme: 🧴 «Material» geht immer, damit Sie rechtzeitig bestellen können.\n\n🧴 MATERIAL ANFRAGEN\n• 🧴 «Material» → Produkt antippen → Menge und Kunde → «Erlaubnis anfragen». Unter «Meine Anfragen» sehen Sie ⏳/✅/❌. Nur bei ✅ verwenden.\n\n🌐 IHRE SPRACHE\n• Die Materialnamen erscheinen in der gewählten Sprache.",
+      "EN": "🪟 NEW LOOK\n• The app is now light, with the Patjac logo at the top centre. 4 buttons at the bottom: 🏠 Home, ⏱️ Clock, 📋 Jobs, 💬 Messages.\n\n🗺️ YOUR ROUTE OF THE DAY\n• 🗺️ «Routes»: today's date and ONLY your clients of today, in time order, with km between them. «🚗 Navigate here» opens Google Maps.\n\n⏰ BE ON TIME AND CLOCK IN\n• Clock in as soon as you arrive. 15 minutes after the start without clocking in, the company is warned and may send a colleague.\n• If you never arrive, the job is closed as «No-show» and not paid.\n\n🔄 AS A REPLACEMENT\n• You get the message «🔄 New job for you» with time and address. Please go straight away.\n\n📷 PHOTOS AND VIDEOS IN THE CHAT\n• In 💬 Messages you can send photos and videos.\n\n🔒 FINISHED JOB = LOCKED\n• After clocking out (or the automatic end) the job is «Completed» with a 🔒. You can't change anything, only view it until the end of the day. If something is wrong, message the company.\n\n📲 CREATE THE PATJAC ICON\n• Open the link with Safari (iPhone) or Chrome (Android), not inside WhatsApp.\n• Android: tap «Install Patjac». iPhone: Share ⬆️ → «Add to Home Screen» → «Add», then enter your code inside the icon.\n\n🚫 YOUR ACCESS IS ONLY YOURS\n• The app only works on your phone; attempts on other phones are reported to the company.\n\n⏰ WHEN YOU CAN USE THE APP\n• You can log in with your PIN at any time.\n• Clocking, jobs, routes, messages and documents only work during your shift: from 1 h before your first job to 2 h after the last. Otherwise you see 🔒 and the opening time.\n• Exception: 🧴 «Materials» always works, so you can order in advance.\n\n🧴 ASK FOR MATERIAL\n• 🧴 «Materials» → tap a product → quantity and client → «Ask for permission». «My requests» shows ⏳/✅/❌. Use it only when ✅.\n\n🌐 YOUR LANGUAGE\n• Material names appear in the language you choose.",
+      "IT": "🪟 NUOVO ASPETTO\n• L'app ora è chiara, con il logo Patjac in alto al centro. In basso 4 pulsanti: 🏠 Inizio, ⏱️ Presenze, 📋 Lavori, 💬 Messaggi.\n\n🗺️ IL TUO PERCORSO DEL GIORNO\n• 🗺️ «Percorsi»: la data di oggi e SOLO i tuoi clienti di oggi, in ordine di ora, con i km tra loro.\n\n⏰ PUNTUALITÀ\n• Timbra appena arrivi. 15 minuti dopo l'inizio senza timbrare, l'azienda viene avvisata e può mandare un collega.\n• Se non arrivi, il lavoro si chiude come «Assente» e non viene pagato.\n\n🔄 COME SOSTITUTO\n• Ricevi il messaggio «🔄 Nuovo lavoro per te» con ora e indirizzo.\n\n📷 FOTO E VIDEO NELLA CHAT\n• In 💬 Messaggi puoi inviare foto e video.\n\n🔒 LAVORO FINITO = BLOCCATO\n• Dopo l'uscita (o la fine automatica) il lavoro è «Completato» con 🔒. Non puoi più modificarlo, solo vederlo fino a fine giornata. Se qualcosa non va, scrivi all'azienda.\n\n📲 CREARE L'ICONA PATJAC\n• Apri il link con Safari (iPhone) o Chrome (Android), non dentro WhatsApp.\n• Android: tocca «Installa Patjac». iPhone: Condividi ⬆️ → «Aggiungi a Home» → «Aggiungi», poi inserisci il codice nell'icona.\n\n🚫 IL TUO ACCESSO È SOLO TUO\n• L'app funziona solo sul tuo telefono; i tentativi da altri telefoni vengono segnalati all'azienda.\n\n⏰ QUANDO PUOI USARE L'APP\n• Puoi entrare con il PIN quando vuoi.\n• Timbrature, lavori, percorsi, messaggi e documenti funzionano solo nel tuo turno: da 1 ora prima del primo lavoro a 2 ore dopo l'ultimo. Altrimenti vedi 🔒 e l'orario di apertura.\n• Eccezione: 🧴 «Materiali» funziona sempre, per ordinare in anticipo.\n\n🧴 CHIEDERE MATERIALE\n• 🧴 «Materiali» → tocca un prodotto → quantità e cliente → «Chiedi autorizzazione». In «Le mie richieste» vedi ⏳/✅/❌. Usalo solo con ✅.\n\n🌐 LA TUA LINGUA\n• I nomi dei materiali appaiono nella lingua scelta."
      }
     }
    ],
@@ -8704,10 +8755,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "management_customer",
      "contentKey": {
-      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.\n\n🧮 CALCULADORA DE PRECIOS (nueva versión, igual que la web)\n🔹 Limpieza a fondo y de mudanza: precio por pieza (dormitorios, salones, cocinas, baños y ventanas) con desplegables; el tamaño elegido rellena las cantidades y puedes cambiarlas (hasta 30 dormitorios).\n🔹 Limpieza regular: horas según las piezas (mínimo 2 h), CHF 40/h o CHF 44/h si es mensual.\n🔹 Jardín mínimo 2 h (restos verdes aparte) y reparaciones mínimo 1 h (material aparte).\n🔹 Tú ves el desglose interno 🔒; el mensaje al cliente solo lleva las cantidades y el precio total.\n\n📦 ALMACÉN Y PEDIDOS: ELEGIR EN VEZ DE ESCRIBIR\n🔹 En productos, proveedores y pedidos, cada casilla (nombre, proveedor, unidad, ubicación, descripción, contacto, teléfono, e-mail, dirección, web) muestra una lista ▾ con lo que ya escribiste antes: toca y elige.\n🔹 Solo escribes cuando el dato es nuevo (sale «➕ Nuevo: …»).\n🔹 Si escribes un producto o proveedor que ya existe, la app avisa y te ofrece «✏️ Editar ese» para no duplicarlo.\n🔹 Un proveedor nuevo escrito en un producto o pedido se guarda solo; un producto nuevo escrito en un pedido se crea solo (stock 0).\n\n💾 MEDIDOR DE ESPACIO\n🔹 En Inicio verás la barra «💾 Espacio usado». Tócala para verlo en grande: datos (máx. 500 MB) y archivos (máx. 1 GB) del plan gratuito, y cuántos clientes, trabajos, facturas… tienes.\n🔹 Al llegar al 80 % recibes un aviso en el móvil (se revisa cada día a las 8:07). Entonces: copia de seguridad y valorar el plan Pro.\n\n⏰ EMPLEADOS: ENTRAN SIEMPRE, TRABAJAN SOLO EN SU TURNO\n🔹 El empleado puede entrar con su PIN a cualquier hora.\n🔹 Fichar, trabajos, rutas, mensajes y documentos solo se abren en su turno: desde 1 hora antes de su primer trabajo hasta 2 horas después del último. Fuera de eso ve una pantalla 🔒 con la hora en que se abre (o su próximo día de trabajo).\n🔹 Excepción: 🧴 «Materiales» funciona siempre, para que pueda pedir material con antelación.\n🔹 Cuando empieza su turno, la app se desbloquea sola (sin volver a entrar); cuando termina, se bloquea sola.\n\n🧴 MATERIALES PARA EMPLEADOS\n🔹 Los empleados tienen un icono 🧴 «Materiales» con los productos del almacén (solo foto y nombre, sin precios ni stock).\n🔹 Tocan un producto, eligen cantidad y cliente y piden autorización. Te llega un aviso al móvil.\n🔹 Tú respondes en Almacén y pedidos → 📨 «Solicitudes»: ✅ Autorizar o ❌ Rechazar, con una respuesta opcional. Si está marcada la casilla, al autorizar se descuenta la cantidad del stock.\n🔹 El empleado recibe el aviso con tu respuesta.\n🔹 Cuando llega una solicitud nueva: aviso en el móvil, aviso dentro de la app (aunque la tengas abierta), número en el icono 📦 Almacén y un recuadro morado en Inicio. Tócalo y vas directo a 📨 «Solicitudes».\n\n🔔 AVISOS DE MATERIAL (reparado)\n🔹 Antes, si tenías la app abierta en pantalla, el aviso de una solicitud de material no se mostraba. Ahora lo ves siempre: aviso dentro de la app, número en 📦 Almacén y recuadro morado en Inicio que te lleva directo a 📨 Solicitudes.",
-      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.\n\n🧮 PREISRECHNER (neu, wie die Webseite)\n🔹 Grund- und Umzugsreinigung: Preis pro Raum (Schlafzimmer, Wohnzimmer, Küchen, Bäder, Fenster) mit Auswahllisten.\n🔹 Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. oder CHF 44/Std. monatlich.\n🔹 Interne Aufschlüsselung 🔒 nur für Sie; der Kunde erhält nur Anzahl und Gesamtpreis.\n\n📦 LAGER & BESTELLUNGEN: WÄHLEN STATT TIPPEN\n🔹 Jedes Feld zeigt eine Liste ▾ der schon verwendeten Werte – antippen und wählen. Nur Neues wird getippt («➕ Neu»).\n🔹 Doppelte Produkte/Lieferanten werden erkannt («✏️ Diesen bearbeiten»). Neue Lieferanten/Produkte aus einer Bestellung werden automatisch gespeichert.\n\n💾 SPEICHERANZEIGE\n🔹 Auf der Startseite «💾 Speicherplatz» antippen: Daten (max. 500 MB), Dateien (max. 1 GB). Ab 80 % kommt eine Meldung.\n\n⏰ MITARBEITER: ANMELDEN IMMER, ARBEITEN NUR IN DER SCHICHT\n🔹 Anmelden geht jederzeit; Stempeln, Aufträge, Routen, Nachrichten und Dokumente nur 1 Std. vor dem ersten bis 2 Std. nach dem letzten Auftrag.\n🔹 Ausnahme: 🧴 «Material» geht immer. Die App entsperrt/sperrt sich automatisch.\n\n🧴 MATERIAL FÜR MITARBEITER\n🔹 Symbol 🧴 «Material»: Lagerprodukte nur mit Foto und Name. Mitarbeiter fragen um Erlaubnis; Sie antworten unter Lager → 📨 «Anfragen» (✅/❌, Lager wird optional abgezogen).",
-      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.\n\n🧮 PRICE CALCULATOR (new, same as the website)\n🔹 Deep and move-out cleaning: price per room (bedrooms, living rooms, kitchens, bathrooms, windows) with drop-downs.\n🔹 Regular cleaning: hours by rooms (min. 2 h), CHF 40/h or CHF 44/h monthly.\n🔹 Internal breakdown 🔒 only for you; the client only gets counts and the total.\n\n📦 STOCK & ORDERS: CHOOSE INSTEAD OF TYPING\n🔹 Every field shows a ▾ list of values already used – tap to choose. Type only when it's new («➕ New»).\n🔹 Duplicate products/suppliers are detected («✏️ Edit that one»). New suppliers/products typed in an order are saved automatically.\n\n💾 STORAGE METER\n🔹 On Home tap «💾 Storage used»: data (max 500 MB), files (max 1 GB). At 80 % you get an alert.\n\n⏰ EMPLOYEES: LOG IN ANY TIME, WORK ONLY IN THEIR SHIFT\n🔹 Login works any time; clocking, jobs, routes, messages and documents only from 1 h before the first job to 2 h after the last.\n🔹 Exception: 🧴 «Materials» always works. The app unlocks/locks itself automatically.\n\n🧴 MATERIALS FOR EMPLOYEES\n🔹 🧴 «Materials» icon: warehouse products with photo and name only. Employees ask for permission; you answer in Stock → 📨 «Requests» (✅/❌, stock optionally reduced).",
-      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti.\n\n🧮 CALCOLATORE PREZZI (nuovo, come il sito)\n🔹 Pulizia a fondo e di trasloco: prezzo per locale (camere, soggiorni, cucine, bagni, finestre) con menu a tendina.\n🔹 Pulizia regolare: ore secondo i locali (min. 2 h), CHF 40/h o CHF 44/h mensile.\n🔹 Dettaglio interno 🔒 solo per te; il cliente riceve solo quantità e totale.\n\n📦 MAGAZZINO E ORDINI: SCEGLIERE INVECE DI SCRIVERE\n🔹 Ogni campo mostra un elenco ▾ dei valori già usati – tocca e scegli. Scrivi solo se è nuovo («➕ Nuovo»).\n🔹 Prodotti/fornitori doppi vengono segnalati («✏️ Modifica quello»). Nuovi fornitori/prodotti scritti in un ordine si salvano da soli.\n\n💾 MISURATORE SPAZIO\n🔹 In Home tocca «💾 Spazio usato»: dati (max 500 MB), file (max 1 GB). All'80 % ricevi un avviso.\n\n⏰ DIPENDENTI: ENTRANO SEMPRE, LAVORANO SOLO NEL TURNO\n🔹 L'accesso funziona sempre; timbrature, lavori, percorsi, messaggi e documenti solo da 1 ora prima del primo lavoro a 2 ore dopo l'ultimo.\n🔹 Eccezione: 🧴 «Materiali» funziona sempre. L'app si sblocca/blocca da sola.\n\n🧴 MATERIALI PER DIPENDENTI\n🔹 Icona 🧴 «Materiali»: prodotti del magazzino solo con foto e nome. I dipendenti chiedono l'autorizzazione; rispondi in Magazzino → 📨 «Richieste» (✅/❌, stock scalato a scelta)."
+      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.\n\n🧮 CALCULADORA DE PRECIOS (nueva versión, igual que la web)\n🔹 Limpieza a fondo y de mudanza: precio por pieza (dormitorios, salones, cocinas, baños y ventanas) con desplegables; el tamaño elegido rellena las cantidades y puedes cambiarlas (hasta 30 dormitorios).\n🔹 Limpieza regular: horas según las piezas (mínimo 2 h), CHF 40/h o CHF 44/h si es mensual.\n🔹 Jardín mínimo 2 h (restos verdes aparte) y reparaciones mínimo 1 h (material aparte).\n🔹 Tú ves el desglose interno 🔒; el mensaje al cliente solo lleva las cantidades y el precio total.\n\n📦 ALMACÉN Y PEDIDOS: ELEGIR EN VEZ DE ESCRIBIR\n🔹 En productos, proveedores y pedidos, cada casilla (nombre, proveedor, unidad, ubicación, descripción, contacto, teléfono, e-mail, dirección, web) muestra una lista ▾ con lo que ya escribiste antes: toca y elige.\n🔹 Solo escribes cuando el dato es nuevo (sale «➕ Nuevo: …»).\n🔹 Si escribes un producto o proveedor que ya existe, la app avisa y te ofrece «✏️ Editar ese» para no duplicarlo.\n🔹 Un proveedor nuevo escrito en un producto o pedido se guarda solo; un producto nuevo escrito en un pedido se crea solo (stock 0).\n\n💾 MEDIDOR DE ESPACIO\n🔹 En Inicio verás la barra «💾 Espacio usado». Tócala para verlo en grande: datos (máx. 500 MB) y archivos (máx. 1 GB) del plan gratuito, y cuántos clientes, trabajos, facturas… tienes.\n🔹 Al llegar al 80 % recibes un aviso en el móvil (se revisa cada día a las 8:07). Entonces: copia de seguridad y valorar el plan Pro.\n\n⏰ EMPLEADOS: ENTRAN SIEMPRE, TRABAJAN SOLO EN SU TURNO\n🔹 El empleado puede entrar con su PIN a cualquier hora.\n🔹 Fichar, trabajos, rutas, mensajes y documentos solo se abren en su turno: desde 1 hora antes de su primer trabajo hasta 2 horas después del último. Fuera de eso ve una pantalla 🔒 con la hora en que se abre (o su próximo día de trabajo).\n🔹 Excepción: 🧴 «Materiales» funciona siempre, para que pueda pedir material con antelación.\n🔹 Cuando empieza su turno, la app se desbloquea sola (sin volver a entrar); cuando termina, se bloquea sola.\n\n🧴 MATERIALES PARA EMPLEADOS\n🔹 Los empleados tienen un icono 🧴 «Materiales» con los productos del almacén (solo foto y nombre, sin precios ni stock).\n🔹 Tocan un producto, eligen cantidad y cliente y piden autorización. Te llega un aviso al móvil.\n🔹 Tú respondes en Almacén y pedidos → 📨 «Solicitudes»: ✅ Autorizar o ❌ Rechazar, con una respuesta opcional. Si está marcada la casilla, al autorizar se descuenta la cantidad del stock.\n🔹 El empleado recibe el aviso con tu respuesta.\n🔹 Cuando llega una solicitud nueva: aviso en el móvil, aviso dentro de la app (aunque la tengas abierta), número en el icono 📦 Almacén y un recuadro morado en Inicio. Tócalo y vas directo a 📨 «Solicitudes».\n\n🔔 AVISOS DE MATERIAL (reparado)\n🔹 Antes, si tenías la app abierta en pantalla, el aviso de una solicitud de material no se mostraba. Ahora lo ves siempre: aviso dentro de la app, número en 📦 Almacén y recuadro morado en Inicio que te lleva directo a 📨 Solicitudes.\n\n🌐 IDIOMAS: PRODUCTOS EN TU IDIOMA\n🔹 Los productos de Almacén y pedidos ahora cambian al idioma elegido (nombre, descripción y unidad: Unidad / Stück / Piece / Pezzo).\n🔹 Al guardar un producto, la app lo traduce sola a los 4 idiomas. En «🌐 Nombre en todos los idiomas» puedes ver y corregir cada traducción.\n🔹 Los empleados también ven los materiales en su idioma.\n🔹 Revisamos toda la app en alemán, español, inglés e italiano y corregimos los textos que no cambiaban (dibujos de Academy, gastos, nómina, etc.).",
+      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.\n\n🧮 PREISRECHNER (neu, wie die Webseite)\n🔹 Grund- und Umzugsreinigung: Preis pro Raum (Schlafzimmer, Wohnzimmer, Küchen, Bäder, Fenster) mit Auswahllisten.\n🔹 Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. oder CHF 44/Std. monatlich.\n🔹 Interne Aufschlüsselung 🔒 nur für Sie; der Kunde erhält nur Anzahl und Gesamtpreis.\n\n📦 LAGER & BESTELLUNGEN: WÄHLEN STATT TIPPEN\n🔹 Jedes Feld zeigt eine Liste ▾ der schon verwendeten Werte – antippen und wählen. Nur Neues wird getippt («➕ Neu»).\n🔹 Doppelte Produkte/Lieferanten werden erkannt («✏️ Diesen bearbeiten»). Neue Lieferanten/Produkte aus einer Bestellung werden automatisch gespeichert.\n\n💾 SPEICHERANZEIGE\n🔹 Auf der Startseite «💾 Speicherplatz» antippen: Daten (max. 500 MB), Dateien (max. 1 GB). Ab 80 % kommt eine Meldung.\n\n⏰ MITARBEITER: ANMELDEN IMMER, ARBEITEN NUR IN DER SCHICHT\n🔹 Anmelden geht jederzeit; Stempeln, Aufträge, Routen, Nachrichten und Dokumente nur 1 Std. vor dem ersten bis 2 Std. nach dem letzten Auftrag.\n🔹 Ausnahme: 🧴 «Material» geht immer. Die App entsperrt/sperrt sich automatisch.\n\n🧴 MATERIAL FÜR MITARBEITER\n🔹 Symbol 🧴 «Material»: Lagerprodukte nur mit Foto und Name. Mitarbeiter fragen um Erlaubnis; Sie antworten unter Lager → 📨 «Anfragen» (✅/❌, Lager wird optional abgezogen).\n\n🌐 SPRACHEN: PRODUKTE IN IHRER SPRACHE\n🔹 Lagerprodukte wechseln jetzt in die gewählte Sprache (Name, Beschreibung, Einheit).\n🔹 Beim Speichern wird automatisch in alle 4 Sprachen übersetzt; unter «🌐 Name in allen Sprachen» können Sie korrigieren.",
+      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.\n\n🧮 PRICE CALCULATOR (new, same as the website)\n🔹 Deep and move-out cleaning: price per room (bedrooms, living rooms, kitchens, bathrooms, windows) with drop-downs.\n🔹 Regular cleaning: hours by rooms (min. 2 h), CHF 40/h or CHF 44/h monthly.\n🔹 Internal breakdown 🔒 only for you; the client only gets counts and the total.\n\n📦 STOCK & ORDERS: CHOOSE INSTEAD OF TYPING\n🔹 Every field shows a ▾ list of values already used – tap to choose. Type only when it's new («➕ New»).\n🔹 Duplicate products/suppliers are detected («✏️ Edit that one»). New suppliers/products typed in an order are saved automatically.\n\n💾 STORAGE METER\n🔹 On Home tap «💾 Storage used»: data (max 500 MB), files (max 1 GB). At 80 % you get an alert.\n\n⏰ EMPLOYEES: LOG IN ANY TIME, WORK ONLY IN THEIR SHIFT\n🔹 Login works any time; clocking, jobs, routes, messages and documents only from 1 h before the first job to 2 h after the last.\n🔹 Exception: 🧴 «Materials» always works. The app unlocks/locks itself automatically.\n\n🧴 MATERIALS FOR EMPLOYEES\n🔹 🧴 «Materials» icon: warehouse products with photo and name only. Employees ask for permission; you answer in Stock → 📨 «Requests» (✅/❌, stock optionally reduced).\n\n🌐 LANGUAGES: PRODUCTS IN YOUR LANGUAGE\n🔹 Inventory products now switch to the chosen language (name, description, unit).\n🔹 When you save, the app translates into all 4 languages automatically; correct them under «🌐 Name in all languages».",
+      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti.\n\n🧮 CALCOLATORE PREZZI (nuovo, come il sito)\n🔹 Pulizia a fondo e di trasloco: prezzo per locale (camere, soggiorni, cucine, bagni, finestre) con menu a tendina.\n🔹 Pulizia regolare: ore secondo i locali (min. 2 h), CHF 40/h o CHF 44/h mensile.\n🔹 Dettaglio interno 🔒 solo per te; il cliente riceve solo quantità e totale.\n\n📦 MAGAZZINO E ORDINI: SCEGLIERE INVECE DI SCRIVERE\n🔹 Ogni campo mostra un elenco ▾ dei valori già usati – tocca e scegli. Scrivi solo se è nuovo («➕ Nuovo»).\n🔹 Prodotti/fornitori doppi vengono segnalati («✏️ Modifica quello»). Nuovi fornitori/prodotti scritti in un ordine si salvano da soli.\n\n💾 MISURATORE SPAZIO\n🔹 In Home tocca «💾 Spazio usato»: dati (max 500 MB), file (max 1 GB). All'80 % ricevi un avviso.\n\n⏰ DIPENDENTI: ENTRANO SEMPRE, LAVORANO SOLO NEL TURNO\n🔹 L'accesso funziona sempre; timbrature, lavori, percorsi, messaggi e documenti solo da 1 ora prima del primo lavoro a 2 ore dopo l'ultimo.\n🔹 Eccezione: 🧴 «Materiali» funziona sempre. L'app si sblocca/blocca da sola.\n\n🧴 MATERIALI PER DIPENDENTI\n🔹 Icona 🧴 «Materiali»: prodotti del magazzino solo con foto e nome. I dipendenti chiedono l'autorizzazione; rispondi in Magazzino → 📨 «Richieste» (✅/❌, stock scalato a scelta).\n\n🌐 LINGUE: PRODOTTI NELLA TUA LINGUA\n🔹 I prodotti del magazzino ora cambiano nella lingua scelta (nome, descrizione, unità).\n🔹 Al salvataggio l'app traduce in tutte le 4 lingue; puoi correggere in «🌐 Nome in tutte le lingue»."
      }
     }
    ],
@@ -8926,10 +8977,17 @@ const ACADEMY_COURSES_V2 = [
   },
 ];
 
+// German labels inside the Academy pictures, translated when shown in another language
+const ACADEMY_SVG_TXT = {"KALK": ["CAL", "LIMESCALE", "CALCARE"], "SUVA Norm": ["Norma SUVA", "SUVA standard", "Norma SUVA"], "Parkett": ["Parqué", "Parquet", "Parquet"], "Marmor": ["Mármol", "Marble", "Marmo"], "Granit": ["Granito", "Granite", "Granito"], "Kunststoff": ["Plástico", "Plastic", "Plastica"], "🌸 Frühling / Spring": ["🌸 Primavera", "🌸 Spring", "🌸 Primavera"], "☀️ Sommer / Summer": ["☀️ Verano", "☀️ Summer", "☀️ Estate"], "🍂 Herbst / Autumn": ["🍂 Otoño", "🍂 Autumn", "🍂 Autunno"], "❄️ Winter / Hiver": ["❄️ Invierno", "❄️ Winter", "❄️ Inverno"], "Schaufel": ["Pala", "Shovel", "Pala"], "Rechen": ["Rastrillo", "Rake", "Rastrello"], "Heckenschere": ["Cortasetos", "Hedge trimmer", "Tagliasiepi"], "Giesskanne": ["Regadera", "Watering can", "Annaffiatoio"], "⚠ Invasive Neophyten – Freisetzungsverordnung CH 2024": ["⚠ Neófitos invasores – Ordenanza CH 2024", "⚠ Invasive neophytes – Swiss Release Ordinance 2024", "⚠ Neofite invasive – Ordinanza CH 2024"], "VERBOTEN ⛔": ["PROHIBIDO ⛔", "BANNED ⛔", "VIETATO ⛔"], "Goldrute": ["Vara de oro", "Goldenrod", "Verga d'oro"], "Anhang 2.1": ["Anexo 2.1", "Annex 2.1", "Allegato 2.1"], "Anhang 2.2": ["Anexo 2.2", "Annex 2.2", "Allegato 2.2"], "Umgangsverbot": ["Prohibido su uso", "Handling banned", "Divieto d'uso"], "seit 1.9.2024": ["desde 1.9.2024", "since 1.9.2024", "dal 1.9.2024"], "Jap. Knöterich": ["Hierba nudosa jap.", "Jap. knotweed", "Poligono giapp."], "Entsorgung Pflicht": ["Eliminación obligatoria", "Disposal required", "Smaltimento obbligatorio"], "Sondermüll": ["Residuo especial", "Special waste", "Rifiuto speciale"], "EINGESCHRÄNKT ⚠": ["RESTRINGIDO ⚠", "RESTRICTED ⚠", "LIMITATO ⚠"], "Sommerflieder": ["Arbusto de mariposas", "Butterfly bush", "Albero delle farfalle"], "Inverkehrbringen": ["Venta", "Sale", "Vendita"], "verboten": ["prohibida", "banned", "vietata"], "Kunde": ["Cliente", "Client", "Cliente"], "Mitarbeiter": ["Empleado", "Employee", "Dipendente"], "Gut gemacht!": ["¡Buen trabajo!", "Well done!", "Ben fatto!"], "Danke! Bis nächste": ["¡Gracias! Hasta la", "Thanks! See you", "Grazie! A la"], "Woche!": ["próxima semana!", "next week!", "prossima settimana!"], "Kundenzufriedenheit 5/5": ["Satisfacción del cliente 5/5", "Customer satisfaction 5/5", "Soddisfazione cliente 5/5"], "MWST 8.1%": ["IVA 8.1%", "VAT 8.1%", "IVA 8.1%"], "Rechnung": ["Factura", "Invoice", "Fattura"], "Helm": ["Casco", "Helmet", "Casco"], "Schutzbrille": ["Gafas", "Goggles", "Occhiali"], "Handschuhe": ["Guantes", "Gloves", "Guanti"], "Sicherheitsschuhe S3": ["Calzado S3", "Safety shoes S3", "Scarpe S3"], "Gehörschutz": ["Protección auditiva", "Ear protection", "Protezione udito"], "Atemschutz": ["Mascarilla", "Respirator", "Maschera"], "Explosiv": ["Explosivo", "Explosive", "Esplosivo"], "Ätzend": ["Corrosivo", "Corrosive", "Corrosivo"], "Giftig": ["Tóxico", "Toxic", "Tossico"], "Entzündlich": ["Inflamable", "Flammable", "Infiammabile"], "⚠ Sicherheitsdatenblatt (SDS) – Pflicht laut ChemV Schweiz": ["⚠ Ficha de seguridad (SDS) – obligatoria según ChemV Suiza", "⚠ Safety data sheet (SDS) – required by Swiss ChemV", "⚠ Scheda di sicurezza (SDS) – obbligatoria secondo ChemV"], "• Vor Gebrauch SDS lesen  • Gefahren kennen  • PSA anlegen": ["• Leer la SDS antes de usar  • Conocer los peligros  • Usar EPI", "• Read the SDS before use  • Know the hazards  • Wear PPE", "• Leggere la SDS prima dell'uso  • Conoscere i pericoli  • Indossare DPI"], "• Lagervorschriften beachten  • Notfallnummer: 145 (Tox Info Suisse)": ["• Respetar normas de almacenaje  • Emergencias: 145 (Tox Info Suisse)", "• Follow storage rules  • Emergency: 145 (Tox Info Suisse)", "• Rispettare le norme di stoccaggio  • Emergenza: 145 (Tox Info Suisse)"], "Rücken gerade ✓": ["Espalda recta ✓", "Back straight ✓", "Schiena dritta ✓"], "Knie beugen – 90° ✓": ["Doblar rodillas – 90° ✓", "Bend knees – 90° ✓", "Piegare le ginocchia – 90° ✓"], "❌ Falsch – Rücken": ["❌ Mal – espalda", "❌ Wrong – back", "❌ Sbagliato – schiena"], "krumm = Verletzung": ["curvada = lesión", "bent = injury", "curva = infortunio"], "SUVA Ergonomie-Richtlinie": ["Guía de ergonomía SUVA", "SUVA ergonomics guideline", "Linee guida ergonomia SUVA"]};
+const translateSvg = (svg, lang) => {
+  const i = {ES:0,EN:1,IT:2}[lang];
+  if(i===undefined) return svg;
+  return svg.replace(/(<text[^>]*>)([^<]*)(<\/text>)/g, (m,a,b,c)=>{ const tr = ACADEMY_SVG_TXT[b]; return tr ? a + tr[i].replace(/&/g,"&amp;") + c : m; });
+};
+
 // SVG illustration renderer
-// SVG illustration renderer
-function CourseIllustration({illustrationKey, height=160}){
-  const svg = ACADEMY_ILLUSTRATIONS[illustrationKey] || ACADEMY_ILLUSTRATIONS.cleaning;
+function CourseIllustration({illustrationKey, height=160, lang}){
+  const svg = translateSvg(ACADEMY_ILLUSTRATIONS[illustrationKey] || ACADEMY_ILLUSTRATIONS.cleaning, lang);
   return (
     <div style={{borderRadius:14,overflow:"hidden",height,flexShrink:0,background:"#0a1628"}}
       dangerouslySetInnerHTML={{__html: svg.trim()}}
@@ -9070,7 +9128,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
               onMouseLeave={e=>{e.currentTarget.style.background=CP.surface;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}}
             >
               {/* Illustration */}
-              <CourseIllustration illustrationKey={course.illustrationKey} height={140}/>
+              <CourseIllustration illustrationKey={course.illustrationKey} height={140} lang={lang}/>
               {/* Badge overlay */}
               {course.badge&&(
                 <div style={{position:"relative"}}>
@@ -9233,7 +9291,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
                         ⏱️ {c.duration}
                       </span>
                       <span style={{background:"rgba(0,0,0,0.035)",color:CP.textSecondary,fontSize:10,padding:"2px 8px",borderRadius:6}}>
-                        📊 {c.level}
+                        📊 {({Beginner:L("Anfänger","Principiante","Beginner","Principiante"),Intermediate:L("Mittelstufe","Intermedio","Intermediate","Intermedio"),Advanced:L("Fortgeschritten","Avanzado","Advanced","Avanzato")})[c.level]||c.level}
                       </span>
                     </div>
                   </div>
@@ -9288,7 +9346,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
       <CPScreen title={title} icon={course.emoji} onBack={()=>setView("home")} t={t} actions={<LangBar/>}>
         {/* Course illustration */}
         <div style={{marginBottom:16}}>
-          <CourseIllustration illustrationKey={course.illustrationKey} height={160}/>
+          <CourseIllustration illustrationKey={course.illustrationKey} height={160} lang={lang}/>
         </div>
 
         {/* Info card */}
@@ -9415,7 +9473,7 @@ function AcademyApp({t, lang, setLang, notify, onBack, currentUser}){
         {/* Lesson illustration */}
         {selLesson.illustrationKey&&(
           <div style={{marginBottom:16}}>
-            <CourseIllustration illustrationKey={selLesson.illustrationKey} height={150}/>
+            <CourseIllustration illustrationKey={selLesson.illustrationKey} height={150} lang={lang}/>
           </div>
         )}
 
@@ -9830,6 +9888,8 @@ function HelpModal({t, lang, onClose}){
       icon:"📦",
       title:{DE:"Lager & Bestellungen",ES:"Almacén y pedidos",EN:"Inventory & Orders",IT:"Magazzino e ordini"},
       items:[
+        {h:{"DE":"🌐 Produkte in allen Sprachen","ES":"🌐 Productos en todos los idiomas","EN":"🌐 Products in all languages","IT":"🌐 Prodotti in tutte le lingue"},
+          b:{"ES":"🔹 Al guardar un producto, su nombre y descripción se traducen solos a alemán, español, inglés e italiano.\n🔹 Para corregir: ✏️ Editar → «🌐 Nombre en todos los idiomas» → cambia el texto → 💾 Guardar.\n🔹 «🌐 Traducir ahora» vuelve a traducir desde el nombre.\n🔹 Las unidades (Unidad, Litro, Paquete…) también cambian de idioma.","DE":"Name und Beschreibung werden beim Speichern automatisch in DE/ES/EN/IT übersetzt. Korrigieren: ✏️ → «🌐 Name in allen Sprachen».","EN":"Name and description are translated automatically into DE/ES/EN/IT when saved. To correct: ✏️ → «🌐 Name in all languages».","IT":"Nome e descrizione vengono tradotti automaticamente in DE/ES/EN/IT al salvataggio. Per correggere: ✏️ → «🌐 Nome in tutte le lingue»."}},
         {h:{"DE":"📨 Material-Anfragen der Mitarbeiter","ES":"📨 Solicitudes de material de los empleados","EN":"📨 Employees' material requests","IT":"📨 Richieste di materiale dei dipendenti"},
           b:{"ES":"🔔 Cuando llega una solicitud nueva ves un aviso (también con la app abierta), un número en 📦 Almacén y un recuadro morado en Inicio: tócalo y vas directo a 📨 Solicitudes.\n🔹 Los empleados ven los productos (solo foto y nombre) en su icono 🧴 «Materiales» y piden autorización.\n🔹 Te llega un aviso. Ve a Almacén y pedidos → 📨 «Solicitudes».\n🔹 Escribe una respuesta si quieres y pulsa ✅ Autorizar o ❌ Rechazar.\n🔹 Con la casilla marcada, al autorizar se descuenta la cantidad del stock.","DE":"Lager → 📨 «Anfragen»: ✅ Erlauben oder ❌ Ablehnen, optional mit Antwort; Lager wird abgezogen, wenn angehakt.","EN":"Stock → 📨 «Requests»: ✅ Approve or ❌ Reject, optional answer; stock reduced if ticked.","IT":"Magazzino → 📨 «Richieste»: ✅ Autorizza o ❌ Rifiuta, risposta facoltativa; stock scalato se spuntato."}},
         {h:{"DE":"⚡ Schneller erfassen: wählen statt tippen","ES":"⚡ Ingresar más rápido: elegir en vez de escribir","EN":"⚡ Faster entry: choose instead of typing","IT":"⚡ Inserimento rapido: scegliere invece di scrivere"},
@@ -10179,7 +10239,8 @@ function EmployeeMaterialsApp({t,lang,jobs,currentUser,notify,onBack}){
   const todayJobs = (jobs||[]).filter(j=>j.employeeId===currentUser?.id && j.date===todayStr && j.status!=="cancelled");
   const loadMine = () => supaRpc("employee_my_requests",{}).then(r=>setMine(Array.isArray(r)?r:[])).catch(()=>{});
   useEffect(()=>{
-    supaRpc("employee_products",{}).then(r=>setItems(Array.isArray(r)?r:[])).catch(()=>setItems([]));
+    supaRpc("employee_products_i18n",{}).then(r=>{ if(!Array.isArray(r)) throw 0; setItems(r); })
+      .catch(()=>supaRpc("employee_products",{}).then(r=>setItems(Array.isArray(r)?r:[])).catch(()=>setItems([])));
     loadMine(); const iv=setInterval(loadMine,30000); return ()=>clearInterval(iv);
   },[]);
   const open = it => { setSel(it); setQty(1); setNote(""); setJobId(todayJobs[0]?.id||""); };
@@ -10194,7 +10255,9 @@ function EmployeeMaterialsApp({t,lang,jobs,currentUser,notify,onBack}){
   };
   const stTxt = s => s==="approved"?`✅ ${L("Erlaubt","Autorizado","Approved","Autorizzato")}`:s==="rejected"?`❌ ${L("Nicht erlaubt","No autorizado","Not approved","Non autorizzato")}`:`⏳ ${L("Wartet","Esperando respuesta","Waiting","In attesa")}`;
   const stCol = s => s==="approved"?"#0f7b0f":s==="rejected"?"#c42b1c":"#9a5b00";
-  const list = (items||[]).filter(it=>!q||comboNorm(it.name).includes(comboNorm(q)));
+  const nm = it => prodName(it, lang);
+  const byId = id => (items||[]).find(x=>x.id===id);
+  const list = (items||[]).filter(it=>!q||comboNorm(nm(it)+" "+it.name).includes(comboNorm(q)));
   const pic = (it,size) => safeImg(it.image) ? <img src={it.image} alt="" style={{width:size,height:size,objectFit:"cover",borderRadius:10}}/> : <div style={{width:size,height:size,borderRadius:10,background:"#f0f0f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.45}}>{it.icon||"📦"}</div>;
   return (
     <CPScreen title={t.materials||"Materiales"} icon="🧴" onBack={onBack} t={t}>
@@ -10206,7 +10269,7 @@ function EmployeeMaterialsApp({t,lang,jobs,currentUser,notify,onBack}){
         {list.map(it=>(
           <button key={it.id} onClick={()=>open(it)} style={{background:"#fff",border:`1px solid ${CP.border}`,borderRadius:12,padding:10,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:CP.font}}>
             {pic(it,80)}
-            <span style={{fontSize:13,fontWeight:600,color:CP.textPrimary,textAlign:"center",lineHeight:1.25}}>{it.name}</span>
+            <span style={{fontSize:13,fontWeight:600,color:CP.textPrimary,textAlign:"center",lineHeight:1.25}}>{nm(it)}</span>
           </button>
         ))}
       </div>
@@ -10216,7 +10279,7 @@ function EmployeeMaterialsApp({t,lang,jobs,currentUser,notify,onBack}){
           {mine.map(r=>(
             <CPCard key={r.id} style={{padding:"10px 14px"}}>
               <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center"}}>
-                <div><b>{r.product_name}</b> × {Number(r.qty)}<div style={{fontSize:12,color:CP.textTertiary}}>{new Date(r.created_at).toLocaleString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}{r.client_name?` · ${r.client_name}`:""}</div></div>
+                <div><b>{byId(r.product_id)?nm(byId(r.product_id)):r.product_name}</b> × {Number(r.qty)}<div style={{fontSize:12,color:CP.textTertiary}}>{new Date(r.created_at).toLocaleString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}{r.client_name?` · ${r.client_name}`:""}</div></div>
                 <span style={{color:stCol(r.status),fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>{stTxt(r.status)}</span>
               </div>
               {r.answer&&<div style={{fontSize:12.5,color:CP.textSecondary,marginTop:4}}>💬 {r.answer}</div>}
@@ -10228,7 +10291,7 @@ function EmployeeMaterialsApp({t,lang,jobs,currentUser,notify,onBack}){
         <CPModal title={`🧴 ${L("Erlaubnis anfragen","Pedir autorización","Ask for permission","Chiedi autorizzazione")}`} onClose={()=>setSel(null)} width={440}>
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,marginBottom:14}}>
             {pic(sel,150)}
-            <div style={{fontSize:18,fontWeight:700,textAlign:"center"}}>{sel.name}</div>
+            <div style={{fontSize:18,fontWeight:700,textAlign:"center"}}>{nm(sel)}</div>
           </div>
           <CPField label={L("Menge","Cantidad","Quantity","Quantità")}>
             <div style={{display:"flex",alignItems:"center",gap:12,justifyContent:"center"}}>
@@ -10269,7 +10332,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
       if(status==="approved" && reqStock && r.product_id){
         setProducts(prev=>prev.map(p=>p.id===r.product_id?{...p,stock:Math.max(0,(Number(p.stock)||0)-(Number(r.qty)||0))}:p));
       }
-      notify(status==="approved"?`✅ ${L("Erlaubt","Autorizado","Approved","Autorizzato")}: ${r.product_name}`:`❌ ${L("Abgelehnt","Rechazado","Rejected","Rifiutato")}: ${r.product_name}`, status==="approved"?"success":"warning");
+      notify(status==="approved"?`✅ ${L("Erlaubt","Autorizado","Approved","Autorizzato")}: ${prodById(r.product_id)?pName(prodById(r.product_id)):r.product_name}`:`❌ ${L("Abgelehnt","Rechazado","Rejected","Rifiutato")}: ${prodById(r.product_id)?pName(prodById(r.product_id)):r.product_name}`, status==="approved"?"success":"warning");
       loadReqs();
       try{ window.dispatchEvent(new Event("patjac-mat-changed")); }catch(e){}
     }catch(e){ notify(t.error,"error"); }
@@ -10293,11 +10356,13 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
     {id:"safety",   label:t.catSafety||"Safety",     icon:"🦺"},
   ];
 
-  const pName = (p) => ({DE:p.name,ES:p.nameES,EN:p.nameEN,IT:p.nameIT})[lang]||p.name;
+  const pName = (p) => prodName(p, lang);
+  const uL = (u) => unitLabel(u, lang);
+  const prodById = (id) => products.find(x=>x.id===id);
 
   const filtered = products.filter(p=>{
     const matchCat = catFilter==="all"||p.category===catFilter;
-    const matchSearch = !search || normTxt([p.name,p.nameES,p.nameEN,p.nameIT,p.category].join(" ")).includes(normTxt(search));
+    const matchSearch = !search || normTxt([p.name,...Object.values(p.names||{}),p.category].join(" ")).includes(normTxt(search));
     return matchCat&&matchSearch;
   });
 
@@ -10379,7 +10444,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
         <CPStat label={t.lowStock||"Low stock"} value={lowStockProducts.length} icon="⚠️" accent={lowStockProducts.length>0?"#F08C00":"#2F9E44"}/>
         <CPStat label={t.outOfStock||"Out"} value={outOfStockProducts.length} icon="🚫" accent={outOfStockProducts.length>0?"#C92A2A":"#2F9E44"}/>
         <CPStat label={t.stockValue||"Value"} value={`CHF ${totalStockValue.toFixed(0)}`} icon="💰" accent="#0CA678"/>
-        <CPStat label={t.orders||"Orders"} value={`${pendingOrders} ${L("pend.","pend.","pend.","pend.")}`} icon="🚚" accent={pendingOrders>0?"#9a5b00":"#2F9E44"}/>
+        <CPStat label={t.orders||"Orders"} value={`${pendingOrders} ${L("offen","pend.","pending","in sospeso")}`} icon="🚚" accent={pendingOrders>0?"#9a5b00":"#2F9E44"}/>
       </div>
 
       {/* Low stock alerts */}
@@ -10392,7 +10457,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             {lowStockProducts.map(p=>(
               <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(240,140,0,0.15)",borderRadius:20,padding:"4px 12px"}}>
                 {safeImg(p.image)?<Avatar photo={p.image} size={24} round={false}/>:<span>{p.icon}</span>}
-                <span style={{color:"#9a5b00",fontSize:12,fontWeight:600}}>{pName(p)}: {p.stock} {p.unit}</span>
+                <span style={{color:"#9a5b00",fontSize:12,fontWeight:600}}>{pName(p)}: {p.stock} {uL(p.unit)}</span>
                 <button onClick={()=>quickOrder(p)} style={{background:"rgba(240,140,0,0.4)",border:"none",borderRadius:10,color:CP.textPrimary,padding:"2px 8px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:CP.font}}>
                   🚚 {t.quickOrder||"Order"}
                 </button>
@@ -10457,19 +10522,19 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                     )}
                   </div>
 
-                  <div style={{color:CP.textSecondary,fontSize:12,marginBottom:10,lineHeight:1.4}}>{p.description}</div>
+                  <div style={{color:CP.textSecondary,fontSize:12,marginBottom:10,lineHeight:1.4}}>{prodDesc(p,lang)}</div>
 
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
                     <div style={{background:"rgba(0,0,0,0.035)",borderRadius:8,padding:"6px 8px"}}>
-                      <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>BESTAND</div>
-                      <div style={{color:isOut?"#c42b1c":isLow?"#9a5b00":"#107c10",fontWeight:700,fontSize:16}}>{p.stock} {p.unit}</div>
+                      <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2,textTransform:"uppercase"}}>{L("Bestand","Stock","Stock","Scorta")}</div>
+                      <div style={{color:isOut?"#c42b1c":isLow?"#9a5b00":"#107c10",fontWeight:700,fontSize:16}}>{p.stock} {uL(p.unit)}</div>
                     </div>
                     <div style={{background:"rgba(0,0,0,0.035)",borderRadius:8,padding:"6px 8px"}}>
                       <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>MIN</div>
-                      <div style={{color:CP.textSecondary,fontWeight:700,fontSize:16}}>{p.minStock} {p.unit}</div>
+                      <div style={{color:CP.textSecondary,fontWeight:700,fontSize:16}}>{p.minStock} {uL(p.unit)}</div>
                     </div>
                     <div style={{background:"rgba(0,0,0,0.035)",borderRadius:8,padding:"6px 8px"}}>
-                      <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2}}>WERT</div>
+                      <div style={{color:CP.textTertiary,fontSize:9,marginBottom:2,textTransform:"uppercase"}}>{L("Wert","Valor","Value","Valore")}</div>
                       <div style={{color:"#0067c0",fontWeight:700,fontSize:13}}>CHF {(Number(p.stock||0)*prPrice(p)).toFixed(0)}</div>
                     </div>
                   </div>
@@ -10477,7 +10542,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                   {stockBar(p)}
 
                   <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                    <CPBtn onClick={()=>{setForm({...p, price:p.price ?? p.unitPrice ?? 0});setSelId(p.id);setModal("product");}} variant="secondary" size="sm">✏️</CPBtn>
+                    <CPBtn onClick={()=>{setForm({...p, name:pName(p), description:prodDesc(p,lang), _origName:pName(p), _origDesc:prodDesc(p,lang), price:p.price ?? p.unitPrice ?? 0});setSelId(p.id);setModal("product");}} variant="secondary" size="sm">✏️</CPBtn>
                     <CPBtn onClick={()=>setProducts(prev=>prev.map(x=>x.id===p.id?{...x,stock:x.stock+1}:x))} variant="success" size="sm">＋1</CPBtn>
                     <CPBtn onClick={()=>setProducts(prev=>prev.map(x=>x.id===p.id?{...x,stock:Math.max(0,x.stock-1)}:x))} variant="secondary" size="sm">−1</CPBtn>
                     {(isLow||isOut)&&<CPBtn onClick={()=>quickOrder(p)} variant="warning" size="sm">🚚 {t.quickOrder||"Order"}</CPBtn>}
@@ -10523,7 +10588,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                 <div style={{background:"rgba(0,0,0,0.035)",borderRadius:10,padding:"8px 12px",marginBottom:10}}>
                   {order.items.map((item,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:i<order.items.length-1?`1px solid ${CP.border}`:"none",fontSize:13}}>
-                      <span style={{color:CP.textSecondary}}>{item.productName} × {item.qty}</span>
+                      <span style={{color:CP.textSecondary}}>{(prodById(item.productId)?pName(prodById(item.productId)):item.productName)} × {item.qty}</span>
                       <span style={{color:CP.textPrimary,fontWeight:600}}>CHF {(item.total||0).toFixed(2)}</span>
                     </div>
                   ))}
@@ -10555,7 +10620,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                       fileName: `${L("Bestellung","Pedido","Order","Ordine")}_${order.supplierName||sup?.name||""}_${order.date||""}`,
                       getHtml: ()=>{
                         const esc = v => String(v??"").replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
-                        const rows = (order.items||[]).map(it=>`<tr><td>${esc(it.productName||it.name)}</td><td style="text-align:right">${esc(it.qty)} ${esc(it.unit||"")}</td><td style="text-align:right">${Number(it.unitPrice||0).toFixed(2)}</td><td style="text-align:right">${Number(it.total||(it.qty||0)*(it.unitPrice||0)).toFixed(2)}</td></tr>`).join("");
+                        const rows = (order.items||[]).map(it=>`<tr><td>${esc(prodById(it.productId)?pName(prodById(it.productId)):(it.productName||it.name))}</td><td style="text-align:right">${esc(it.qty)} ${esc(it.unit||"")}</td><td style="text-align:right">${Number(it.unitPrice||0).toFixed(2)}</td><td style="text-align:right">${Number(it.total||(it.qty||0)*(it.unitPrice||0)).toFixed(2)}</td></tr>`).join("");
                         return `<style>body{font-family:Arial,sans-serif;color:#000;font-size:12px}h2{color:#1C7ED6;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:14px}th{background:#1C7ED6;color:#fff;padding:7px;text-align:left}td{padding:7px;border-bottom:1px solid #ddd}</style>
 <h2>${L("Bestellung","Pedido","Order","Ordine")}</h2><div><b>Patjac Reinigung Garten &amp; Services</b> · Zürich · ${COMPANY_EMAIL}</div>
 <div style="margin-top:10px">${L("Lieferant","Proveedor","Supplier","Fornitore")}: <b>${esc(order.supplierName||sup?.name||"")}</b><br/>${L("Datum","Fecha","Date","Data")}: ${esc(fmtDate(order.date))}${order.deliveryDate?`<br/>${L("Lieferung","Entrega","Delivery","Consegna")}: ${esc(fmtDate(order.deliveryDate))}`:""}</div>
@@ -10590,10 +10655,10 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                 <div style={{display:"flex",gap:12,alignItems:"center"}}>
                   {pr&&safeImg(pr.image)?<img src={pr.image} alt="" style={{width:52,height:52,objectFit:"cover",borderRadius:8}}/>:<div style={{width:52,height:52,borderRadius:8,background:"#f0f0f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>{pr?.icon||"📦"}</div>}
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:700,fontSize:14.5}}>{r.product_name} × {Number(r.qty)}</div>
+                    <div style={{fontWeight:700,fontSize:14.5}}>{pr?pName(pr):r.product_name} × {Number(r.qty)}</div>
                     <div style={{fontSize:12.5,color:CP.textSecondary}}>👤 {r.employee_name||"—"}{r.client_name?` · 🏠 ${r.client_name}`:""} · {new Date(r.created_at).toLocaleString(lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
                     {r.note&&<div style={{fontSize:12.5,color:CP.textPrimary,marginTop:2}}>💬 {r.note}</div>}
-                    {pr&&<div style={{fontSize:12,color:CP.textTertiary}}>{L("Im Lager","En almacén","In stock","In magazzino")}: {pr.stock??0} {pr.unit||""}</div>}
+                    {pr&&<div style={{fontSize:12,color:CP.textTertiary}}>{L("Im Lager","En almacén","In stock","In magazzino")}: {pr.stock??0} {uL(pr.unit)}</div>}
                   </div>
                   {r.status!=="pending"&&<span style={{fontWeight:700,fontSize:13,color:r.status==="approved"?"#0f7b0f":"#c42b1c"}}>{r.status==="approved"?"✅":"❌"}</span>}
                 </div>
@@ -10652,7 +10717,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {products.filter(p=>p.supplier===sup.id).map(p=>(
                     <span key={p.id} style={{background:"rgba(103,65,217,0.15)",border:"1px solid rgba(103,65,217,0.3)",borderRadius:12,padding:"3px 10px",fontSize:11,color:"#7e3fbf"}}>
-                      {p.icon} {pName(p)} ({p.stock} {p.unit})
+                      {p.icon} {pName(p)} ({p.stock} {uL(p.unit)})
                     </span>
                   ))}
                 </div>
@@ -10719,13 +10784,30 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <ImagePicker value={form.image} onChange={v=>setForm(f=>({...f,image:v||""}))} lang={lang} round={false} capture="environment" fallback={form.icon||"📦"}/>
           </CPField>
           <CPField label={t.productName||"Name"}>
-            <CPCombo testId="inv-pname" lang={lang} value={form.name||""} onChange={v=>setForm(f=>({...f,name:v}))} options={products.filter(p=>p.id!==selId).map(p=>p.name)}/>
-            {(()=>{ const dup=products.find(p=>p.id!==selId && comboNorm(p.name)===comboNorm(form.name)); return dup?(
+            <CPCombo testId="inv-pname" lang={lang} value={form.name||""} onChange={v=>setForm(f=>({...f,name:v}))} options={products.filter(p=>p.id!==selId).map(p=>pName(p))}/>
+            {(()=>{ const dup=products.find(p=>p.id!==selId && [p.name,...Object.values(p.names||{})].some(n=>comboNorm(n)===comboNorm(form.name))); return dup?(
               <div style={{marginTop:6,background:"rgba(197,90,0,0.08)",border:"1px solid rgba(197,90,0,0.35)",borderRadius:8,padding:"8px 10px",fontSize:12.5,color:"#9a5b00",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                ⚠️ {L("Dieses Produkt gibt es schon","Este producto ya existe","This product already exists","Questo prodotto esiste già")} ({dup.stock??0} {dup.unit||""})
-                <CPBtn size="sm" variant="secondary" onClick={()=>{ setSelId(dup.id); setForm({...dup}); }}>✏️ {L("Dieses bearbeiten","Editar ese producto","Edit that one","Modifica quello")}</CPBtn>
+                ⚠️ {L("Dieses Produkt gibt es schon","Este producto ya existe","This product already exists","Questo prodotto esiste già")} ({dup.stock??0} {uL(dup.unit)})
+                <CPBtn size="sm" variant="secondary" onClick={()=>{ setSelId(dup.id); setForm({...dup, name:pName(dup)}); }}>✏️ {L("Dieses bearbeiten","Editar ese producto","Edit that one","Modifica quello")}</CPBtn>
               </div>):null; })()}
           </CPField>
+          <details data-testid="inv-names" style={{margin:"-4px 0 12px",background:"rgba(0,103,192,.05)",border:"1px solid rgba(0,103,192,.2)",borderRadius:8,padding:"8px 10px"}}>
+            <summary style={{cursor:"pointer",fontSize:13,fontWeight:600,color:"#0067c0"}}>🌐 {L("Name in allen Sprachen (automatisch)","Nombre en todos los idiomas (automático)","Name in all languages (automatic)","Nome in tutte le lingue (automatico)")}</summary>
+            <div style={{fontSize:12,color:CP.textSecondary,margin:"6px 0 8px"}}>{L("Wird beim Speichern automatisch übersetzt. Sie können jede Übersetzung korrigieren.","Se traduce solo al guardar. Puedes corregir cualquier traducción.","Translated automatically when you save. You can correct any translation.","Viene tradotto al salvataggio. Puoi correggere ogni traduzione.")}</div>
+            {LANGS4.map(l=>(
+              <div key={l} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <span style={{width:26,fontSize:12,fontWeight:700,color:CP.textSecondary}}>{l}</span>
+                <div style={{flex:1}}><CPInput testId={"inv-name-"+l} value={(form.names||{})[l]||""} placeholder={form.name||""} onChange={e=>{ const v=e.target.value; setForm(f=>({...f,names:{...(f.names||{}),[l]:v},_namesTouched:true})); }}/></div>
+              </div>
+            ))}
+            <CPBtn size="sm" variant="secondary" onClick={async()=>{
+              if(!String(form.name||"").trim()) return;
+              notify("🌐 …","info",1500);
+              const res = await translateAll(form.name, {});
+              if(Object.keys(res).length){ setForm(f=>({...f,names:{...res,[lang]:String(f.name).trim()},_namesTouched:true})); notify(L("Übersetzt ✓","Traducido ✓","Translated ✓","Tradotto ✓")); }
+              else notify(L("Übersetzung jetzt nicht möglich (keine Verbindung)","No se pudo traducir ahora (sin conexión)","Translation not possible now (offline)","Traduzione non possibile ora (offline)"),"warning");
+            }}>🌐 {L("Jetzt übersetzen","Traducir ahora","Translate now","Traduci ora")}</CPBtn>
+          </details>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
             <CPField label={t.productCategory||"Category"}>
               <CPSelect value={form.category||"cleaning"} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
@@ -10737,7 +10819,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
               </CPSelect>
             </CPField>
             <CPField label={t.unit||"Unit"}>
-              <CPCombo lang={lang} value={form.unit??"Liter"} onChange={v=>setForm(f=>({...f,unit:v}))} options={["Liter","kg","Stück","Pack","Flasche","Rolle","Karton",...products.map(p=>p.unit)]}/>
+              <CPCombo lang={lang} value={uL(form.unit??"Liter")} onChange={v=>setForm(f=>({...f,unit:v}))} options={unitOptions(lang, products.map(p=>p.unit))}/>
             </CPField>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 12px"}}>
@@ -10755,7 +10837,7 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
             <CPCombo testId="inv-psup" lang={lang} value={form._supName ?? (suppliers.find(x=>x.id===form.supplier)?.name||"")} onChange={v=>setForm(f=>({...f,_supName:v}))} options={suppliers.map(x=>x.name)}/>
           </CPField>
           <CPField label={t.description||"Desc"}>
-            <CPCombo lang={lang} value={form.description||""} onChange={v=>setForm(f=>({...f,description:v}))} options={products.map(p=>p.description)}/>
+            <CPCombo lang={lang} value={form.description||""} onChange={v=>setForm(f=>({...f,description:v,_descTouched:true}))} options={products.map(p=>prodDesc(p,lang))}/>
           </CPField>
           <CPField label={t.locationLabel||"Location"}>
             <CPCombo lang={lang} value={form.location||""} onChange={v=>setForm(f=>({...f,location:v}))} options={products.map(p=>p.location)}/>
@@ -10768,12 +10850,33 @@ function InventoryApp({t,lang,notify,onBack,orders,setOrders,products,setProduct
               <CPBtn onClick={()=>setModal(null)} variant="secondary">{t.cancel}</CPBtn>
               <CPBtn onClick={()=>{
                 if(!String(form.name||"").trim()){notify(t.error,"error");return;}
-                const {_supName, ...clean} = form;
+                const {_supName, _namesTouched, _descTouched, _origName, _origDesc, ...clean} = form;
                 clean.name = String(clean.name).trim();
                 if(_supName!==undefined){ const supId = findOrAddSupplier(_supName, clean.category); clean.supplier = supId || ""; }
+                // names: if the name was changed in this language, the other languages are re-translated (unless typed by hand)
+                const nameChanged = !selId || clean.name !== (_origName ?? clean.name);
+                let names = {...(clean.names||{})};
+                if(nameChanged && !_namesTouched) names = {};
+                names[lang] = (_namesTouched && names[lang]) ? names[lang] : clean.name;
+                clean.names = names;
+                const descTxt = String(clean.description||"").trim();
+                const descChanged = !selId || descTxt !== (_origDesc ?? descTxt);
+                let descs = {...(clean.descriptions||{})};
+                if(descChanged) descs = descTxt ? {[lang]:descTxt} : {};
+                clean.descriptions = Object.keys(descs).length ? descs : null;
+                const pid = selId || gid();
                 if(selId) setProducts(prev=>prev.map(p=>p.id===selId?{...p,...clean}:p));
-                else setProducts(prev=>[...prev,{...clean,id:gid()}]);
+                else setProducts(prev=>[...prev,{...clean,id:pid}]);
                 notify(t.success);setModal(null);
+                const needN = LANGS4.some(l=>!names[l]); const needD = descTxt && LANGS4.some(l=>!(descs||{})[l]);
+                if(needN || needD){
+                  (async()=>{
+                    const n2 = needN ? await translateAll(clean.name, names) : names;
+                    const d2 = needD ? await translateAll(descTxt, descs) : clean.descriptions;
+                    setProducts(prev=>prev.map(p=>p.id===pid?{...p,names:n2,descriptions:d2}:p));
+                    if(LANGS4.every(l=>n2[l])) notify(`🌐 ${L("In alle Sprachen übersetzt","Traducido a todos los idiomas","Translated into all languages","Tradotto in tutte le lingue")}: ${n2[lang]||clean.name}`,"success",3500);
+                  })();
+                }
               }}>💾 {t.save}</CPBtn>
             </div>
           </div>
