@@ -140,7 +140,7 @@ const T = {
     notClockedIn:"Nicht eingecheckt",
     swissLegalNotes:"Schweizer Rechtshinweise",
     securityActive:"Sicherheitsstatus: Aktiv",
-    contracts:"Verträge", documents:"Dokumente", pricecalc:"Preisrechner", materials:"Material", newContract:"Neuer Vertrag", contractType:"Vertragsart",
+    contracts:"Verträge", documents:"Dokumente", pricecalc:"Preisrechner", agenda:"Termine", materials:"Material", newContract:"Neuer Vertrag", contractType:"Vertragsart",
     clientContract:"Kundenvertrag", employeeContract:"Arbeitsvertrag",
     contractDate:"Vertragsdatum", contractStart:"Beginn", contractEnd:"Ende",
     contractSalary:"Lohn/Tarif", contractHours:"Arbeitsstunden/Woche",
@@ -292,7 +292,7 @@ const T = {
     notClockedIn:"Sin fichar",
     swissLegalNotes:"Notas legales suizas",
     securityActive:"Estado seguridad: Activo",
-    contracts:"Contratos", documents:"Documentos", pricecalc:"Calculadora de precios", materials:"Materiales", newContract:"Nuevo contrato", contractType:"Tipo de contrato",
+    contracts:"Contratos", documents:"Documentos", pricecalc:"Calculadora de precios", agenda:"Agenda", materials:"Materiales", newContract:"Nuevo contrato", contractType:"Tipo de contrato",
     clientContract:"Contrato cliente", employeeContract:"Contrato laboral",
     contractDate:"Fecha contrato", contractStart:"Inicio", contractEnd:"Fin",
     contractSalary:"Salario/Tarifa", contractHours:"Horas semanales",
@@ -443,7 +443,7 @@ const T = {
     notClockedIn:"Not clocked in",
     swissLegalNotes:"Swiss Legal Notes",
     securityActive:"Security status: Active",
-    contracts:"Contracts", documents:"Documents", pricecalc:"Price calculator", materials:"Materials", newContract:"New Contract", contractType:"Contract type",
+    contracts:"Contracts", documents:"Documents", pricecalc:"Price calculator", agenda:"Appointments", materials:"Materials", newContract:"New Contract", contractType:"Contract type",
     clientContract:"Client contract", employeeContract:"Employment contract",
     contractDate:"Contract date", contractStart:"Start", contractEnd:"End",
     contractSalary:"Salary/Rate", contractHours:"Weekly hours",
@@ -594,7 +594,7 @@ const T = {
     notClockedIn:"Non timbrato",
     swissLegalNotes:"Note legali svizzere",
     securityActive:"Stato sicurezza: Attivo",
-    contracts:"Contratti", documents:"Documenti", pricecalc:"Calcolatore prezzi", materials:"Materiali", newContract:"Nuovo contratto", contractType:"Tipo contratto",
+    contracts:"Contratti", documents:"Documenti", pricecalc:"Calcolatore prezzi", agenda:"Agenda", materials:"Materiali", newContract:"Nuovo contratto", contractType:"Tipo contratto",
     clientContract:"Contratto cliente", employeeContract:"Contratto di lavoro",
     contractDate:"Data contratto", contractStart:"Inizio", contractEnd:"Fine",
     contractSalary:"Salario/Tariffa", contractHours:"Ore settimanali",
@@ -1157,6 +1157,7 @@ const APPS = [
   {id:"dashboard", icon:"🏠", color:"#1C7ED6"},
   {id:"clients",   icon:"👥", color:"#2F9E44"},
   {id:"jobs",      icon:"📋", color:"#F08C00"},
+  {id:"agenda",    icon:"📅", color:"#0067C0"},
   {id:"employees", icon:"👤", color:"#7048E8"},
   {id:"invoices",  icon:"🧾", color:"#C92A2A"},
   {id:"finance",   icon:"💰", color:"#0CA678"},
@@ -1992,6 +1993,17 @@ export default function PatjacCarPlay(){
     setTimeout(()=>setNotification(null),ms);
   },[]);
 
+  // ── ADMIN: today's appointments (📅 Agenda) for the home card and the badge
+  const [apptToday,setApptToday] = useState([]);
+  const loadApptToday = useRef(null);
+  useEffect(()=>{
+    if(authState!=="app" || currentUser?.role!=="admin"){ setApptToday([]); loadApptToday.current=null; return; }
+    const f = () => { const d=ymd(new Date()); docsFetch(`appointments?select=id,title,kind,client_name,address,time_start,time_end&date=eq.${d}&status=eq.scheduled&order=time_start.asc`).then(r=>{ if(Array.isArray(r)) setApptToday(r); }).catch(()=>{}); };
+    loadApptToday.current = f; f();
+    const iv = setInterval(f, 5*60*1000);
+    return ()=>clearInterval(iv);
+  },[authState, currentUser?.role]);
+
   // ── ADMIN: "already billed" marks shared by all devices (table billing_dismissed)
   const [billDismissed,setBillDismissed] = useState(()=>new Set());
   useEffect(()=>{
@@ -2240,6 +2252,7 @@ export default function PatjacCarPlay(){
       case "materials":  return currentUser?.role==="employee" ? <EmployeeMaterialsApp {...props} lang={lang}/> : null;
       case "documents":  return <DocumentsApp {...props} lang={lang} currentUser={currentUser} contracts={contracts} companySettings={companySettings}/>;
       case "pricecalc":  return currentUser?.role==="admin" ? <PriceCalculatorApp {...props} lang={lang}/> : null;
+      case "agenda":     return currentUser?.role==="admin" ? <AgendaApp t={t} lang={lang} clients={clients} jobs={jobs} notify={notify} onBack={()=>setActiveApp(null)} onChanged={()=>loadApptToday.current?.()}/> : null;
       case "contracts":  return <ContractsApp {...props} lang={lang} currentUser={currentUser} contracts={contracts} setContracts={dbSetContracts}/>;
       default: return null;
     }
@@ -2387,7 +2400,7 @@ export default function PatjacCarPlay(){
   const unreadCount = (messages||[]).filter(m=>!m.read&&m.to===(currentUser?.id||"admin")).length;
   const homeLabel = L("Start","Inicio","Home","Home");
   const shortName = id => ({messaging:L("Nachrichten","Mensajes","Messages","Messaggi"),settings:L("Einstellungen","Ajustes","Settings","Impostazioni"),timeclock:L("Zeit","Fichaje","Clock","Presenze")})[id];
-  const mkItem = app => ({id:app.id,icon:app.icon,label:appName(app.id),short:shortName(app.id),badge:app.id==="messaging"&&unreadCount>0?unreadCount:app.id==="inventory"&&matPending.length>0?matPending.length:app.id==="invoices"&&billingDueAll.length>0?billingDueAll.length:null});
+  const mkItem = app => ({id:app.id,icon:app.icon,label:appName(app.id),short:shortName(app.id),badge:app.id==="messaging"&&unreadCount>0?unreadCount:app.id==="inventory"&&matPending.length>0?matPending.length:app.id==="invoices"&&billingDueAll.length>0?billingDueAll.length:app.id==="agenda"&&apptToday.length>0?apptToday.length:null});
   const homeItem = {id:null,icon:"🏠",label:homeLabel};
   const navItems = currentUser?.role==="employee" ? [homeItem,...EMPLOYEE_APPS.map(mkItem)] : [homeItem,...APPS.map(mkItem)];
   const tabIds = currentUser?.role==="employee" ? ["timeclock","jobs","messaging"] : ["jobs","messaging","settings"];
@@ -2477,7 +2490,7 @@ export default function PatjacCarPlay(){
               jobs={jobs} invoices={invoices} clients={clients} employees={employees}
               notify={notify} messages={messages} onIssueInvoice={g=>{setInvoicePrefill(g); openApp("invoices");}}
               lastBackupAt={companySettings.lastBackupAt} onBackup={doBackup} backupBusy={backupBusy}
-              billingDue={billingDueAll} onDismissBill={dismissBilling}
+              billingDue={billingDueAll} onDismissBill={dismissBilling} apptToday={apptToday}
               matPending={matPending.map(x=>({...x,product_name:prodName(products.find(p=>p.id===x.product_id)||{name:x.product_name},lang)}))} onOpenMat={()=>{ INV_OPEN.view="requests"; openApp("inventory"); }}/>
           )}
         </div>
@@ -2614,7 +2627,7 @@ function StorageMeter({lang, onBackup}){
 }
 
 // ─── HOME SCREEN (Admin) ─────────────────────────────────────
-function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,employees,notify,messages,onIssueInvoice,lastBackupAt,onBackup,backupBusy,matPending,onOpenMat,billingDue:billingDueIn,onDismissBill}){
+function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,employees,notify,messages,onIssueInvoice,lastBackupAt,onBackup,backupBusy,matPending,onOpenMat,billingDue:billingDueIn,onDismissBill,apptToday}){
   const matCount = (matPending||[]).length;
   const L = makeL(lang);
   const billingDue = billingDueIn || [];
@@ -2649,6 +2662,16 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
         <CPStat label={t.pendingInvoices} value={pending} icon="🧾" accent={pending>0?"#C92A2A":"#2F9E44"}/>
         <CPStat label={t.activeEmployees} value={employees.filter(e=>e.active).length} icon="👤" accent="#7048E8"/>
       </div>
+      {(apptToday||[]).length>0&&(
+        <div data-testid="appt-today" onClick={()=>openApp("agenda")} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",marginBottom:14,borderRadius:10,cursor:"pointer",background:"rgba(0,103,192,.07)",border:"1px solid rgba(0,103,192,.3)"}}>
+          <span style={{fontSize:28}}>📅</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{color:"#0067c0",fontWeight:700,fontSize:14.5}}>{L(`Heute ${apptToday.length} Termin(e)`,`Hoy tienes ${apptToday.length} ${apptToday.length===1?"cita":"citas"}`,`${apptToday.length} appointment(s) today`,`Oggi ${apptToday.length} appuntamento/i`)}</div>
+            <div style={{color:CP.textSecondary,fontSize:12.5,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{apptToday.slice(0,3).map(a=>`${a.time_start} ${a.title}`).join(" · ")}</div>
+          </div>
+          <span style={{background:"#0067c0",color:"#fff",borderRadius:6,padding:"6px 10px",fontSize:12.5,fontWeight:600,whiteSpace:"nowrap"}}>{L("Ansehen","Ver","View","Vedi")} →</span>
+        </div>
+      )}
       {matCount>0&&(
         <div data-testid="mat-alert" onClick={onOpenMat} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",marginBottom:14,borderRadius:10,cursor:"pointer",
           background:"rgba(103,65,217,.08)",border:"1px solid rgba(103,65,217,.35)"}}>
@@ -2665,7 +2688,7 @@ function HomeScreen({t,openApp,clock,lang,currentUser,jobs,invoices,clients,empl
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(4,1fr)":"repeat(auto-fill,minmax(124px,1fr))",gap:mob?8:10,marginBottom:20}}>
         {allApps.map(app=>(
           <AppTile key={app.id} app={app} label={mob&&app.id==="pricecalc"?L("Preise","Precios","Prices","Prezzi"):mob&&app.id==="inventory"?L("Lager","Almacén","Stock","Magazzino"):app.id==="payroll"?(t.payrollTitle||"Payroll"):t[app.id]||app.id} onOpen={()=>openApp(app.id)}
-            badge={app.id==="messaging"&&unreadMsg>0?unreadMsg:app.id==="inventory"&&matCount>0?matCount:app.id==="invoices"&&(pending+billingDue.length)>0?(pending+billingDue.length):null}
+            badge={app.id==="messaging"&&unreadMsg>0?unreadMsg:app.id==="inventory"&&matCount>0?matCount:app.id==="agenda"&&(apptToday||[]).length>0?apptToday.length:app.id==="invoices"&&(pending+billingDue.length)>0?(pending+billingDue.length):null}
           />
         ))}
       </div>
@@ -2842,6 +2865,262 @@ async function translateAll(text, keep={}){
 
 // Lets the admin home card open "Almacén" directly on the 📨 Requests tab
 const INV_OPEN = { view: null };
+
+// ─── AGENDA (administrator only) ─────────────────────────────
+// Appointments / visits with clients: date, time, place, reminder on the phone (server sends it), WhatsApp confirmation, calendar file.
+const APPT_KINDS = [
+  {id:"visit",   icon:"🏠", L:["Besuch beim Kunden","Visita al cliente","Client visit","Visita al cliente"]},
+  {id:"quote",   icon:"📐", L:["Besichtigung / Offerte","Visita para presupuesto","Quote visit","Sopralluogo / preventivo"]},
+  {id:"call",    icon:"📞", L:["Anruf","Llamada","Call","Chiamata"]},
+  {id:"meeting", icon:"🤝", L:["Besprechung","Reunión","Meeting","Riunione"]},
+  {id:"other",   icon:"📌", L:["Sonstiges","Otro","Other","Altro"]},
+];
+const apptKind = id => APPT_KINDS.find(k=>k.id===id) || APPT_KINDS[0];
+const apptLangIdx = lang => ({DE:0,ES:1,EN:2,IT:3}[lang] ?? 1);
+const addMinutesHHMM = (hhmm, m) => { const [h,mi]=(hhmm||"09:00").split(":").map(Number); const t=Math.min(23*60+59, h*60+mi+m); return `${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`; };
+const hhmmToMin = s => { const [h,m]=(s||"0:0").split(":").map(Number); return (h||0)*60+(m||0); };
+
+function AgendaApp({t,lang,clients,jobs,notify,onBack,onChanged}){
+  const L = makeL(lang);
+  const li = apptLangIdx(lang);
+  const loc = lang==="DE"?"de-CH":lang==="ES"?"es-ES":lang==="IT"?"it-IT":"en-GB";
+  const [items,setItems] = useState(null);
+  const [view,setView] = useState("month");          // month | list
+  const [month,setMonth] = useState(()=>todayStr.slice(0,7));
+  const [day,setDay] = useState(todayStr);
+  const [form,setForm] = useState(null);
+  const [showPast,setShowPast] = useState(false);
+  const [busy,setBusy] = useState(false);
+  const [delId,setDelId] = useState(null);
+
+  const load = async () => {
+    try{
+      const from = ymd(new Date(Date.now()-120*86400000));
+      const r = await docsFetch(`appointments?select=*&date=gte.${from}&order=date.asc,time_start.asc&limit=1000`);
+      setItems(Array.isArray(r)?r:[]);
+    }catch(e){ setItems([]); notify(L("Keine Verbindung","Sin conexión","No connection","Nessuna connessione"),"error"); }
+  };
+  useEffect(()=>{ load(); },[]);
+  const changed = () => { load(); onChanged&&onChanged(); };
+
+  const cap1 = x => x ? x.charAt(0).toUpperCase()+x.slice(1) : x;
+  const fmtDay = d => cap1(new Date(d+"T12:00:00").toLocaleDateString(loc,{weekday:"long",day:"numeric",month:"long"}));
+  const kindLabel = id => apptKind(id).L[li];
+  const list = items||[];
+  const byDate = useMemo(()=>{ const m={}; list.forEach(a=>{ (m[a.date]=m[a.date]||[]).push(a); }); Object.values(m).forEach(v=>v.sort((a,b)=>(a.time_start||"").localeCompare(b.time_start||""))); return m; },[items]);
+  const jobsOn = d => (jobs||[]).filter(j=>j.date===d && j.status!=="cancelled");
+
+  const blank = (d) => ({id:null,title:"",kind:"visit",client_id:null,client_name:"",phone:"",email:"",address:"",date:d||day||todayStr,time_start:"09:00",time_end:"10:00",status:"scheduled",notes:"",remind_minutes:60});
+  const openNew = (d) => setForm(blank(d));
+  const openEdit = (a) => setForm({...a, phone:a.phone||"", email:a.email||"", address:a.address||"", notes:a.notes||"", time_end:a.time_end||""});
+  const pickClient = (name) => {
+    const c = (clients||[]).find(x=>comboNorm(x.name)===comboNorm(name));
+    setForm(f=>({...f, client_name:name, client_id:c?c.id:null,
+      ...(c?{phone:f.phone||c.phone||"", email:f.email||c.email||"", address:f.address||clientAddr(c)}:{})}));
+  };
+  const conflicts = form ? (byDate[form.date]||[]).filter(a=>a.id!==form.id && a.status==="scheduled" && form.time_start &&
+      hhmmToMin(form.time_start) < hhmmToMin(a.time_end||addMinutesHHMM(a.time_start,60)) && hhmmToMin(form.time_end||addMinutesHHMM(form.time_start,60)) > hhmmToMin(a.time_start)) : [];
+
+  const save = async () => {
+    if(!form || busy) return;
+    const title = String(form.title||"").trim() || kindLabel(form.kind) + (form.client_name?` – ${form.client_name}`:"");
+    if(!form.date || !/^\d{1,2}:\d{2}$/.test(form.time_start||"")){ notify(L("Datum und Uhrzeit angeben","Indica fecha y hora","Enter date and time","Indica data e ora"),"error"); return; }
+    if(form.time_end && hhmmToMin(form.time_end) <= hhmmToMin(form.time_start)){ notify(L("Ende muss nach dem Beginn sein","La hora de fin debe ser después del inicio","End must be after start","La fine deve essere dopo l'inizio"),"error"); return; }
+    const row = {title:title.slice(0,140), kind:form.kind, client_id:form.client_id||null, client_name:(form.client_name||"").trim().slice(0,120)||null,
+      phone:(form.phone||"").trim().slice(0,40)||null, email:(form.email||"").trim().slice(0,120)||null, address:(form.address||"").trim().slice(0,200)||null,
+      date:form.date, time_start:form.time_start, time_end:form.time_end||null, status:form.status||"scheduled", notes:(form.notes||"").slice(0,1000)||null,
+      remind_minutes:Number(form.remind_minutes)||0};
+    setBusy(true);
+    try{
+      if(form.id) await docsFetch(`appointments?id=eq.${form.id}`,"PATCH",row);
+      else await docsFetch("appointments","POST",row);
+      notify(`📅 ${L("Termin gespeichert","Cita guardada","Appointment saved","Appuntamento salvato")} · ${fmtDay(row.date)} ${row.time_start}`,"success",3500);
+      setForm(null); setDay(row.date); setMonth(row.date.slice(0,7)); changed();
+    }catch(e){ notify(t.error||"Error","error"); }
+    finally{ setBusy(false); }
+  };
+  const setStatus = async (a, status) => {
+    try{ await docsFetch(`appointments?id=eq.${a.id}`,"PATCH",{status}); changed();
+      notify(status==="done"?`✅ ${L("Erledigt","Hecha","Done","Fatto")}`:status==="cancelled"?`🚫 ${L("Abgesagt","Cancelada","Cancelled","Annullato")}`:`↩️ ${L("Wieder geplant","Programada de nuevo","Scheduled again","Riprogrammato")}`,"info"); }
+    catch(e){ notify(t.error||"Error","error"); }
+  };
+  const remove = async (id) => {
+    try{ await docsFetch(`appointments?id=eq.${id}`,"DELETE"); setDelId(null); setForm(null); changed(); notify(L("Termin gelöscht","Cita eliminada","Appointment deleted","Appuntamento eliminato"),"success"); }
+    catch(e){ notify(t.error||"Error","error"); }
+  };
+  // WhatsApp confirmation to the client (in the app language)
+  const waText = a => L(
+    `Guten Tag${a.client_name?" "+a.client_name:""}\nWir bestätigen unseren Termin am ${fmtDay(a.date)} um ${a.time_start} Uhr${a.address?` (${a.address})`:""}.\nFreundliche Grüsse\nPatjac Reinigung Garten Services`,
+    `Hola${a.client_name?" "+a.client_name:""}:\nLe confirmamos nuestra cita el ${fmtDay(a.date)} a las ${a.time_start}${a.address?` (${a.address})`:""}.\nUn saludo,\nPatjac Reinigung Garten Services`,
+    `Hello${a.client_name?" "+a.client_name:""},\nWe confirm our appointment on ${fmtDay(a.date)} at ${a.time_start}${a.address?` (${a.address})`:""}.\nKind regards,\nPatjac Reinigung Garten Services`,
+    `Buongiorno${a.client_name?" "+a.client_name:""},\nconfermiamo il nostro appuntamento il ${fmtDay(a.date)} alle ${a.time_start}${a.address?` (${a.address})`:""}.\nCordiali saluti,\nPatjac Reinigung Garten Services`);
+  const waLink = a => { const ph=String(a.phone||"").replace(/[^\d+]/g,"").replace(/^00/,"+").replace(/^0(\d{9})$/,"+41$1").replace(/^\+/,""); return `https://wa.me/${ph}?text=${encodeURIComponent(waText(a))}`; };
+  // .ics file → adds the appointment to the phone / computer calendar
+  const downloadIcs = a => {
+    const z = (d,tm) => d.replace(/-/g,"")+"T"+(tm||"09:00").replace(":","")+"00";
+    const esc = s => String(s||"").replace(/[\\;,]/g,m=>"\\"+m).replace(/\n/g,"\\n");
+    const ics = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Patjac//Agenda//ES","BEGIN:VEVENT",`UID:${a.id}@patjac`,`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").slice(0,15)}Z`,
+      `DTSTART;TZID=Europe/Zurich:${z(a.date,a.time_start)}`,`DTEND;TZID=Europe/Zurich:${z(a.date,a.time_end||addMinutesHHMM(a.time_start,60))}`,
+      `SUMMARY:${esc(a.title)}`,a.address?`LOCATION:${esc(a.address)}`:"",`DESCRIPTION:${esc([a.client_name,a.phone,a.notes].filter(Boolean).join(" · "))}`,
+      a.remind_minutes>0?`BEGIN:VALARM\r\nTRIGGER:-PT${a.remind_minutes}M\r\nACTION:DISPLAY\r\nDESCRIPTION:${esc(a.title)}\r\nEND:VALARM`:"","END:VEVENT","END:VCALENDAR"].filter(Boolean).join("\r\n");
+    const u = URL.createObjectURL(new Blob([ics],{type:"text/calendar"})); const el=document.createElement("a"); el.href=u; el.download=`cita-${a.date}.ics`; document.body.appendChild(el); el.click(); el.remove(); setTimeout(()=>URL.revokeObjectURL(u),2000);
+  };
+  const stColor = s => s==="done"?"#107c10":s==="cancelled"?"#8a8a8a":"#0067c0";
+  const remindOpts = [[0,L("Keine Erinnerung","Sin aviso","No reminder","Nessun promemoria")],[15,L("15 Min. vorher","15 min antes","15 min before","15 min prima")],[30,L("30 Min. vorher","30 min antes","30 min before","30 min prima")],[60,L("1 Std. vorher","1 hora antes","1 hour before","1 ora prima")],[120,L("2 Std. vorher","2 horas antes","2 hours before","2 ore prima")],[1440,L("1 Tag vorher","1 día antes","1 day before","1 giorno prima")]];
+
+  const Card = ({a}) => {
+    const k = apptKind(a.kind); const past = a.date<todayStr || (a.date===todayStr && hhmmToMin(a.time_end||a.time_start) < hhmmToMin(new Date().toTimeString().slice(0,5)));
+    return (
+      <CPCard data-appt={a.id} style={{padding:"12px 14px",borderLeft:`4px solid ${stColor(a.status)}`,opacity:a.status==="cancelled"?.6:1}}>
+        <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+          <div style={{minWidth:58,textAlign:"center"}}>
+            <div style={{fontSize:18,fontWeight:800,color:CP.textPrimary}}>{a.time_start}</div>
+            {a.time_end&&<div style={{fontSize:11.5,color:CP.textTertiary}}>{a.time_end}</div>}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:14.5,color:CP.textPrimary,textDecoration:a.status==="cancelled"?"line-through":"none"}}>{k.icon} {a.title}</div>
+            <div style={{fontSize:12.5,color:CP.textSecondary,marginTop:2}}>{k.L[li]}{a.client_name?` · 👤 ${a.client_name}`:""}{a.phone?` · ${a.phone}`:""}</div>
+            {a.address&&<div style={{fontSize:12.5,color:CP.textSecondary}}>📍 {a.address}</div>}
+            {a.notes&&<div style={{fontSize:12.5,color:CP.textPrimary,marginTop:3}}>📝 {a.notes}</div>}
+            <div style={{fontSize:11.5,marginTop:4,color:stColor(a.status),fontWeight:600}}>
+              {a.status==="done"?`✅ ${L("Erledigt","Hecha","Done","Fatto")}`:a.status==="cancelled"?`🚫 ${L("Abgesagt","Cancelada","Cancelled","Annullato")}`:past?`⏰ ${L("Vorbei – als erledigt markieren?","Ya pasó: ¿marcar como hecha?","Past – mark as done?","Passato – segnare come fatto?")}`:(a.remind_minutes>0?`🔔 ${remindOpts.find(o=>o[0]===a.remind_minutes)?.[1]||a.remind_minutes+" min"}`:`🔕 ${L("Keine Erinnerung","Sin aviso","No reminder","Nessun promemoria")}`)}
+            </div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>
+          <CPBtn size="sm" variant="secondary" onClick={()=>openEdit(a)}>✏️ {L("Ändern","Editar","Edit","Modifica")}</CPBtn>
+          {a.status==="scheduled"?<CPBtn size="sm" variant="secondary" onClick={()=>setStatus(a,"done")}>✅ {L("Erledigt","Hecha","Done","Fatto")}</CPBtn>
+            :<CPBtn size="sm" variant="secondary" onClick={()=>setStatus(a,"scheduled")}>↩️ {L("Wieder planen","Volver a programar","Reschedule","Riprogramma")}</CPBtn>}
+          {a.phone&&<a href={`tel:${String(a.phone).replace(/[^\d+]/g,"")}`} style={{textDecoration:"none"}}><CPBtn size="sm" variant="secondary">📞</CPBtn></a>}
+          {a.phone&&a.status==="scheduled"&&<a href={waLink(a)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><CPBtn size="sm" variant="secondary">💬 {L("Bestätigen","Confirmar","Confirm","Conferma")}</CPBtn></a>}
+          {a.address&&<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.address)}`} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><CPBtn size="sm" variant="secondary">🗺️</CPBtn></a>}
+          <CPBtn size="sm" variant="secondary" onClick={()=>downloadIcs(a)}>📆 {L("In Kalender","Al calendario","To calendar","Al calendario")}</CPBtn>
+        </div>
+      </CPCard>);
+  };
+
+  // month grid (Monday first)
+  const [yy,mm] = month.split("-").map(Number);
+  const first = new Date(yy,mm-1,1); const lead = (first.getDay()+6)%7; const daysIn = new Date(yy,mm,0).getDate();
+  const cells = [...Array(lead).fill(null), ...Array.from({length:daysIn},(_,i)=>`${month}-${String(i+1).padStart(2,"0")}`)];
+  while(cells.length%7) cells.push(null);
+  const shiftMonth = n => { const d=new Date(yy,mm-1+n,1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`); };
+  const wd = [...Array(7)].map((_,i)=>new Date(2024,0,1+i).toLocaleDateString(loc,{weekday:"short"}));
+  const upcoming = list.filter(a=>a.date>=todayStr && a.status==="scheduled");
+  const listShown = showPast ? [...list].reverse() : upcoming;
+  const todayCount = (byDate[todayStr]||[]).filter(a=>a.status==="scheduled").length;
+
+  return (
+    <CPScreen title={t.agenda||"Agenda"} icon="📅" onBack={onBack} t={t}
+      actions={<CPBtn size="sm" onClick={()=>openNew(view==="month"?day:todayStr)}>＋ {L("Neuer Termin","Nueva cita","New appointment","Nuovo appuntamento")}</CPBtn>}>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        {[["month","📅",L("Monat","Mes","Month","Mese")],["list","📋",L("Nächste Termine","Próximas citas","Upcoming","Prossimi")]].map(([id,ic,lb])=>(
+          <button key={id} onClick={()=>setView(id)} style={{padding:"8px 14px",borderRadius:20,border:`1px solid ${view===id?"#0067c0":CP.border}`,background:view===id?"#0067c0":"#fff",color:view===id?"#fff":CP.textPrimary,fontWeight:600,cursor:"pointer",fontFamily:CP.font}}>{ic} {lb}</button>))}
+        <span style={{marginLeft:"auto",fontSize:13,color:CP.textSecondary}}>{L("Heute","Hoy","Today","Oggi")}: <b style={{color:"#0067c0"}}>{todayCount}</b> · {L("Kommend","Próximas","Upcoming","Prossimi")}: <b>{upcoming.length}</b></span>
+      </div>
+      {items===null&&<div style={{textAlign:"center",padding:30,color:CP.textTertiary}}>⏳</div>}
+
+      {items!==null&&view==="month"&&<>
+        <CPCard style={{padding:12,marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <CPBtn size="sm" variant="secondary" onClick={()=>shiftMonth(-1)}>‹</CPBtn>
+            <div style={{fontWeight:700,fontSize:16}}>{cap1(first.toLocaleDateString(loc,{month:"long",year:"numeric"}))}</div>
+            <CPBtn size="sm" variant="secondary" onClick={()=>shiftMonth(1)}>›</CPBtn>
+          </div>
+          <div data-testid="agenda-grid" style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+            {wd.map((w,i)=><div key={i} style={{textAlign:"center",fontSize:11,fontWeight:700,color:CP.textTertiary,textTransform:"uppercase"}}>{w}</div>)}
+            {cells.map((d,i)=>{ if(!d) return <div key={i}/>;
+              const n=(byDate[d]||[]).filter(a=>a.status==="scheduled").length; const nj=jobsOn(d).length; const sel=d===day; const isT=d===todayStr;
+              return (
+                <button key={i} data-day={d} onClick={()=>setDay(d)} onDoubleClick={()=>openNew(d)} style={{minHeight:52,borderRadius:8,cursor:"pointer",fontFamily:CP.font,padding:"4px 2px",
+                  border:`1px solid ${sel?"#0067c0":isT?"rgba(0,103,192,.45)":CP.border}`,background:sel?"rgba(0,103,192,.10)":"#fff",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                  <span style={{fontSize:13.5,fontWeight:isT?800:600,color:isT?"#0067c0":d<todayStr?CP.textTertiary:CP.textPrimary}}>{Number(d.slice(8))}</span>
+                  {n>0&&<span style={{background:"#0067c0",color:"#fff",borderRadius:9,fontSize:10,fontWeight:700,padding:"0 6px"}}>{n}</span>}
+                  {nj>0&&<span style={{fontSize:9,color:"#9a5b00"}}>📋{nj}</span>}
+                </button>); })}
+          </div>
+          <div style={{fontSize:11.5,color:CP.textTertiary,marginTop:8}}>🔵 {L("Termine","Citas","Appointments","Appuntamenti")} · 📋 {L("Aufträge der Mitarbeiter","Trabajos de los empleados","Employee jobs","Lavori dei dipendenti")}</div>
+        </CPCard>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,gap:8,flexWrap:"wrap"}}>
+          <div style={{fontWeight:700,fontSize:15}}>{fmtDay(day)}</div>
+          <CPBtn size="sm" variant="secondary" onClick={()=>openNew(day)}>＋ {L("Termin an diesem Tag","Cita este día","Appointment this day","Appuntamento in questo giorno")}</CPBtn>
+        </div>
+        {jobsOn(day).length>0&&<div style={{fontSize:12.5,color:"#9a5b00",marginBottom:8}}>📋 {jobsOn(day).length} {L("Aufträge","trabajos","jobs","lavori")}: {jobsOn(day).slice(0,4).map(j=>`${j.timeStart} ${j.clientName}`).join(" · ")}</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {(byDate[day]||[]).length===0&&<CPCard style={{textAlign:"center",color:CP.textSecondary}}>{L("Keine Termine an diesem Tag","No hay citas este día","No appointments this day","Nessun appuntamento")}</CPCard>}
+          {(byDate[day]||[]).map(a=><Card key={a.id} a={a}/>)}
+        </div>
+      </>}
+
+      {items!==null&&view==="list"&&<>
+        <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:CP.textSecondary,marginBottom:10}}><input type="checkbox" checked={showPast} onChange={e=>setShowPast(e.target.checked)}/> {L("Alle anzeigen (auch vergangene / erledigte)","Ver todas (también pasadas / hechas)","Show all (also past / done)","Mostra tutti (anche passati / fatti)")}</label>
+        {listShown.length===0&&<CPCard style={{textAlign:"center",color:CP.textSecondary}}>{L("Keine kommenden Termine","No hay citas próximas","No upcoming appointments","Nessun appuntamento in arrivo")}</CPCard>}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {listShown.map((a,i)=>(<div key={a.id}>
+            {(i===0||listShown[i-1].date!==a.date)&&<div style={{fontWeight:700,fontSize:13.5,color:a.date===todayStr?"#0067c0":CP.textSecondary,margin:"8px 0 6px"}}>{a.date===todayStr?`● ${L("Heute","Hoy","Today","Oggi")} – `:""}{fmtDay(a.date)}</div>}
+            <Card a={a}/>
+          </div>))}
+        </div>
+      </>}
+
+      {form&&(
+        <CPModal title={form.id?`✏️ ${L("Termin ändern","Editar cita","Edit appointment","Modifica appuntamento")}`:`📅 ${L("Neuer Termin","Nueva cita","New appointment","Nuovo appuntamento")}`} onClose={()=>setForm(null)} width={520}>
+          <CPField label={L("Art","Tipo","Type","Tipo")}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {APPT_KINDS.map(k=><button key={k.id} onClick={()=>setForm(f=>({...f,kind:k.id}))} style={{padding:"7px 10px",borderRadius:18,cursor:"pointer",fontFamily:CP.font,fontSize:12.5,
+                border:`1px solid ${form.kind===k.id?"#0067c0":CP.border}`,background:form.kind===k.id?"rgba(0,103,192,.12)":"#fff",fontWeight:form.kind===k.id?700:500}}>{k.icon} {k.L[li]}</button>)}
+            </div>
+          </CPField>
+          <CPField label={L("Kunde (wählen oder neu schreiben)","Cliente (elige o escribe uno nuevo)","Client (pick or type a new one)","Cliente (scegli o scrivi)")}>
+            <CPCombo testId="appt-client" lang={lang} value={form.client_name||""} onChange={pickClient} options={(clients||[]).filter(c=>c.active!==false).map(c=>c.name)}/>
+          </CPField>
+          <CPField label={L("Titel (optional)","Título (opcional)","Title (optional)","Titolo (facoltativo)")}>
+            <CPInput testId="appt-title" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder={`${apptKind(form.kind).L[li]}${form.client_name?` – ${form.client_name}`:""}`}/>
+          </CPField>
+          <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr 1fr",gap:"0 10px"}}>
+            <CPField label={L("Datum","Fecha","Date","Data")}><CPInput testId="appt-date" type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></CPField>
+            <CPField label={L("Von","Desde","From","Dalle")}><CPInput testId="appt-start" type="time" value={form.time_start} onChange={e=>{ const v=e.target.value; setForm(f=>({...f,time_start:v, time_end: (!f.time_end || hhmmToMin(f.time_end)<=hhmmToMin(v)) ? addMinutesHHMM(v,60) : f.time_end})); }}/></CPField>
+            <CPField label={L("Bis","Hasta","To","Alle")}><CPInput testId="appt-end" type="time" value={form.time_end||""} onChange={e=>setForm(f=>({...f,time_end:e.target.value}))}/></CPField>
+          </div>
+          {conflicts.length>0&&<div style={{background:"rgba(197,90,0,.08)",border:"1px solid rgba(197,90,0,.35)",borderRadius:8,padding:"8px 10px",fontSize:12.5,color:"#9a5b00",marginBottom:10}}>
+            ⚠️ {L("Überschneidung mit","Coincide con","Overlaps with","Si sovrappone a")}: {conflicts.map(c=>`${c.time_start} ${c.title}`).join(" · ")}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>
+            <CPField label={L("Telefon","Teléfono","Phone","Telefono")}><CPInput value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} inputMode="tel" placeholder="+41 79 …"/></CPField>
+            <CPField label="E-mail"><CPInput value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} inputMode="email"/></CPField>
+          </div>
+          <CPField label={L("Adresse / Ort","Dirección / lugar","Address / place","Indirizzo / luogo")}><CPInput value={form.address} onChange={e=>setForm(f=>({...f,address:e.target.value}))} placeholder={L("Strasse Nr, PLZ Ort","Calle n.º, CP ciudad","Street no., ZIP city","Via n., CAP città")}/></CPField>
+          <CPField label={`🔔 ${L("Erinnerung aufs Handy","Aviso en el móvil","Phone reminder","Promemoria sul telefono")}`}>
+            <CPSelect value={String(form.remind_minutes)} onChange={e=>setForm(f=>({...f,remind_minutes:Number(e.target.value)}))}>
+              {remindOpts.map(([v,lb])=><option key={v} value={v}>{lb}</option>)}
+            </CPSelect>
+          </CPField>
+          <CPField label={L("Notizen","Notas","Notes","Note")}><CPInput value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder={L("z. B. Schlüssel beim Nachbarn, 3 Zimmer","p. ej. llave con el vecino, 3 habitaciones","e.g. key with neighbour, 3 rooms","es. chiave dal vicino, 3 locali")}/></CPField>
+          {form.id&&<CPField label={L("Status","Estado","Status","Stato")}>
+            <CPSelect value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
+              <option value="scheduled">📅 {L("Geplant","Programada","Scheduled","Programmato")}</option>
+              <option value="done">✅ {L("Erledigt","Hecha","Done","Fatto")}</option>
+              <option value="cancelled">🚫 {L("Abgesagt","Cancelada","Cancelled","Annullato")}</option>
+            </CPSelect></CPField>}
+          <div style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:6,flexWrap:"wrap"}}>
+            <div>{form.id&&<CPBtn variant="danger" size="sm" onClick={()=>setDelId(form.id)}>🗑️ {t.delete||"Eliminar"}</CPBtn>}</div>
+            <div style={{display:"flex",gap:8}}>
+              <CPBtn variant="secondary" onClick={()=>setForm(null)}>{t.cancel||"Cancelar"}</CPBtn>
+              <CPBtn onClick={save}>{busy?"⏳":"💾"} {t.save||"Guardar"}</CPBtn>
+            </div>
+          </div>
+        </CPModal>
+      )}
+      {delId&&(
+        <CPModal title={`🗑️ ${L("Termin löschen?","¿Eliminar la cita?","Delete appointment?","Eliminare l'appuntamento?")}`} onClose={()=>setDelId(null)} width={380}>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <CPBtn variant="secondary" onClick={()=>setDelId(null)}>{t.cancel||"Cancelar"}</CPBtn>
+            <CPBtn variant="danger" onClick={()=>remove(delId)}>🗑️ {t.delete||"Eliminar"}</CPBtn>
+          </div>
+        </CPModal>
+      )}
+    </CPScreen>
+  );
+}
 
 // ─── EMPLOYEE HOME SCREEN ────────────────────────────────────
 const EMPLOYEE_APPS = [
@@ -8784,10 +9063,10 @@ const ACADEMY_COURSES_V2 = [
      "done": false,
      "illustrationKey": "management_customer",
      "contentKey": {
-      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.\n\n🧮 CALCULADORA DE PRECIOS (nueva versión, igual que la web)\n🔹 Limpieza a fondo y de mudanza: precio por pieza (dormitorios, salones, cocinas, baños y ventanas) con desplegables; el tamaño elegido rellena las cantidades y puedes cambiarlas (hasta 30 dormitorios).\n🔹 Limpieza regular: horas según las piezas (mínimo 2 h), CHF 40/h o CHF 44/h si es mensual.\n🔹 Jardín mínimo 2 h (restos verdes aparte) y reparaciones mínimo 1 h (material aparte).\n🔹 Tú ves el desglose interno 🔒; el mensaje al cliente solo lleva las cantidades y el precio total.\n\n📦 ALMACÉN Y PEDIDOS: ELEGIR EN VEZ DE ESCRIBIR\n🔹 En productos, proveedores y pedidos, cada casilla (nombre, proveedor, unidad, ubicación, descripción, contacto, teléfono, e-mail, dirección, web) muestra una lista ▾ con lo que ya escribiste antes: toca y elige.\n🔹 Solo escribes cuando el dato es nuevo (sale «➕ Nuevo: …»).\n🔹 Si escribes un producto o proveedor que ya existe, la app avisa y te ofrece «✏️ Editar ese» para no duplicarlo.\n🔹 Un proveedor nuevo escrito en un producto o pedido se guarda solo; un producto nuevo escrito en un pedido se crea solo (stock 0).\n\n💾 MEDIDOR DE ESPACIO\n🔹 En Inicio verás la barra «💾 Espacio usado». Tócala para verlo en grande: datos (máx. 500 MB) y archivos (máx. 1 GB) del plan gratuito, y cuántos clientes, trabajos, facturas… tienes.\n🔹 Al llegar al 80 % recibes un aviso en el móvil (se revisa cada día a las 8:07). Entonces: copia de seguridad y valorar el plan Pro.\n\n⏰ EMPLEADOS: ENTRAN SIEMPRE, TRABAJAN SOLO EN SU TURNO\n🔹 El empleado puede entrar con su PIN a cualquier hora.\n🔹 SIEMPRE (a cualquier hora): 💬 Mensajes (enviar y recibir), 🎓 Patjac Academy, 📁 Documentos, 📋 Trabajos terminados de los últimos 60 días (solo para ver, no se pueden cambiar) y 🧴 Materiales.\n🔹 SOLO EN SU TURNO (desde 1 hora antes de su primer trabajo hasta 2 horas después del último): ⏱️ Fichaje, 🗺️ Rutas y los trabajos del día. Fuera de eso ven 🔒 con la hora en que se abren.\n🔹 Fuera del turno el empleado NO ve clientes, direcciones ni fichajes.\n🔹 Cuando empieza su turno, la app se desbloquea sola (sin volver a entrar); cuando termina, se bloquea sola.\n\n🧴 MATERIALES PARA EMPLEADOS\n🔹 Los empleados tienen un icono 🧴 «Materiales» con los productos del almacén (solo foto y nombre, sin precios ni stock).\n🔹 Tocan un producto, eligen cantidad y cliente y piden autorización. Te llega un aviso al móvil.\n🔹 Tú respondes en Almacén y pedidos → 📨 «Solicitudes»: ✅ Autorizar o ❌ Rechazar, con una respuesta opcional. Si está marcada la casilla, al autorizar se descuenta la cantidad del stock.\n🔹 El empleado recibe el aviso con tu respuesta.\n🔹 Cuando llega una solicitud nueva: aviso en el móvil, aviso dentro de la app (aunque la tengas abierta), número en el icono 📦 Almacén y un recuadro morado en Inicio. Tócalo y vas directo a 📨 «Solicitudes».\n\n🔔 AVISOS DE MATERIAL (reparado)\n🔹 Antes, si tenías la app abierta en pantalla, el aviso de una solicitud de material no se mostraba. Ahora lo ves siempre: aviso dentro de la app, número en 📦 Almacén y recuadro morado en Inicio que te lleva directo a 📨 Solicitudes.\n\n🌐 IDIOMAS: PRODUCTOS EN TU IDIOMA\n🔹 Los productos de Almacén y pedidos ahora cambian al idioma elegido (nombre, descripción y unidad: Unidad / Stück / Piece / Pezzo).\n🔹 Al guardar un producto, la app lo traduce sola a los 4 idiomas. En «🌐 Nombre en todos los idiomas» puedes ver y corregir cada traducción.\n🔹 Los empleados también ven los materiales en su idioma.\n🔹 Revisamos toda la app en alemán, español, inglés e italiano y corregimos los textos que no cambiaban (dibujos de Academy, gastos, nómina, etc.).\n\n🛡️ REVISIÓN DE SEGURIDAD (octubre 2026)\n🔹 En el chat, el nombre de quien escribe lo pone siempre el servidor: un empleado no puede hacerse pasar por otra persona.\n🔹 Un empleado no puede cambiar mensajes ya enviados ni trabajos terminados, tampoco fuera de su turno.\n🔹 Se cerraron funciones internas que no debían poder llamarse desde internet y se reforzaron dos funciones de festivos.\n🔹 Se comprobó: contraseñas cifradas, bloqueo tras intentos fallidos, la app solo funciona en el teléfono autorizado, archivos con nombres imposibles de adivinar.\n\n🧾 AVISOS DE FACTURAS PENDIENTES\n🔹 Por trabajo: aviso en cuanto el trabajo se termina. Semanal: al acabar la semana. Mensual: al acabar el mes.\n🔹 Si ya emitiste la factura queda guardada y no hay aviso. Si falta: aviso en el móvil y resumen diario a las 17:00 con todas las que faltan.\n🔹 En 🧾 Facturas: «⚠️ Facturas pendientes de emitir» → «🧾 Emitir factura» (ya rellenada) → 💾 Guardar. «✓ Ya facturado» la quita en todos tus dispositivos.",
-      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.\n\n🧮 PREISRECHNER (neu, wie die Webseite)\n🔹 Grund- und Umzugsreinigung: Preis pro Raum (Schlafzimmer, Wohnzimmer, Küchen, Bäder, Fenster) mit Auswahllisten.\n🔹 Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. oder CHF 44/Std. monatlich.\n🔹 Interne Aufschlüsselung 🔒 nur für Sie; der Kunde erhält nur Anzahl und Gesamtpreis.\n\n📦 LAGER & BESTELLUNGEN: WÄHLEN STATT TIPPEN\n🔹 Jedes Feld zeigt eine Liste ▾ der schon verwendeten Werte – antippen und wählen. Nur Neues wird getippt («➕ Neu»).\n🔹 Doppelte Produkte/Lieferanten werden erkannt («✏️ Diesen bearbeiten»). Neue Lieferanten/Produkte aus einer Bestellung werden automatisch gespeichert.\n\n💾 SPEICHERANZEIGE\n🔹 Auf der Startseite «💾 Speicherplatz» antippen: Daten (max. 500 MB), Dateien (max. 1 GB). Ab 80 % kommt eine Meldung.\n\n⏰ MITARBEITER: ANMELDEN IMMER, ARBEITEN NUR IN DER SCHICHT\n🔹 Immer: 💬 Nachrichten, 🎓 Academy, 📁 Dokumente, 📋 erledigte Aufträge (60 Tage, nur ansehen), 🧴 Material.\n🔹 Nur in der Schicht: ⏱️ Stempeln, 🗺️ Routen, Aufträge des Tages. Die App entsperrt/sperrt sich automatisch.\n\n🧴 MATERIAL FÜR MITARBEITER\n🔹 Symbol 🧴 «Material»: Lagerprodukte nur mit Foto und Name. Mitarbeiter fragen um Erlaubnis; Sie antworten unter Lager → 📨 «Anfragen» (✅/❌, Lager wird optional abgezogen).\n\n🌐 SPRACHEN: PRODUKTE IN IHRER SPRACHE\n🔹 Lagerprodukte wechseln jetzt in die gewählte Sprache (Name, Beschreibung, Einheit).\n🔹 Beim Speichern wird automatisch in alle 4 Sprachen übersetzt; unter «🌐 Name in allen Sprachen» können Sie korrigieren.\n\n🧾 WARNUNGEN: FEHLENDE RECHNUNGEN\n🔹 Pro Auftrag sofort nach Abschluss, wöchentlich am Sonntag, monatlich am Monatsende. Push + täglich 17:00. Unter 🧾 Rechnungen: «Rechnung erstellen» → Speichern.",
-      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.\n\n🧮 PRICE CALCULATOR (new, same as the website)\n🔹 Deep and move-out cleaning: price per room (bedrooms, living rooms, kitchens, bathrooms, windows) with drop-downs.\n🔹 Regular cleaning: hours by rooms (min. 2 h), CHF 40/h or CHF 44/h monthly.\n🔹 Internal breakdown 🔒 only for you; the client only gets counts and the total.\n\n📦 STOCK & ORDERS: CHOOSE INSTEAD OF TYPING\n🔹 Every field shows a ▾ list of values already used – tap to choose. Type only when it's new («➕ New»).\n🔹 Duplicate products/suppliers are detected («✏️ Edit that one»). New suppliers/products typed in an order are saved automatically.\n\n💾 STORAGE METER\n🔹 On Home tap «💾 Storage used»: data (max 500 MB), files (max 1 GB). At 80 % you get an alert.\n\n⏰ EMPLOYEES: LOG IN ANY TIME, WORK ONLY IN THEIR SHIFT\n🔹 Always: 💬 Messages, 🎓 Academy, 📁 Documents, 📋 finished jobs (60 days, view only), 🧴 Materials.\n🔹 Only during the shift: ⏱️ Clocking, 🗺️ Routes, today's jobs. The app unlocks/locks itself automatically.\n\n🧴 MATERIALS FOR EMPLOYEES\n🔹 🧴 «Materials» icon: warehouse products with photo and name only. Employees ask for permission; you answer in Stock → 📨 «Requests» (✅/❌, stock optionally reduced).\n\n🌐 LANGUAGES: PRODUCTS IN YOUR LANGUAGE\n🔹 Inventory products now switch to the chosen language (name, description, unit).\n🔹 When you save, the app translates into all 4 languages automatically; correct them under «🌐 Name in all languages».\n\n🧾 ALERTS: MISSING INVOICES\n🔹 Per job right after it's finished, weekly on Sunday, monthly at month end. Push + daily at 17:00. In 🧾 Invoices: «Issue invoice» → Save.",
-      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti.\n\n🧮 CALCOLATORE PREZZI (nuovo, come il sito)\n🔹 Pulizia a fondo e di trasloco: prezzo per locale (camere, soggiorni, cucine, bagni, finestre) con menu a tendina.\n🔹 Pulizia regolare: ore secondo i locali (min. 2 h), CHF 40/h o CHF 44/h mensile.\n🔹 Dettaglio interno 🔒 solo per te; il cliente riceve solo quantità e totale.\n\n📦 MAGAZZINO E ORDINI: SCEGLIERE INVECE DI SCRIVERE\n🔹 Ogni campo mostra un elenco ▾ dei valori già usati – tocca e scegli. Scrivi solo se è nuovo («➕ Nuovo»).\n🔹 Prodotti/fornitori doppi vengono segnalati («✏️ Modifica quello»). Nuovi fornitori/prodotti scritti in un ordine si salvano da soli.\n\n💾 MISURATORE SPAZIO\n🔹 In Home tocca «💾 Spazio usato»: dati (max 500 MB), file (max 1 GB). All'80 % ricevi un avviso.\n\n⏰ DIPENDENTI: ENTRANO SEMPRE, LAVORANO SOLO NEL TURNO\n🔹 Sempre: 💬 Messaggi, 🎓 Academy, 📁 Documenti, 📋 lavori finiti (60 giorni, solo vista), 🧴 Materiali.\n🔹 Solo nel turno: ⏱️ Timbrature, 🗺️ Percorsi, lavori del giorno. L'app si sblocca/blocca da sola.\n\n🧴 MATERIALI PER DIPENDENTI\n🔹 Icona 🧴 «Materiali»: prodotti del magazzino solo con foto e nome. I dipendenti chiedono l'autorizzazione; rispondi in Magazzino → 📨 «Richieste» (✅/❌, stock scalato a scelta).\n\n🌐 LINGUE: PRODOTTI NELLA TUA LINGUA\n🔹 I prodotti del magazzino ora cambiano nella lingua scelta (nome, descrizione, unità).\n🔹 Al salvataggio l'app traduce in tutte le 4 lingue; puoi correggere in «🌐 Nome in tutte le lingue».\n\n🧾 AVVISI: FATTURE MANCANTI\n🔹 Per lavoro subito dopo la fine, settimanale la domenica, mensile a fine mese. Push + ogni giorno alle 17:00. In 🧾 Fatture: «Emetti fattura» → Salva."
+      "ES": "🪟 NUEVO DISEÑO (estilo Windows 11)\n🔹 Colores claros y el logo de Patjac en el centro de la barra de arriba (tócalo para volver al inicio).\n🔹 En el ordenador: menú con todas las secciones a la izquierda.\n🔹 En el móvil: barra abajo con Inicio, Trabajos, Mensajes y Ajustes.\n\n🧮 CALCULADORA DE PRECIOS\n🔹 Icono 🧮 (solo administrador). Mismos precios que la página web: limpieza desde CHF 40/h, jardín y reparaciones desde CHF 65/h.\n🔹 Eliges servicio, tamaño y frecuencia → precio orientativo. Puedes enviarlo al cliente por WhatsApp o e-mail.\n\n❌ EMPLEADO QUE NO SE PRESENTA\n🔹 15 min después de la hora de inicio sin llegar: aviso naranja grande en el trabajo.\n🔹 Botón «🔄 Reemplazar por el empleado más cercano»: lista ordenada por distancia al cliente (posición de hoy o domicilio). Pulsas «Asignar» y el nuevo empleado recibe un mensaje al momento.\n🔹 El botón 🔄 también está en cualquier trabajo que aún no ha empezado (p. ej. si alguien avisa que está enfermo).\n🔹 Si termina la hora y nadie llegó, el trabajo se cierra solo como «NO SE PRESENTÓ»: 0 h pagadas y no se cobra al cliente. Aparece en el filtro «Completados».\n\n🗺️ RUTAS DEL DÍA\n🔹 Solo los clientes por visitar ese día, con la fecha y ordenados por hora, y los km entre un cliente y el siguiente.\n🔹 «🚗 Ir aquí» o «Ruta completa del día» abren Google Maps.\n🔹 Como administrador eliges el día (Hoy / Mañana / calendario) y el empleado.\n\n🧾 FACTURAS: POR PAGAR / PAGADO\n🔹 Cada factura tiene un botón rojo «💳 Por pagar». Al tocarlo cambia a verde «✅ Pagado».\n🔹 Si te equivocas, toca el botón verde y vuelve a «Por pagar».\n\n❓ AYUDA CON BUSCADOR\n🔹 En el botón ( ? ) de la barra de arriba hay una barra para buscar cualquier tema (p. ej. «factura», «ruta», «PIN»).\n\n🔐 SEGURIDAD Y ACCESO (recordatorio)\n🔹 La app solo funciona en el teléfono que activas con el código de 8 letras (Empleados → 🔑 Enviar acceso).\n🔹 Los empleados no pueden entrar sábado después de las 12:00, domingos ni festivos de Zúrich.\n🔹 En Mensajes los empleados pueden enviar fotos y vídeos (se reducen solos).\n🔹 Contratos por hora, semana o mes, y selección múltiple para cambiar o borrar varios a la vez.\n\n🔒 TRABAJOS COMPLETADOS BLOQUEADOS\n🔹 Cuando un trabajo está «Completado» (o «No se presentó»), el empleado ya no puede cambiarlo: no puede fichar otra vez ni modificar nada. Solo lo ve, con un candado 🔒, hasta el final del día laboral.\n🔹 Tú como administrador sí puedes corregirlo (✏️).\n\n📲 ICONO DE LA APP Y ACCESO NO COMPARTIBLE\n🔹 Al abrir el enlace del acceso, la app enseña al empleado a crear el icono: en Android sale el botón «Instalar Patjac» (un toque y el icono se crea solo); en iPhone se muestran los pasos Compartir ⬆️ → «Añadir a pantalla de inicio», y el teléfono se activa después DENTRO del icono.\n🔹 Si el enlace se abre dentro de WhatsApp, la app pide abrirlo en Safari o Chrome.\n🔹 El acceso no se puede compartir: la app solo funciona en el teléfono activado, el código sirve una vez y cada empleado tiene una sola sesión abierta.\n🔹 Recibes un aviso 🔒 (y lo ves en Empleados → «Seguridad del acceso») cuando: un empleado activa su teléfono, alguien intenta usar otra vez un código ya usado, o alguien escribe el PIN de un empleado en un teléfono no autorizado.\n\n🧮 CALCULADORA DE PRECIOS (nueva versión, igual que la web)\n🔹 Limpieza a fondo y de mudanza: precio por pieza (dormitorios, salones, cocinas, baños y ventanas) con desplegables; el tamaño elegido rellena las cantidades y puedes cambiarlas (hasta 30 dormitorios).\n🔹 Limpieza regular: horas según las piezas (mínimo 2 h), CHF 40/h o CHF 44/h si es mensual.\n🔹 Jardín mínimo 2 h (restos verdes aparte) y reparaciones mínimo 1 h (material aparte).\n🔹 Tú ves el desglose interno 🔒; el mensaje al cliente solo lleva las cantidades y el precio total.\n\n📦 ALMACÉN Y PEDIDOS: ELEGIR EN VEZ DE ESCRIBIR\n🔹 En productos, proveedores y pedidos, cada casilla (nombre, proveedor, unidad, ubicación, descripción, contacto, teléfono, e-mail, dirección, web) muestra una lista ▾ con lo que ya escribiste antes: toca y elige.\n🔹 Solo escribes cuando el dato es nuevo (sale «➕ Nuevo: …»).\n🔹 Si escribes un producto o proveedor que ya existe, la app avisa y te ofrece «✏️ Editar ese» para no duplicarlo.\n🔹 Un proveedor nuevo escrito en un producto o pedido se guarda solo; un producto nuevo escrito en un pedido se crea solo (stock 0).\n\n💾 MEDIDOR DE ESPACIO\n🔹 En Inicio verás la barra «💾 Espacio usado». Tócala para verlo en grande: datos (máx. 500 MB) y archivos (máx. 1 GB) del plan gratuito, y cuántos clientes, trabajos, facturas… tienes.\n🔹 Al llegar al 80 % recibes un aviso en el móvil (se revisa cada día a las 8:07). Entonces: copia de seguridad y valorar el plan Pro.\n\n⏰ EMPLEADOS: ENTRAN SIEMPRE, TRABAJAN SOLO EN SU TURNO\n🔹 El empleado puede entrar con su PIN a cualquier hora.\n🔹 SIEMPRE (a cualquier hora): 💬 Mensajes (enviar y recibir), 🎓 Patjac Academy, 📁 Documentos, 📋 Trabajos terminados de los últimos 60 días (solo para ver, no se pueden cambiar) y 🧴 Materiales.\n🔹 SOLO EN SU TURNO (desde 1 hora antes de su primer trabajo hasta 2 horas después del último): ⏱️ Fichaje, 🗺️ Rutas y los trabajos del día. Fuera de eso ven 🔒 con la hora en que se abren.\n🔹 Fuera del turno el empleado NO ve clientes, direcciones ni fichajes.\n🔹 Cuando empieza su turno, la app se desbloquea sola (sin volver a entrar); cuando termina, se bloquea sola.\n\n🧴 MATERIALES PARA EMPLEADOS\n🔹 Los empleados tienen un icono 🧴 «Materiales» con los productos del almacén (solo foto y nombre, sin precios ni stock).\n🔹 Tocan un producto, eligen cantidad y cliente y piden autorización. Te llega un aviso al móvil.\n🔹 Tú respondes en Almacén y pedidos → 📨 «Solicitudes»: ✅ Autorizar o ❌ Rechazar, con una respuesta opcional. Si está marcada la casilla, al autorizar se descuenta la cantidad del stock.\n🔹 El empleado recibe el aviso con tu respuesta.\n🔹 Cuando llega una solicitud nueva: aviso en el móvil, aviso dentro de la app (aunque la tengas abierta), número en el icono 📦 Almacén y un recuadro morado en Inicio. Tócalo y vas directo a 📨 «Solicitudes».\n\n🔔 AVISOS DE MATERIAL (reparado)\n🔹 Antes, si tenías la app abierta en pantalla, el aviso de una solicitud de material no se mostraba. Ahora lo ves siempre: aviso dentro de la app, número en 📦 Almacén y recuadro morado en Inicio que te lleva directo a 📨 Solicitudes.\n\n🌐 IDIOMAS: PRODUCTOS EN TU IDIOMA\n🔹 Los productos de Almacén y pedidos ahora cambian al idioma elegido (nombre, descripción y unidad: Unidad / Stück / Piece / Pezzo).\n🔹 Al guardar un producto, la app lo traduce sola a los 4 idiomas. En «🌐 Nombre en todos los idiomas» puedes ver y corregir cada traducción.\n🔹 Los empleados también ven los materiales en su idioma.\n🔹 Revisamos toda la app en alemán, español, inglés e italiano y corregimos los textos que no cambiaban (dibujos de Academy, gastos, nómina, etc.).\n\n🛡️ REVISIÓN DE SEGURIDAD (octubre 2026)\n🔹 En el chat, el nombre de quien escribe lo pone siempre el servidor: un empleado no puede hacerse pasar por otra persona.\n🔹 Un empleado no puede cambiar mensajes ya enviados ni trabajos terminados, tampoco fuera de su turno.\n🔹 Se cerraron funciones internas que no debían poder llamarse desde internet y se reforzaron dos funciones de festivos.\n🔹 Se comprobó: contraseñas cifradas, bloqueo tras intentos fallidos, la app solo funciona en el teléfono autorizado, archivos con nombres imposibles de adivinar.\n\n🧾 AVISOS DE FACTURAS PENDIENTES\n🔹 Por trabajo: aviso en cuanto el trabajo se termina. Semanal: al acabar la semana. Mensual: al acabar el mes.\n🔹 Si ya emitiste la factura queda guardada y no hay aviso. Si falta: aviso en el móvil y resumen diario a las 17:00 con todas las que faltan.\n🔹 En 🧾 Facturas: «⚠️ Facturas pendientes de emitir» → «🧾 Emitir factura» (ya rellenada) → 💾 Guardar. «✓ Ya facturado» la quita en todos tus dispositivos.\n\n📅 NUEVA AGENDA (solo administrador)\n🔹 Icono 📅 «Agenda» para apuntar citas y visitas a clientes con fecha, hora, dirección y notas.\n🔹 Vista por mes y lista de próximas citas. Elige el cliente de la lista y se rellenan solos teléfono y dirección.\n🔹 Aviso en el móvil antes de cada cita (15 min, 30 min, 1 h, 2 h o 1 día antes). En Inicio: «📅 Hoy tienes N citas».\n🔹 Botones: ✅ Hecha, 📞 Llamar, 💬 Confirmar por WhatsApp, 🗺️ Mapa y 📆 Añadir al calendario del móvil.\n🔹 Los empleados no ven la Agenda.",
+      "DE": "🪟 NEUES DESIGN (Windows-11-Stil)\n🔹 Helle Farben, Patjac-Logo in der Mitte der oberen Leiste (antippen = zurück zum Start).\n🔹 Computer: Menü mit allen Bereichen links.\n🔹 Handy: Leiste unten mit Start, Aufträge, Nachrichten, Einstellungen.\n\n🧮 PREISRECHNER\n🔹 Symbol 🧮 (nur Administrator). Gleiche Preise wie die Webseite: Reinigung ab CHF 40/Std., Garten und Reparaturen ab CHF 65/Std.\n🔹 Leistung, Grösse und Häufigkeit wählen → Richtpreis, per WhatsApp oder E-Mail an den Kunden senden.\n\n❌ MITARBEITER ERSCHEINT NICHT\n🔹 15 Min. nach Beginn ohne Ankunft: grosse orange Warnung im Auftrag.\n🔹 «🔄 Durch nächsten Mitarbeiter ersetzen»: Liste nach Entfernung zum Kunden. «Zuweisen» → der neue Mitarbeiter erhält sofort eine Nachricht.\n🔹 Ist die Zeit vorbei und niemand kam, wird der Auftrag automatisch als «NICHT ERSCHIENEN» geschlossen: 0 Std. bezahlt, nicht verrechnet.\n\n🗺️ ROUTEN DES TAGES\n🔹 Nur die Kunden des Tages, mit Datum, nach Uhrzeit geordnet, mit km zwischen den Kunden. «Hierhin navigieren» oder «Ganze Route» öffnen Google Maps.\n\n🧾 RECHNUNGEN: ZU BEZAHLEN / BEZAHLT\n🔹 Roter Knopf «💳 Zu bezahlen» → antippen → grün «✅ Bezahlt». Nochmals antippen macht es rückgängig.\n\n❓ HILFE MIT SUCHE\n🔹 Im ( ? ) oben gibt es eine Suchleiste für jedes Thema.\n\n🔒 ABGESCHLOSSENE AUFTRÄGE GESPERRT\n🔹 Ist ein Auftrag «Abgeschlossen» (oder «Nicht erschienen»), kann der Mitarbeiter nichts mehr ändern – nur ansehen (🔒) bis Ende des Arbeitstages. Der Administrator kann weiterhin korrigieren.\n\n📲 APP-SYMBOL UND NICHT TEILBARER ZUGANG\n🔹 Android: Knopf «Patjac installieren» (ein Tipp, Symbol wird erstellt). iPhone: Schritte Teilen ⬆️ → «Zum Home-Bildschirm», Aktivierung danach IM Symbol.\n🔹 Zugang nicht teilbar: nur auf dem aktivierten Telefon, Code nur 1×, eine Sitzung pro Mitarbeiter.\n🔹 Sie erhalten eine 🔒-Meldung (Mitarbeiter → «Sicherheit des Zugangs») bei Aktivierung, wiederverwendetem Code oder PIN auf fremdem Telefon.\n\n🧮 PREISRECHNER (neu, wie die Webseite)\n🔹 Grund- und Umzugsreinigung: Preis pro Raum (Schlafzimmer, Wohnzimmer, Küchen, Bäder, Fenster) mit Auswahllisten.\n🔹 Unterhaltsreinigung: Stunden nach Räumen (min. 2 Std.), CHF 40/Std. oder CHF 44/Std. monatlich.\n🔹 Interne Aufschlüsselung 🔒 nur für Sie; der Kunde erhält nur Anzahl und Gesamtpreis.\n\n📦 LAGER & BESTELLUNGEN: WÄHLEN STATT TIPPEN\n🔹 Jedes Feld zeigt eine Liste ▾ der schon verwendeten Werte – antippen und wählen. Nur Neues wird getippt («➕ Neu»).\n🔹 Doppelte Produkte/Lieferanten werden erkannt («✏️ Diesen bearbeiten»). Neue Lieferanten/Produkte aus einer Bestellung werden automatisch gespeichert.\n\n💾 SPEICHERANZEIGE\n🔹 Auf der Startseite «💾 Speicherplatz» antippen: Daten (max. 500 MB), Dateien (max. 1 GB). Ab 80 % kommt eine Meldung.\n\n⏰ MITARBEITER: ANMELDEN IMMER, ARBEITEN NUR IN DER SCHICHT\n🔹 Immer: 💬 Nachrichten, 🎓 Academy, 📁 Dokumente, 📋 erledigte Aufträge (60 Tage, nur ansehen), 🧴 Material.\n🔹 Nur in der Schicht: ⏱️ Stempeln, 🗺️ Routen, Aufträge des Tages. Die App entsperrt/sperrt sich automatisch.\n\n🧴 MATERIAL FÜR MITARBEITER\n🔹 Symbol 🧴 «Material»: Lagerprodukte nur mit Foto und Name. Mitarbeiter fragen um Erlaubnis; Sie antworten unter Lager → 📨 «Anfragen» (✅/❌, Lager wird optional abgezogen).\n\n🌐 SPRACHEN: PRODUKTE IN IHRER SPRACHE\n🔹 Lagerprodukte wechseln jetzt in die gewählte Sprache (Name, Beschreibung, Einheit).\n🔹 Beim Speichern wird automatisch in alle 4 Sprachen übersetzt; unter «🌐 Name in allen Sprachen» können Sie korrigieren.\n\n🧾 WARNUNGEN: FEHLENDE RECHNUNGEN\n🔹 Pro Auftrag sofort nach Abschluss, wöchentlich am Sonntag, monatlich am Monatsende. Push + täglich 17:00. Unter 🧾 Rechnungen: «Rechnung erstellen» → Speichern.\n\n📅 NEU: TERMINE (nur Administrator)\n🔹 Termine und Kundenbesuche mit Datum, Zeit, Adresse, Notizen; Monats- und Listenansicht; Push-Erinnerung; WhatsApp-Bestätigung, Karte, In Kalender.",
+      "EN": "🪟 NEW DESIGN (Windows 11 style)\n🔹 Light colours, Patjac logo centred in the top bar (tap it to go home).\n🔹 Computer: menu with all sections on the left. Phone: bar at the bottom (Home, Jobs, Messages, Settings).\n\n🧮 PRICE CALCULATOR\n🔹 🧮 icon (administrator only). Same prices as the website: cleaning from CHF 40/h, garden and repairs from CHF 65/h. Send the estimate by WhatsApp or e-mail.\n\n❌ EMPLOYEE DOES NOT SHOW UP\n🔹 15 min after the start without arrival: big orange warning on the job and a «🔄 Replace with the nearest employee» button (list sorted by distance). The new employee is messaged immediately.\n🔹 When the time is over and nobody came, the job closes automatically as «NO-SHOW»: 0 h paid, not billed.\n\n🗺️ ROUTES OF THE DAY\n🔹 Only that day's clients, with the date, in time order, with km between stops; opens Google Maps.\n\n🧾 INVOICES: TO BE PAID / PAID\n🔹 Red «💳 To be paid» button → tap → green «✅ Paid». Tap again to undo.\n\n❓ HELP WITH SEARCH\n🔹 The ( ? ) button now has a search bar for any topic.\n\n🔒 COMPLETED JOBS LOCKED\n🔹 Once a job is «Completed» (or «No-show») the employee can no longer change it – view only (🔒) until the end of the working day. The administrator can still correct it.\n\n📲 APP ICON AND NON-SHAREABLE ACCESS\n🔹 Android: «Install Patjac» button (one tap creates the icon). iPhone: steps Share ⬆️ → «Add to Home Screen», then activation INSIDE the icon.\n🔹 Access can't be shared: only on the activated phone, code works once, one session per employee.\n🔹 You get a 🔒 alert (Employees → «Access security») on activation, reused code or PIN on an unknown phone.\n\n🧮 PRICE CALCULATOR (new, same as the website)\n🔹 Deep and move-out cleaning: price per room (bedrooms, living rooms, kitchens, bathrooms, windows) with drop-downs.\n🔹 Regular cleaning: hours by rooms (min. 2 h), CHF 40/h or CHF 44/h monthly.\n🔹 Internal breakdown 🔒 only for you; the client only gets counts and the total.\n\n📦 STOCK & ORDERS: CHOOSE INSTEAD OF TYPING\n🔹 Every field shows a ▾ list of values already used – tap to choose. Type only when it's new («➕ New»).\n🔹 Duplicate products/suppliers are detected («✏️ Edit that one»). New suppliers/products typed in an order are saved automatically.\n\n💾 STORAGE METER\n🔹 On Home tap «💾 Storage used»: data (max 500 MB), files (max 1 GB). At 80 % you get an alert.\n\n⏰ EMPLOYEES: LOG IN ANY TIME, WORK ONLY IN THEIR SHIFT\n🔹 Always: 💬 Messages, 🎓 Academy, 📁 Documents, 📋 finished jobs (60 days, view only), 🧴 Materials.\n🔹 Only during the shift: ⏱️ Clocking, 🗺️ Routes, today's jobs. The app unlocks/locks itself automatically.\n\n🧴 MATERIALS FOR EMPLOYEES\n🔹 🧴 «Materials» icon: warehouse products with photo and name only. Employees ask for permission; you answer in Stock → 📨 «Requests» (✅/❌, stock optionally reduced).\n\n🌐 LANGUAGES: PRODUCTS IN YOUR LANGUAGE\n🔹 Inventory products now switch to the chosen language (name, description, unit).\n🔹 When you save, the app translates into all 4 languages automatically; correct them under «🌐 Name in all languages».\n\n🧾 ALERTS: MISSING INVOICES\n🔹 Per job right after it's finished, weekly on Sunday, monthly at month end. Push + daily at 17:00. In 🧾 Invoices: «Issue invoice» → Save.\n\n📅 NEW: APPOINTMENTS (admin only)\n🔹 Appointments and client visits with date, time, address, notes; month and list views; push reminder; WhatsApp confirmation, map, add to calendar.",
+      "IT": "🪟 NUOVO DESIGN (stile Windows 11)\n🔹 Colori chiari, logo Patjac al centro della barra in alto (toccalo per tornare all'inizio).\n🔹 Computer: menu a sinistra. Telefono: barra in basso (Inizio, Lavori, Messaggi, Impostazioni).\n\n🧮 CALCOLATORE PREZZI\n🔹 Icona 🧮 (solo amministratore). Stessi prezzi del sito: pulizie da CHF 40/h, giardino e riparazioni da CHF 65/h.\n\n❌ DIPENDENTE ASSENTE\n🔹 15 min dopo l'inizio senza arrivo: grande avviso arancione e pulsante «🔄 Sostituisci con il più vicino». Il nuovo dipendente riceve subito un messaggio.\n🔹 Finito l'orario senza nessuno: il lavoro si chiude come «ASSENTE», 0 h pagate, non fatturato.\n\n🗺️ PERCORSI DEL GIORNO\n🔹 Solo i clienti del giorno, con data, in ordine di ora e km tra le tappe.\n\n🧾 FATTURE: DA PAGARE / PAGATO\n🔹 Pulsante rosso «💳 Da pagare» → tocca → verde «✅ Pagato».\n\n❓ AIUTO CON RICERCA\n🔹 Nel pulsante ( ? ) c'è una barra di ricerca.\n\n🔒 LAVORI COMPLETATI BLOCCATI\n🔹 Quando un lavoro è «Completato» (o «Assente») il dipendente non può più modificarlo – solo visualizzazione (🔒) fino a fine giornata. L'amministratore può ancora correggerlo.\n\n📲 ICONA DELL'APP E ACCESSO NON CONDIVISIBILE\n🔹 Android: pulsante «Installa Patjac» (un tocco crea l'icona). iPhone: Condividi ⬆️ → «Aggiungi a Home», poi attivazione DENTRO l'icona.\n🔹 Accesso non condivisibile: solo sul telefono attivato, codice valido 1 volta, una sessione per dipendente.\n🔹 Ricevi un avviso 🔒 (Dipendenti → «Sicurezza dell'accesso») per attivazioni, codici riusati o PIN su telefoni sconosciuti.\n\n🧮 CALCOLATORE PREZZI (nuovo, come il sito)\n🔹 Pulizia a fondo e di trasloco: prezzo per locale (camere, soggiorni, cucine, bagni, finestre) con menu a tendina.\n🔹 Pulizia regolare: ore secondo i locali (min. 2 h), CHF 40/h o CHF 44/h mensile.\n🔹 Dettaglio interno 🔒 solo per te; il cliente riceve solo quantità e totale.\n\n📦 MAGAZZINO E ORDINI: SCEGLIERE INVECE DI SCRIVERE\n🔹 Ogni campo mostra un elenco ▾ dei valori già usati – tocca e scegli. Scrivi solo se è nuovo («➕ Nuovo»).\n🔹 Prodotti/fornitori doppi vengono segnalati («✏️ Modifica quello»). Nuovi fornitori/prodotti scritti in un ordine si salvano da soli.\n\n💾 MISURATORE SPAZIO\n🔹 In Home tocca «💾 Spazio usato»: dati (max 500 MB), file (max 1 GB). All'80 % ricevi un avviso.\n\n⏰ DIPENDENTI: ENTRANO SEMPRE, LAVORANO SOLO NEL TURNO\n🔹 Sempre: 💬 Messaggi, 🎓 Academy, 📁 Documenti, 📋 lavori finiti (60 giorni, solo vista), 🧴 Materiali.\n🔹 Solo nel turno: ⏱️ Timbrature, 🗺️ Percorsi, lavori del giorno. L'app si sblocca/blocca da sola.\n\n🧴 MATERIALI PER DIPENDENTI\n🔹 Icona 🧴 «Materiali»: prodotti del magazzino solo con foto e nome. I dipendenti chiedono l'autorizzazione; rispondi in Magazzino → 📨 «Richieste» (✅/❌, stock scalato a scelta).\n\n🌐 LINGUE: PRODOTTI NELLA TUA LINGUA\n🔹 I prodotti del magazzino ora cambiano nella lingua scelta (nome, descrizione, unità).\n🔹 Al salvataggio l'app traduce in tutte le 4 lingue; puoi correggere in «🌐 Nome in tutte le lingue».\n\n🧾 AVVISI: FATTURE MANCANTI\n🔹 Per lavoro subito dopo la fine, settimanale la domenica, mensile a fine mese. Push + ogni giorno alle 17:00. In 🧾 Fatture: «Emetti fattura» → Salva.\n\n📅 NUOVO: AGENDA (solo amministratore)\n🔹 Appuntamenti e visite ai clienti con data, ora, indirizzo, note; vista mese ed elenco; promemoria push; conferma WhatsApp, mappa, al calendario."
      }
     }
    ],
@@ -9674,6 +9953,7 @@ function HelpModal({t, lang, onClose}){
     {id:"reports",    icon:"📈", label:{DE:"Berichte",         ES:"Informes",        EN:"Reports",        IT:"Rapporti"}},
     {id:"academy",    icon:"🎓", label:{DE:"Academy",          ES:"Academy",         EN:"Academy",        IT:"Academy"}},
     {id:"pricecalc",  icon:"🧮", label:{DE:"Preisrechner",     ES:"Calculadora de precios", EN:"Price calculator", IT:"Calcolatore prezzi"}},
+    {id:"agenda",     icon:"📅", label:{DE:"Termine",          ES:"Agenda",          EN:"Appointments",   IT:"Agenda"}},
     {id:"settings",   icon:"⚙️", label:{DE:"Einstellungen",   ES:"Configuración",   EN:"Settings",       IT:"Impostazioni"}},
   ];
 
@@ -9995,6 +10275,17 @@ function HelpModal({t, lang, onClose}){
              EN:"Each course contains:\n• Lessons with illustrations (SVG)\n• Learning objectives & norm references\n• Quiz at the end (multiple choice)\n• Minimum score to pass: 70%\n• 🏆 PDF certificate after passing (with name & date)\n\nProgress:\n• 'My Courses' shows completed & ongoing courses\n• Total hours, points, rank\n• Courses can be restarted at any time\n\nEmployees can access the Academy from their own smartphone/desktop.",
              IT:"Ogni corso contiene:\n• Lezioni con illustrazioni (SVG)\n• Obiettivi di apprendimento e riferimenti normativi\n• Quiz alla fine (scelta multipla)\n• Punteggio minimo per superare: 70%\n• 🏆 Certificato PDF dopo il superamento (con nome e data)\n\nProgresso:\n• 'I miei corsi' mostra corsi completati e in corso\n• Ore totali, punti, classifica\n• I corsi possono essere riavviati in qualsiasi momento\n\nI dipendenti possono accedere alla Academy dal proprio smartphone/desktop."}
         },
+      ]
+    },
+
+    agenda: {
+      icon:"📅",
+      title:{DE:"Termine (nur Administrator)",ES:"Agenda (solo administrador)",EN:"Appointments (admin only)",IT:"Agenda (solo amministratore)"},
+      items:[
+        {h:{"DE":"📅 Termin eintragen","ES":"📅 Apuntar una cita","EN":"📅 Add an appointment","IT":"📅 Inserire un appuntamento"},
+          b:{"ES":"1. Abre 📅 «Agenda» (solo tú la ves, los empleados no).\n2. Toca «＋ Nueva cita» (o un día del calendario → «＋ Cita este día»).\n3. Elige el tipo: 🏠 Visita al cliente, 📐 Visita para presupuesto, 📞 Llamada, 🤝 Reunión u 📌 Otro.\n4. Cliente: elígelo de la lista (se rellenan solos teléfono, e-mail y dirección) o escribe uno nuevo.\n5. Fecha, hora de inicio y fin, aviso (15 min, 30 min, 1 hora, 2 horas o 1 día antes) y notas.\n6. 💾 Guardar. Si coincide con otra cita, la app te avisa.","DE":"📅 Termine öffnen → «＋ Neuer Termin» → Art, Kunde (Telefon/Adresse werden ergänzt), Datum, Zeit, Erinnerung, Notizen → Speichern. Bei Überschneidung erscheint eine Warnung.","EN":"📅 Appointments → «＋ New appointment» → type, client (phone/address filled in), date, time, reminder, notes → Save. Overlaps show a warning.","IT":"📅 Agenda → «＋ Nuovo appuntamento» → tipo, cliente (telefono/indirizzo compilati), data, ora, promemoria, note → Salva. Le sovrapposizioni vengono segnalate."}},
+        {h:{"DE":"🔔 Erinnerungen und Kalender","ES":"🔔 Avisos y calendario","EN":"🔔 Reminders and calendar","IT":"🔔 Promemoria e calendario"},
+          b:{"ES":"🔹 Te llega un aviso al móvil antes de la cita (aunque la app esté cerrada).\n🔹 En Inicio ves «📅 Hoy tienes N citas» y el icono Agenda muestra el número.\n🔹 Vista 📅 Mes: los días con citas tienen un número azul; 📋 muestra los trabajos de los empleados ese día.\n🔹 Vista 📋 Próximas citas: todas las citas que vienen, ordenadas por fecha y hora.\n🔹 En cada cita: ✏️ Editar, ✅ Hecha, 📞 Llamar, 💬 Confirmar por WhatsApp (mensaje ya escrito), 🗺️ Mapa y 📆 Al calendario (la añade al calendario del móvil o del ordenador).","DE":"Push-Erinnerung vor dem Termin, Startseite «Heute N Termine», Monats- und Listenansicht, pro Termin: Ändern, Erledigt, Anrufen, WhatsApp-Bestätigung, Karte, In Kalender (.ics).","EN":"Push reminder before the appointment, home card «N appointments today», month and list views; per appointment: edit, done, call, WhatsApp confirmation, map, add to calendar (.ics).","IT":"Promemoria push prima dell'appuntamento, schermata iniziale «Oggi N appuntamenti», vista mese ed elenco; per ogni appuntamento: modifica, fatto, chiama, conferma WhatsApp, mappa, al calendario (.ics)."}},
       ]
     },
 
